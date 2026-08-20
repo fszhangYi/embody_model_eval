@@ -1,0 +1,10 @@
+{
+  "max_mean_l2": 2.0,
+  "max_l2": 5.0,
+  "max_tcp_ep_mean_mm": 25.0,
+  "max_tcp_ep_p95_mm": 40.0,
+  "max_tcp_eR_mean_deg": 20.0,
+  "min_pass_ep_rate": 0.5,
+  "pass_ep_mm": 5.0,
+  "_comment": "E23 threshold gates for scripts/batch_score.py and viewer export. Tune per task."
+}

@@ -328,6 +328,20 @@
       <div class="rec-status" id="recStatus">未录制 · 保存为 WebM</div>
     </div>
   </details>
+
+  <details class="drawer compact" open>
+    <summary>导出 / 门禁</summary>
+    <div class="body">
+      <div class="btn-grid">
+        <button id="btnExportHtml" type="button">导出 HTML</button>
+        <button id="btnExportJson" type="button">导出 JSON</button>
+      </div>
+      <label class="hint" style="display:flex;gap:6px;align-items:center;margin-top:8px">
+        <input id="chkExportShot" type="checkbox"/> 附带当前画布缩略图（更占内存）
+      </label>
+      <p class="hint" id="gateHint" style="margin-top:8px">门禁：加载 thresholds…</p>
+    </div>
+  </details>
 </aside>
 
 <aside class="hud drawer-rail right">
@@ -438,6 +452,12 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import URDFLoader from 'urdf-loader';
 import { computeTcpMetrics, formatSummaryLine } from './tcp_metrics.js';
+import {
+  buildReportHtml,
+  buildReportSummary,
+  evaluateGates,
+  downloadText,
+} from './export_report.js';
 
 const JOINTS = [
   'shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'
@@ -1494,6 +1514,69 @@ try {
     d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
     document.getElementById('tcpStats').appendChild(d);
   }
+
+  // E23: load thresholds (meta.thresholds overrides example file)
+  let thresholds = meta.thresholds || null;
+  if (!thresholds) {
+    try {
+      const tr = await fetch('./scripts/thresholds.example.json?_=' + Date.now());
+      if (tr.ok) thresholds = await tr.json();
+    } catch (_) { /* offline / missing */ }
+  }
+  const gates = evaluateGates(meta, tcp, {
+    ...thresholds,
+    min_pass_ep_rate: thresholds?.min_pass_ep_rate,
+    pass_ep_mm: thresholds?.pass_ep_mm ?? thrEp,
+  });
+  const gateEl = document.getElementById('gateHint');
+  if (gateEl) {
+    const failed = gates.checks.filter((c) => !c.ok).map((c) => c.name);
+    gateEl.textContent = gates.checks.length
+      ? `门禁 ${gates.passed ? 'PASS' : 'FAIL'} · ${gates.checks.length} 项`
+        + (failed.length ? ` · 未过: ${failed.join(', ')}` : '')
+      : '门禁：未配置阈值';
+  }
+  {
+    const d = document.createElement('div');
+    d.className = 'stat';
+    d.innerHTML = `<div class="label">门禁</div><div class="value">${gates.checks.length ? (gates.passed ? 'PASS' : 'FAIL') : '—'}</div>`;
+    document.getElementById('tcpStats').appendChild(d);
+  }
+
+  function captureShot() {
+    if (!document.getElementById('chkExportShot')?.checked) return null;
+    try {
+      // downscale via temp canvas to limit memory
+      const src = world.renderer.domElement;
+      const maxW = 960;
+      const scale = Math.min(1, maxW / Math.max(1, src.width));
+      const w = Math.max(1, Math.round(src.width * scale));
+      const h = Math.max(1, Math.round(src.height * scale));
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      c.getContext('2d').drawImage(src, 0, 0, w, h);
+      return c.toDataURL('image/jpeg', 0.72);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  document.getElementById('btnExportHtml')?.addEventListener('click', () => {
+    const html = buildReportHtml({
+      meta,
+      tcp,
+      gates,
+      screenshotDataUrl: captureShot(),
+    });
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    downloadText(`embody_report_${stamp}.html`, html, 'text/html;charset=utf-8');
+  });
+  document.getElementById('btnExportJson')?.addEventListener('click', () => {
+    const summary = buildReportSummary({ meta, tcp, gates, screenshotDataUrl: null });
+    const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-');
+    downloadText(`eval_summary_${stamp}.json`, JSON.stringify(summary, null, 2), 'application/json');
+  });
 
   const jointContrib = computeJointTcpContrib(world.armGT, DATA.frames);
   const contribChart = setupJointContribChart(names);
