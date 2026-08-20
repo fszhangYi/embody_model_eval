@@ -363,6 +363,10 @@
         <div class="chart-head"><span class="name">分段 TCP 误差</span><span class="sub">路径等长四段</span></div>
         <div class="chart-wrap"><canvas id="tcpSegChart" class="chart"></canvas></div>
       </div>
+      <div class="chart-card">
+        <div class="chart-head"><span class="name">任务 / 接近向量误差</span><span class="sub">相对 meta.goal_pose</span></div>
+        <div class="chart-wrap"><canvas id="tcpTaskChart" class="chart"></canvas></div>
+      </div>
       <p class="hint" id="tcpTaskHint" style="margin-top:6px"></p>
     </div>
   </details>
@@ -1011,11 +1015,50 @@ function setupTcpCharts(DATA, tcp) {
 
   const taskEl = document.getElementById('tcpTaskHint');
   if (tcp.task.available) {
+    const labels = DATA.frames.map((_, i) => i);
+    charts.push(new Chart(document.getElementById('tcpTaskChart'), {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          line('pred→goal e_p', tcp.task.series.pred.map((x) => x.ep_mm), '#60a5fa', 2),
+          line('GT→goal e_p', tcp.task.series.gt.map((x) => x.ep_mm), '#f87171', 1.5, [4, 3]),
+          line('pred approach', tcp.task.series.pred.map((x) => x.approach_deg), '#fbbf24', 2),
+          line('GT approach', tcp.task.series.gt.map((x) => x.approach_deg), '#a3e635', 1.5, [4, 3]),
+        ],
+      },
+      options: baseChartOpts(),
+    }));
+    const pf = tcp.task.pred.final;
+    const gf = tcp.task.gt.final;
+    const dlt = tcp.task.delta_final;
     taskEl.textContent =
-      `任务误差（相对目标）：pred e_p μ=${tcp.task.pred.ep_mm.mean.toFixed(2)} mm · `
-      + `e_R μ=${tcp.task.pred.eR_deg.mean.toFixed(2)}°`;
+      `任务（相对 goal）：pred e_p μ=${tcp.task.pred.ep_mm.mean.toFixed(2)} mm · `
+      + `approach μ=${tcp.task.pred.approach_deg.mean.toFixed(2)}° · `
+      + `末帧 pred e_p ${pf.ep_mm.toFixed(2)} mm / approach ${pf.approach_deg.toFixed(2)}° · `
+      + `末帧 Δ(pred−GT) e_p ${dlt.ep_mm.toFixed(2)} mm · approach ${dlt.approach_deg.toFixed(2)}° `
+      + `（GT 末帧 e_p ${gf.ep_mm.toFixed(2)} mm）`;
   } else {
-    taskEl.textContent = `任务误差：${tcp.task.reason}（可在 JSON meta.goal_pose 提供 {pos,quat}）`;
+    taskEl.textContent = `任务误差：${tcp.task.reason}`;
+    const ctx = document.getElementById('tcpTaskChart');
+    if (ctx) {
+      charts.push(new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [] },
+        options: {
+          ...baseChartOpts(),
+          plugins: {
+            ...baseChartOpts().plugins,
+            title: {
+              display: true,
+              text: '需 meta.goal_pose = {pos, quat, approach?}',
+              color: '#9db0c9',
+              font: { size: 11 },
+            },
+          },
+        },
+      }));
+    }
   }
 
   document.querySelectorAll('details.drawer').forEach((d) => {
@@ -1032,7 +1075,7 @@ function setupTcpCharts(DATA, tcp) {
 function fillTcpOverview(tcp) {
   const box = document.getElementById('tcpStats');
   box.innerHTML = '';
-  for (const [label, value] of [
+  const rows = [
     ['TCP e_p μ', `${tcp.summary.ep_mm.mean.toFixed(2)} mm`],
     ['TCP e_p p95', `${tcp.summary.ep_mm.p95.toFixed(2)} mm`],
     ['TCP e_R μ', `${tcp.summary.eR_deg.mean.toFixed(2)}°`],
@@ -1043,7 +1086,16 @@ function fillTcpOverview(tcp) {
     ['‖Δv‖ μ', `${tcp.summary.v_err_mps.mean.toFixed(4)} m/s`],
     ['‖Δω‖ μ', `${tcp.summary.w_err_dps.mean.toFixed(2)} °/s`],
     ['‖Δa‖ μ', `${tcp.summary.a_err_mps2.mean.toFixed(3)} m/s²`],
-  ]) {
+  ];
+  if (tcp.task?.available) {
+    rows.push(
+      ['任务 e_p μ', `${tcp.task.pred.ep_mm.mean.toFixed(2)} mm`],
+      ['接近角 μ', `${tcp.task.pred.approach_deg.mean.toFixed(2)}°`],
+      ['末帧任务 e_p', `${tcp.task.pred.final.ep_mm.toFixed(2)} mm`],
+      ['末帧接近角', `${tcp.task.pred.final.approach_deg.toFixed(2)}°`],
+    );
+  }
+  for (const [label, value] of rows) {
     const d = document.createElement('div');
     d.className = 'stat';
     d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
@@ -1059,11 +1111,16 @@ function updateTcpFrameHint(tcp, i) {
     el.textContent = '';
     return;
   }
-  el.textContent =
+  let text =
     `TCP · e_p ${s.ep_mm[i].toFixed(2)} mm · e_R ${s.eR_deg[i].toFixed(2)}° · `
     + `Δxyz (${s.dx_mm[i].toFixed(1)}, ${s.dy_mm[i].toFixed(1)}, ${s.dz_mm[i].toFixed(1)}) mm · `
     + `Δrpy (${s.droll_deg[i].toFixed(1)}, ${s.dpitch_deg[i].toFixed(1)}, ${s.dyaw_deg[i].toFixed(1)})° · `
     + `‖Δv‖ ${s.v_err_mps[i].toFixed(4)} m/s`;
+  if (tcp.task?.available) {
+    const pt = tcp.task.series.pred[i];
+    text += ` · 任务 e_p ${pt.ep_mm.toFixed(2)} mm · 接近 ${pt.approach_deg.toFixed(2)}°`;
+  }
+  el.textContent = text;
 }
 
 function paintErrHeatmap(canvas, epMm) {

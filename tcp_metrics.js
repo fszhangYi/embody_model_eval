@@ -189,6 +189,36 @@ function pathLength(pos) {
   return L;
 }
 
+function vecNormalize(v) {
+  const n = Math.hypot(v.x, v.y, v.z) || 1;
+  return { x: v.x / n, y: v.y / n, z: v.z / n };
+}
+
+/** Rotate vector by unit quaternion (q * v * q^{-1}). */
+function quatRotateVec(qIn, v) {
+  const q = quatNormalize(qIn);
+  const qv = { x: v.x, y: v.y, z: v.z, w: 0 };
+  const r = quatMul(quatMul(q, qv), quatConjugate(q));
+  return { x: r.x, y: r.y, z: r.z };
+}
+
+/** Unit approach direction from goalPose.approach or −Z of goal quat. */
+function goalApproachDir(goalPose) {
+  if (goalPose?.approach) return vecNormalize(goalPose.approach);
+  if (goalPose?.quat) return vecNormalize(quatRotateVec(goalPose.quat, { x: 0, y: 0, z: -1 }));
+  return { x: 0, y: 0, z: -1 };
+}
+
+/** Gripper approach proxy: −Y of TCP quat (SO-100 gripper local −Y ≈ tip direction). */
+function tcpApproachDir(quat, localAxis = { x: 0, y: -1, z: 0 }) {
+  return vecNormalize(quatRotateVec(quat, localAxis));
+}
+
+function approachAngleDeg(a, b) {
+  const dot = clamp(a.x * b.x + a.y * b.y + a.z * b.z, -1, 1);
+  return Math.acos(dot) * (180 / Math.PI);
+}
+
 /** Split by cumulative GT path length into 4 equal segments. */
 function segmentByPathLength(gtPos, ep, eR) {
   const names = ['approach', 'contact', 'transport', 'retreat'];
@@ -301,32 +331,46 @@ export function computeTcpMetrics({ gtPos, predPos, gtQuat, predQuat, fps, goalP
 
   let task = {
     available: false,
-    reason: 'compare_result 未提供目标物 / grasp frame 位姿',
+    reason: 'compare_result 未提供目标物 / grasp frame 位姿（meta.goal_pose: {pos,quat,approach?}）',
   };
   if (goalPose?.pos && goalPose?.quat) {
+    const gp = goalPose.pos;
+    const gq = goalPose.quat;
+    const gApproach = goalApproachDir(goalPose);
+    const localAxis = goalPose.tcp_approach_local || { x: 0, y: -1, z: 0 };
     const gtTask = new Array(n);
     const predTask = new Array(n);
     for (let i = 0; i < n; i++) {
-      const gp = goalPose.pos;
-      const gq = goalPose.quat;
+      const gtApp = tcpApproachDir(gtQuat[i], localAxis);
+      const predApp = tcpApproachDir(predQuat[i], localAxis);
       gtTask[i] = {
         ep_mm: Math.hypot(gtPos[i].x - gp.x, gtPos[i].y - gp.y, gtPos[i].z - gp.z) * 1000,
         eR_deg: quatAngle(gtQuat[i], gq) * RAD2DEG,
+        approach_deg: approachAngleDeg(gtApp, gApproach),
       };
       predTask[i] = {
         ep_mm: Math.hypot(predPos[i].x - gp.x, predPos[i].y - gp.y, predPos[i].z - gp.z) * 1000,
         eR_deg: quatAngle(predQuat[i], gq) * RAD2DEG,
+        approach_deg: approachAngleDeg(predApp, gApproach),
       };
     }
+    const last = n - 1;
+    const pack = (rows) => ({
+      ep_mm: summarize(rows.map((x) => x.ep_mm)),
+      eR_deg: summarize(rows.map((x) => x.eR_deg)),
+      approach_deg: summarize(rows.map((x) => x.approach_deg)),
+      final: rows[last],
+    });
     task = {
       available: true,
-      gt: {
-        ep_mm: summarize(gtTask.map((x) => x.ep_mm)),
-        eR_deg: summarize(gtTask.map((x) => x.eR_deg)),
-      },
-      pred: {
-        ep_mm: summarize(predTask.map((x) => x.ep_mm)),
-        eR_deg: summarize(predTask.map((x) => x.eR_deg)),
+      goal: { pos: gp, quat: gq, approach: gApproach },
+      gt: pack(gtTask),
+      pred: pack(predTask),
+      // pred vs GT relative to same goal (positive ⇒ pred farther/worse than GT)
+      delta_final: {
+        ep_mm: predTask[last].ep_mm - gtTask[last].ep_mm,
+        eR_deg: predTask[last].eR_deg - gtTask[last].eR_deg,
+        approach_deg: predTask[last].approach_deg - gtTask[last].approach_deg,
       },
       series: { gt: gtTask, pred: predTask },
     };

@@ -23,7 +23,27 @@
       "gripper": 0.010129739339030431
     },
     "source": "simulate",
-    "fps": 30
+    "fps": 30,
+    "goal_pose": {
+      "pos": {
+        "x": 0.18,
+        "y": 0.02,
+        "z": 0.08
+      },
+      "quat": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0,
+        "w": 1.0
+      },
+      "approach": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": -1.0
+      },
+      "frame": "world",
+      "note": "simulate demo grasp goal for A5 task metrics"
+    }
   },
   "series": {
     "t": [
