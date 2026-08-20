@@ -286,6 +286,35 @@
     <summary>概览</summary>
     <div class="body">
       <div class="stats-row" id="stats"></div>
+      <div class="stats-row" id="tcpStats" style="margin-top:8px"></div>
+      <p class="hint" id="tcpTemporalHint" style="margin-top:8px"></p>
+    </div>
+  </details>
+
+  <details class="drawer" open>
+    <summary>TCP 指标</summary>
+    <div class="body">
+      <div class="chart-card">
+        <div class="chart-head"><span class="name">TCP 位置 / 姿态误差</span><span class="sub" id="tcpErrSub">mm · deg</span></div>
+        <div class="chart-wrap tall"><canvas id="tcpErrChart" class="chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><span class="name">TCP 分轴 Δxyz</span><span class="sub">mm</span></div>
+        <div class="chart-wrap"><canvas id="tcpAxisChart" class="chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><span class="name">TCP 姿态分轴 Δrpy</span><span class="sub">°</span></div>
+        <div class="chart-wrap"><canvas id="tcpRpyChart" class="chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><span class="name">TCP 速度 / 加速度误差</span><span class="sub">m/s · °/s · m/s²</span></div>
+        <div class="chart-wrap"><canvas id="tcpVelChart" class="chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><span class="name">分段 TCP 误差</span><span class="sub">路径等长四段</span></div>
+        <div class="chart-wrap"><canvas id="tcpSegChart" class="chart"></canvas></div>
+      </div>
+      <p class="hint" id="tcpTaskHint" style="margin-top:6px"></p>
     </div>
   </details>
 
@@ -319,6 +348,7 @@
   <details class="drawer">
     <summary>当前帧数值</summary>
     <div class="body">
+      <p class="hint" id="tcpFrameHint" style="margin-bottom:8px"></p>
       <table>
         <thead>
           <tr><th>关节</th><th>当前</th><th>GT</th><th>pred</th><th>误差</th></tr>
@@ -331,7 +361,7 @@
   <details class="drawer">
     <summary>说明</summary>
     <div class="body">
-      <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 为指尖中点 + xyz 轴；散点 ±15 帧。左侧控制播放与录制；右侧面板可折叠。录制捕获 3D 画布为 WebM。</p>
+      <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 为指尖中点 + xyz 轴；散点 ±15 帧。右侧「TCP 指标」含位置/姿态/分轴/速度/分段与时序对齐（DTW·滞后）。录制捕获 3D 画布为 WebM。</p>
     </div>
   </details>
 </aside>
@@ -340,6 +370,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import URDFLoader from 'urdf-loader';
+import { computeTcpMetrics, formatSummaryLine } from './tcp_metrics.js';
 
 const JOINTS = [
   'shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'
@@ -514,16 +545,26 @@ function syncTcpAxes(axes, robot) {
 
 function computeTcpPaths(probe, frames) {
   const cur = [], gt = [], pred = [];
+  const gtQuat = [], predQuat = [];
   const tmp = new THREE.Vector3();
+  const q = new THREE.Quaternion();
   for (const f of frames) {
     setPose(probe, f.current);
     cur.push(getTcp(probe, tmp).clone());
     setPose(probe, f.next_gt);
-    gt.push(getTcp(probe, tmp).clone());
+    {
+      const pose = getTcpPose(probe, tmp, q);
+      gt.push(pose.pos.clone());
+      gtQuat.push(pose.quat.clone());
+    }
     setPose(probe, f.next_pred);
-    pred.push(getTcp(probe, tmp).clone());
+    {
+      const pose = getTcpPose(probe, tmp, q);
+      pred.push(pose.pos.clone());
+      predQuat.push(pose.quat.clone());
+    }
   }
-  return { cur, gt, pred };
+  return { cur, gt, pred, gtQuat, predQuat };
 }
 
 async function initScene(container, frames) {
@@ -647,6 +688,176 @@ function baseChartOpts(extra = {}) {
     },
     ...extra,
   };
+}
+
+function setupTcpCharts(DATA, tcp) {
+  const charts = [];
+  const labels = DATA.series.t;
+  document.getElementById('tcpErrSub').textContent =
+    `ep ${formatSummaryLine(tcp.summary.ep_mm)} mm · eR ${formatSummaryLine(tcp.summary.eR_deg)}°`;
+
+  const line = (label, data, color, width = 1.8, dash = []) => ({
+    label,
+    data,
+    borderColor: color,
+    borderWidth: width,
+    borderDash: dash,
+    backgroundColor: 'transparent',
+    tension: 0.28,
+    pointRadius: 0,
+    pointHoverRadius: 3,
+    pointHoverBackgroundColor: color,
+  });
+
+  charts.push(new Chart(document.getElementById('tcpErrChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        line('e_p (mm)', tcp.series.ep_mm, '#f87171', 2),
+        line('e_R (°)', tcp.series.eR_deg, '#60a5fa', 2),
+      ],
+    },
+    options: baseChartOpts(),
+  }));
+
+  charts.push(new Chart(document.getElementById('tcpAxisChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        line('Δx', tcp.series.dx_mm, '#f87171'),
+        line('Δy', tcp.series.dy_mm, '#34d399'),
+        line('Δz', tcp.series.dz_mm, '#60a5fa'),
+      ],
+    },
+    options: baseChartOpts(),
+  }));
+
+  charts.push(new Chart(document.getElementById('tcpRpyChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        line('Δroll', tcp.series.droll_deg, '#f87171'),
+        line('Δpitch', tcp.series.dpitch_deg, '#34d399'),
+        line('Δyaw', tcp.series.dyaw_deg, '#60a5fa'),
+      ],
+    },
+    options: baseChartOpts(),
+  }));
+
+  charts.push(new Chart(document.getElementById('tcpVelChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        line('‖Δv‖ (m/s)', tcp.series.v_err_mps, '#fbbf24', 2),
+        line('‖Δω‖ (°/s)', tcp.series.w_err_dps, '#c084fc', 1.6, [4, 3]),
+        line('‖Δa‖ (m/s²)', tcp.series.a_err_mps2, '#94a3b8', 1.4, [2, 2]),
+      ],
+    },
+    options: baseChartOpts(),
+  }));
+
+  const segNames = ['approach', 'contact', 'transport', 'retreat'];
+  const segLabels = ['接近', '接触', '搬运', '回撤'];
+  charts.push(new Chart(document.getElementById('tcpSegChart'), {
+    type: 'bar',
+    data: {
+      labels: segLabels,
+      datasets: [
+        {
+          label: 'e_p mean (mm)',
+          data: segNames.map((k) => tcp.segments[k].ep_mm.mean),
+          backgroundColor: 'rgba(248,113,113,0.75)',
+          borderRadius: 3,
+          maxBarThickness: 18,
+        },
+        {
+          label: 'e_R mean (°)',
+          data: segNames.map((k) => tcp.segments[k].eR_deg.mean),
+          backgroundColor: 'rgba(96,165,250,0.75)',
+          borderRadius: 3,
+          maxBarThickness: 18,
+        },
+      ],
+    },
+    options: {
+      ...baseChartOpts(),
+      scales: {
+        ...baseChartOpts().scales,
+        x: {
+          ...baseChartOpts().scales.x,
+          grid: { display: false },
+        },
+      },
+    },
+  }));
+
+  const lagSign = tcp.temporal.lag_frames > 0
+    ? 'pred 滞后 GT'
+    : (tcp.temporal.lag_frames < 0 ? 'pred 超前 GT' : '无明显滞后');
+  document.getElementById('tcpTemporalHint').textContent =
+    `时序：最佳滞后 ${tcp.temporal.lag_frames} 帧 (${tcp.temporal.lag_s.toFixed(3)}s，${lagSign}) · `
+    + `该滞后下 mean e_p ${tcp.temporal.mean_ep_at_lag_mm.toFixed(2)} mm · `
+    + `DTW ${ (tcp.temporal.dtw_normalized_m * 1000).toFixed(2) } mm/步`;
+
+  const taskEl = document.getElementById('tcpTaskHint');
+  if (tcp.task.available) {
+    taskEl.textContent =
+      `任务误差（相对目标）：pred e_p μ=${tcp.task.pred.ep_mm.mean.toFixed(2)} mm · `
+      + `e_R μ=${tcp.task.pred.eR_deg.mean.toFixed(2)}°`;
+  } else {
+    taskEl.textContent = `任务误差：${tcp.task.reason}（可在 JSON meta.goal_pose 提供 {pos,quat}）`;
+  }
+
+  document.querySelectorAll('details.drawer').forEach((d) => {
+    d.addEventListener('toggle', () => {
+      if (!d.open) return;
+      requestAnimationFrame(() => {
+        charts.forEach((c) => { try { c.resize(); } catch (_) {} });
+      });
+    });
+  });
+  return charts;
+}
+
+function fillTcpOverview(tcp) {
+  const box = document.getElementById('tcpStats');
+  box.innerHTML = '';
+  for (const [label, value] of [
+    ['TCP e_p μ', `${tcp.summary.ep_mm.mean.toFixed(2)} mm`],
+    ['TCP e_p p95', `${tcp.summary.ep_mm.p95.toFixed(2)} mm`],
+    ['TCP e_R μ', `${tcp.summary.eR_deg.mean.toFixed(2)}°`],
+    ['TCP e_R p95', `${tcp.summary.eR_deg.p95.toFixed(2)}°`],
+    ['|Δx| μ', `${tcp.summary.dx_mm.mean.toFixed(2)} mm`],
+    ['|Δy| μ', `${tcp.summary.dy_mm.mean.toFixed(2)} mm`],
+    ['|Δz| μ', `${tcp.summary.dz_mm.mean.toFixed(2)} mm`],
+    ['‖Δv‖ μ', `${tcp.summary.v_err_mps.mean.toFixed(4)} m/s`],
+    ['‖Δω‖ μ', `${tcp.summary.w_err_dps.mean.toFixed(2)} °/s`],
+    ['‖Δa‖ μ', `${tcp.summary.a_err_mps2.mean.toFixed(3)} m/s²`],
+  ]) {
+    const d = document.createElement('div');
+    d.className = 'stat';
+    d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    box.appendChild(d);
+  }
+}
+
+function updateTcpFrameHint(tcp, i) {
+  const el = document.getElementById('tcpFrameHint');
+  if (!el || !tcp?.series) return;
+  const s = tcp.series;
+  if (i < 0 || i >= s.ep_mm.length) {
+    el.textContent = '';
+    return;
+  }
+  el.textContent =
+    `TCP · e_p ${s.ep_mm[i].toFixed(2)} mm · e_R ${s.eR_deg[i].toFixed(2)}° · `
+    + `Δxyz (${s.dx_mm[i].toFixed(1)}, ${s.dy_mm[i].toFixed(1)}, ${s.dz_mm[i].toFixed(1)}) mm · `
+    + `Δrpy (${s.droll_deg[i].toFixed(1)}, ${s.dpitch_deg[i].toFixed(1)}, ${s.dyaw_deg[i].toFixed(1)})° · `
+    + `‖Δv‖ ${s.v_err_mps[i].toFixed(4)} m/s`;
 }
 
 function setupCharts(DATA) {
@@ -816,6 +1027,19 @@ try {
   document.getElementById('loadHint')?.remove();
   world.resize();
 
+  const toPlainPos = (p) => ({ x: p.x, y: p.y, z: p.z });
+  const toPlainQuat = (q) => ({ x: q.x, y: q.y, z: q.z, w: q.w });
+  const tcp = computeTcpMetrics({
+    gtPos: world.paths.gt.map(toPlainPos),
+    predPos: world.paths.pred.map(toPlainPos),
+    gtQuat: world.paths.gtQuat.map(toPlainQuat),
+    predQuat: world.paths.predQuat.map(toPlainQuat),
+    fps: meta.fps,
+    goalPose: meta.goal_pose || null,
+  });
+  fillTcpOverview(tcp);
+  setupTcpCharts(DATA, tcp);
+
   const slider = document.getElementById('frameSlider');
   const frameLabel = document.getElementById('frameLabel');
   const frameTable = document.getElementById('frameTable');
@@ -867,6 +1091,8 @@ try {
     syncTcpAxes(world.tcpCur, world.armCur);
     syncTcpAxes(world.tcpGT, world.armGT);
     syncTcpAxes(world.tcpPred, world.armPred);
+
+    updateTcpFrameHint(tcp, i);
 
     frameTable.innerHTML = names.map((n, j) =>
       `<tr><td>${n}</td><td>${f.current[j].toFixed(2)}</td><td>${f.next_gt[j].toFixed(2)}</td><td>${f.next_pred[j].toFixed(2)}</td><td>${f.err[j].toFixed(2)}</td></tr>`
