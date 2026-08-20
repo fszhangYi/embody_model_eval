@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+.env.*
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Jupyter / notebooks
+.ipynb_checkpoints/
+
+# Logs / local server
+*.log
+nohup.out
+
+# Recordings / large local outputs
+*.webm
+*.mp4
+*.mov
+recordings/
+
+# Optional local overrides
+compare_result.local.json

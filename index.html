@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Embody Model Eval</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "three/examples/jsm/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+    "urdf-loader": "https://cdn.jsdelivr.net/npm/urdf-loader@0.12.5/src/URDFLoader.js"
+  }
+}
+</script>
+<style>
+  :root {
+    --bg: #0b1018;
+    --panel: rgba(18, 26, 38, 0.9);
+    --border: rgba(58, 77, 102, 0.75);
+    --text: #e7ecf3;
+    --muted: #8b9bb4;
+    --accent: #3dd6c6;
+    --cur: #9ca3af;
+    --gt: #ef4444;
+    --pred: #3b82f6;
+    --danger: #f87171;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; overflow: hidden;
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+
+  #arm3d {
+    position: fixed; inset: 0; z-index: 0;
+    background: radial-gradient(900px 500px at 20% 0%, #1a2740 0%, var(--bg) 55%);
+    touch-action: none;
+  }
+  #arm3d canvas { display: block; width: 100% !important; height: 100% !important; }
+  #arm3d .loading {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); background: rgba(11,16,24,0.72); z-index: 2; pointer-events: none;
+  }
+
+  .hud { position: fixed; z-index: 10; pointer-events: none; }
+  .hud > * { pointer-events: auto; }
+
+  .topbar {
+    top: 0; left: 0; right: 0;
+    display: flex; align-items: center; gap: 14px;
+    padding: 10px 14px;
+    background: linear-gradient(180deg, rgba(11,16,24,0.92) 0%, rgba(11,16,24,0.4) 70%, transparent 100%);
+  }
+  .topbar h1 { margin: 0; font-size: 0.95rem; font-weight: 600; white-space: nowrap; }
+  .topbar .meta {
+    color: var(--muted); font-size: 0.75rem; min-width: 0; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .pill {
+    display: inline-flex; gap: 8px; align-items: center;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: rgba(26,35,50,0.7);
+    font-size: 0.72rem; color: var(--muted); flex-shrink: 0;
+  }
+  .pill .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .rec-pill {
+    display: none; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid rgba(248,113,113,0.55); background: rgba(80,20,28,0.75);
+    color: #fecaca; font-size: 0.72rem; flex-shrink: 0;
+  }
+  .rec-pill.on { display: inline-flex; }
+  .rec-pill .blink {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--danger);
+    animation: blink 1s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  button {
+    background: rgba(36, 50, 71, 0.92); color: var(--text);
+    border: 1px solid #354a66; border-radius: 8px;
+    padding: 7px 12px; cursor: pointer; font: inherit; font-size: 0.8rem;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  button.active { background: #1e3d3a; border-color: var(--accent); color: var(--accent); }
+  button.danger { border-color: rgba(248,113,113,0.55); }
+  button.danger.active, button.danger.recording {
+    background: rgba(90, 22, 30, 0.9); border-color: var(--danger); color: #fecaca;
+  }
+  button.toggle.on { opacity: 1; }
+  button.toggle.off { opacity: 0.4; text-decoration: line-through; border-style: dashed; }
+  button.toggle.cur.on { border-color: var(--cur); color: #d1d5db; background: #2a3038; }
+  button.toggle.gt.on { border-color: var(--gt); color: #fecaca; background: #3a1f24; }
+  button.toggle.pred.on { border-color: var(--pred); color: #bfdbfe; background: #1e2a44; }
+
+  .drawer-rail {
+    top: 56px; bottom: 14px;
+    display: flex; flex-direction: column; gap: 8px;
+    max-width: min(400px, 92vw);
+  }
+  .drawer-rail.left { left: 12px; align-items: flex-start; }
+  .drawer-rail.right { right: 12px; align-items: flex-end; }
+
+  .drawer {
+    width: min(360px, 88vw);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .drawer > summary {
+    list-style: none; cursor: pointer; user-select: none;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 12px;
+    font-size: 0.82rem; font-weight: 560;
+    background: rgba(26, 35, 50, 0.55);
+  }
+  .drawer > summary::-webkit-details-marker { display: none; }
+  .drawer > summary::after { content: "+"; color: var(--muted); font-weight: 400; }
+  .drawer[open] > summary::after { content: "−"; }
+  .drawer > summary:hover { color: var(--accent); }
+  .drawer .body {
+    padding: 10px 12px 12px;
+    border-top: 1px solid rgba(58,77,102,0.45);
+    max-height: min(48vh, 420px);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(61,214,198,0.45) transparent;
+  }
+  .drawer .body::-webkit-scrollbar { width: 4px; height: 4px; }
+  .drawer .body::-webkit-scrollbar-track { background: transparent; }
+  .drawer .body::-webkit-scrollbar-thumb {
+    background: rgba(61,214,198,0.45);
+    border-radius: 999px;
+  }
+  .drawer .body::-webkit-scrollbar-thumb:hover {
+    background: rgba(61,214,198,0.7);
+  }
+  .drawer.compact .body { max-height: none; }
+
+  .btn-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  }
+  .btn-grid.triple { grid-template-columns: 1fr 1fr 1fr; }
+  .btn-grid button { width: 100%; }
+  .ctrl-block { margin-top: 10px; }
+  .ctrl-block:first-child { margin-top: 0; }
+  .ctrl-label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 0.72rem; color: var(--muted); margin-bottom: 4px;
+  }
+  .ctrl-label strong {
+    color: var(--accent); font-weight: 560; font-variant-numeric: tabular-nums;
+  }
+  input[type=range] {
+    width: 100%; accent-color: var(--accent); margin: 0;
+  }
+  .rec-status {
+    margin-top: 8px; font-size: 0.72rem; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .rec-status.hot { color: #fecaca; }
+
+  .stats-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat {
+    background: rgba(26,35,50,0.65); border: 1px solid rgba(42,58,82,0.8);
+    border-radius: 8px; padding: 8px 10px;
+  }
+  .stat .label { color: var(--muted); font-size: 0.68rem; text-transform: uppercase; }
+  .stat .value {
+    margin-top: 2px; font-size: 1.05rem; color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .chart-card {
+    background: linear-gradient(180deg, rgba(28,40,58,0.55) 0%, rgba(18,26,38,0.35) 100%);
+    border: 1px solid rgba(58,77,102,0.45);
+    border-radius: 10px;
+    padding: 10px 10px 8px;
+    margin-bottom: 10px;
+  }
+  .chart-card:last-child { margin-bottom: 0; }
+  .chart-head {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .chart-head .name { font-size: 0.78rem; font-weight: 560; }
+  .chart-head .sub { font-size: 0.68rem; color: var(--muted); }
+  .chart-wrap { position: relative; height: 132px; }
+  .chart-wrap.tall { height: 158px; }
+  canvas.chart { width: 100% !important; height: 100% !important; }
+
+  .row-ctrl { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  select {
+    background: #1a2332; color: var(--text); border: 1px solid #354a66;
+    border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 0.8rem;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+  th, td {
+    padding: 5px 4px; border-bottom: 1px solid rgba(42,58,82,0.9);
+    text-align: right; font-variant-numeric: tabular-nums;
+  }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  .hint { color: var(--muted); font-size: 0.72rem; line-height: 1.45; margin: 0; }
+
+  @media (max-width: 900px) {
+    .topbar .meta { display: none; }
+    .drawer { width: min(300px, 86vw); }
+  }
+</style>
+</head>
+<body>
+
+<div id="arm3d"><div class="loading" id="loadHint">加载 3× SO-100 URDF…</div></div>
+
+<div class="hud topbar">
+  <h1 id="title">Embody 模型评测</h1>
+  <span class="meta" id="subtitle">加载中…</span>
+  <span class="rec-pill" id="recPill"><i class="blink"></i>REC <span id="recTimer">00:00</span></span>
+  <span class="pill">
+    <i class="dot" style="background:var(--cur)"></i>cur
+    <i class="dot" style="background:var(--gt)"></i>GT
+    <i class="dot" style="background:var(--pred)"></i>pred
+  </span>
+</div>
+
+<aside class="hud drawer-rail left">
+  <details class="drawer compact" open>
+    <summary>播放控制</summary>
+    <div class="body">
+      <div class="btn-grid">
+        <button id="btnPlay" type="button">播放</button>
+        <button id="btnReset" type="button">重置</button>
+      </div>
+      <div class="ctrl-block">
+        <div class="ctrl-label"><span>帧</span><strong id="frameLabel">t=0</strong></div>
+        <input id="frameSlider" type="range" min="0" max="1" value="0"/>
+      </div>
+      <div class="ctrl-block">
+        <div class="ctrl-label"><span>速度</span><strong id="speedLabel">0.20×</strong></div>
+        <input id="speedSlider" type="range" min="0.05" max="1.5" step="0.05" value="0.2"/>
+      </div>
+    </div>
+  </details>
+
+  <details class="drawer compact" open>
+    <summary>显示机械臂</summary>
+    <div class="body">
+      <div class="btn-grid triple">
+        <button id="btnToggleCur" class="toggle cur on" type="button">灰</button>
+        <button id="btnToggleGT" class="toggle gt on" type="button">红</button>
+        <button id="btnTogglePred" class="toggle pred on" type="button">蓝</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="drawer compact" open>
+    <summary>录制</summary>
+    <div class="body">
+      <div class="btn-grid triple">
+        <button id="btnRecStart" type="button">开始</button>
+        <button id="btnRecStop" class="danger" type="button" disabled>停止</button>
+        <button id="btnRecSave" type="button" disabled>保存</button>
+      </div>
+      <div class="rec-status" id="recStatus">未录制 · 保存为 WebM</div>
+    </div>
+  </details>
+</aside>
+
+<aside class="hud drawer-rail right">
+  <details class="drawer compact" open>
+    <summary>概览</summary>
+    <div class="body">
+      <div class="stats-row" id="stats"></div>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary>误差曲线</summary>
+    <div class="body">
+      <div class="chart-card">
+        <div class="chart-head"><span class="name">L2 误差随时间</span><span class="sub" id="errSub">—</span></div>
+        <div class="chart-wrap"><canvas id="errChart" class="chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><span class="name">逐关节 MAE</span><span class="sub">deg</span></div>
+        <div class="chart-wrap"><canvas id="maeChart" class="chart"></canvas></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary>关节轨迹</summary>
+    <div class="body">
+      <div class="row-ctrl">
+        <label>关节 <select id="jointSelect"></select></label>
+      </div>
+      <div class="chart-card">
+        <div class="chart-head"><span class="name">位姿轨迹</span><span class="sub">current · GT · pred</span></div>
+        <div class="chart-wrap tall"><canvas id="trajChart" class="chart"></canvas></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary>当前帧数值</summary>
+    <div class="body">
+      <table>
+        <thead>
+          <tr><th>关节</th><th>当前</th><th>GT</th><th>pred</th><th>误差</th></tr>
+        </thead>
+        <tbody id="frameTable"></tbody>
+      </table>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary>说明</summary>
+    <div class="body">
+      <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 为指尖中点 + xyz 轴；散点 ±15 帧。左侧控制播放与录制；右侧面板可折叠。录制捕获 3D 画布为 WebM。</p>
+    </div>
+  </details>
+</aside>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import URDFLoader from 'urdf-loader';
+
+const JOINTS = [
+  'shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'
+];
+const DEG2RAD = Math.PI / 180;
+const URDF_CUR = './so100_colored/so100_cur.urdf';
+const URDF_GT = './so100_colored/so100_gt.urdf';
+const URDF_PRED = './so100_colored/so100_pred.urdf';
+const COLOR_CUR = 0x9ca3af;
+const COLOR_GT = 0xef4444;
+const COLOR_PRED = 0x3b82f6;
+const TCP_WINDOW = 15;
+const TCP_MAX = TCP_WINDOW * 2 + 1;
+
+async function loadData() {
+  const res = await fetch('./compare_result.json?_=' + Date.now());
+  if (!res.ok) throw new Error('无法加载 compare_result.json');
+  return res.json();
+}
+
+function softMaterial(robot) {
+  robot.traverse((c) => {
+    if (!c.isMesh || !c.material) return;
+    const mats = Array.isArray(c.material) ? c.material : [c.material];
+    mats.forEach((m) => {
+      if (!m) return;
+      if (m.opacity < 1) {
+        m.transparent = true;
+        m.depthWrite = false;
+      }
+    });
+  });
+}
+
+function setPose(robot, qDeg) {
+  if (!robot) return;
+  for (let i = 0; i < JOINTS.length; i++) {
+    const joint = robot.joints?.[JOINTS[i]];
+    if (!joint) continue;
+    joint.ignoreLimits = true;
+    joint.setJointValue(qDeg[i] * DEG2RAD);
+  }
+  robot.updateMatrixWorld(true);
+}
+
+const TCP_OFFSET_GRIPPER = new THREE.Vector3(0, -0.1062, 0);
+const _tcpPos = new THREE.Vector3();
+const _tcpQuat = new THREE.Quaternion();
+
+function getTcpPose(robot, pos = _tcpPos, quat = _tcpQuat) {
+  const link = robot.links?.gripper;
+  if (!link) {
+    pos.set(0, 0, 0);
+    quat.identity();
+    return { pos, quat };
+  }
+  link.updateWorldMatrix(true, false);
+  pos.copy(TCP_OFFSET_GRIPPER).applyMatrix4(link.matrixWorld);
+  link.getWorldQuaternion(quat);
+  return { pos, quat };
+}
+
+function getTcp(robot, out = new THREE.Vector3()) {
+  return getTcpPose(robot, out).pos;
+}
+
+function loadRobot(urdfUrl) {
+  return new Promise((resolve, reject) => {
+    const manager = new THREE.LoadingManager();
+    let robot = null;
+    let settled = false;
+    const finish = () => {
+      if (settled || !robot) return;
+      settled = true;
+      softMaterial(robot);
+      resolve(robot);
+    };
+    manager.onLoad = finish;
+    manager.onError = (url) => {
+      if (!settled) {
+        settled = true;
+        reject(new Error('资源加载失败: ' + url));
+      }
+    };
+    const loader = new URDFLoader(manager);
+    loader.packages = '';
+    loader.workingPath = urdfUrl.replace(/[^/]+$/, '');
+    loader.load(
+      urdfUrl,
+      (r) => {
+        robot = r;
+        robot.ignoreLimits = true;
+        robot.rotation.x = -Math.PI / 2;
+      },
+      undefined,
+      (err) => {
+        if (!settled) {
+          settled = true;
+          reject(err);
+        }
+      },
+    );
+  });
+}
+
+function makeScatter(colorHex) {
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(TCP_MAX * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setDrawRange(0, 0);
+  const mat = new THREE.PointsMaterial({
+    color: colorHex, size: 0.016, sizeAttenuation: true,
+    transparent: true, opacity: 0.92, depthWrite: false,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.renderOrder = 10;
+  pts.frustumCulled = false;
+  return pts;
+}
+
+function updateScatter(pointsObj, path, frameIdx) {
+  const start = Math.max(0, frameIdx - TCP_WINDOW);
+  const end = Math.min(path.length - 1, frameIdx + TCP_WINDOW);
+  const attr = pointsObj.geometry.getAttribute('position');
+  let n = 0;
+  for (let i = start; i <= end; i++) {
+    const p = path[i];
+    attr.setXYZ(n++, p.x, p.y, p.z);
+  }
+  attr.needsUpdate = true;
+  pointsObj.geometry.setDrawRange(0, n);
+  pointsObj.geometry.computeBoundingSphere();
+}
+
+function makeTcpAxes(axisLen = 0.048, shaftR = 0.0024) {
+  const g = new THREE.Group();
+  const yUp = new THREE.Vector3(0, 1, 0);
+  const addAxis = (dir, color) => {
+    const shaftLen = axisLen * 0.72;
+    const tipLen = axisLen * 0.28;
+    const shaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(shaftR, shaftR, shaftLen, 10),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    const tip = new THREE.Mesh(
+      new THREE.ConeGeometry(shaftR * 2.4, tipLen, 12),
+      new THREE.MeshBasicMaterial({ color }),
+    );
+    shaft.position.y = shaftLen / 2;
+    tip.position.y = shaftLen + tipLen / 2;
+    const axis = new THREE.Group();
+    axis.add(shaft, tip);
+    axis.quaternion.setFromUnitVectors(yUp, dir.clone().normalize());
+    g.add(axis);
+  };
+  addAxis(new THREE.Vector3(1, 0, 0), 0xff3333);
+  addAxis(new THREE.Vector3(0, 1, 0), 0x33cc55);
+  addAxis(new THREE.Vector3(0, 0, 1), 0x3388ff);
+  g.add(new THREE.Mesh(
+    new THREE.SphereGeometry(0.0038, 12, 10),
+    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+  ));
+  g.renderOrder = 30;
+  return g;
+}
+
+function syncTcpAxes(axes, robot) {
+  const { pos, quat } = getTcpPose(robot);
+  axes.position.copy(pos);
+  axes.quaternion.copy(quat);
+}
+
+function computeTcpPaths(probe, frames) {
+  const cur = [], gt = [], pred = [];
+  const tmp = new THREE.Vector3();
+  for (const f of frames) {
+    setPose(probe, f.current);
+    cur.push(getTcp(probe, tmp).clone());
+    setPose(probe, f.next_gt);
+    gt.push(getTcp(probe, tmp).clone());
+    setPose(probe, f.next_pred);
+    pred.push(getTcp(probe, tmp).clone());
+  }
+  return { cur, gt, pred };
+}
+
+async function initScene(container, frames) {
+  const w = container.clientWidth || window.innerWidth;
+  const h = container.clientHeight || window.innerHeight;
+  const scene = new THREE.Scene();
+  scene.fog = new THREE.Fog(0x0b1018, 1.8, 5.5);
+
+  const camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 20);
+  camera.position.set(0.7, 0.42, 0.9);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(w, h);
+  renderer.setClearColor(0x0b1018, 1);
+  container.appendChild(renderer.domElement);
+
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 0.16, 0);
+  controls.enableDamping = true;
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+  const key = new THREE.DirectionalLight(0xffffff, 1.0);
+  key.position.set(1.5, 2.5, 1.2); scene.add(key);
+  const fill = new THREE.DirectionalLight(0x88aaff, 0.35);
+  fill.position.set(-1.5, 1.0, -1.0); scene.add(fill);
+  scene.add(new THREE.GridHelper(1.6, 16, 0x3a4d66, 0x243247));
+
+  const [armCur, armGT, armPred] = await Promise.all([
+    loadRobot(URDF_CUR), loadRobot(URDF_GT), loadRobot(URDF_PRED),
+  ]);
+  scene.add(armCur, armGT, armPred);
+
+  const paths = computeTcpPaths(armGT, frames);
+  const scatterCur = makeScatter(COLOR_CUR);
+  const scatterGT = makeScatter(COLOR_GT);
+  const scatterPred = makeScatter(COLOR_PRED);
+  scene.add(scatterCur, scatterGT, scatterPred);
+
+  const tcpCur = makeTcpAxes();
+  const tcpGT = makeTcpAxes();
+  const tcpPred = makeTcpAxes();
+  scene.add(tcpCur, tcpGT, tcpPred);
+
+  function resize() {
+    const ww = container.clientWidth || window.innerWidth;
+    const hh = container.clientHeight || window.innerHeight;
+    camera.aspect = ww / hh;
+    camera.updateProjectionMatrix();
+    renderer.setSize(ww, hh);
+  }
+  window.addEventListener('resize', resize);
+
+  return {
+    armCur, armGT, armPred,
+    scatterCur, scatterGT, scatterPred,
+    tcpCur, tcpGT, tcpPred,
+    paths,
+    canvas: renderer.domElement,
+    resize,
+    render() { controls.update(); renderer.render(scene, camera); },
+  };
+}
+
+function makeAreaGradient(ctx, colorTop, colorBot) {
+  const g = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height || 160);
+  g.addColorStop(0, colorTop);
+  g.addColorStop(1, colorBot);
+  return g;
+}
+
+function baseChartOpts(extra = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    animation: { duration: 450, easing: 'easeOutQuart' },
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: {
+        display: true,
+        position: 'top',
+        align: 'end',
+        labels: {
+          color: '#a8b6cc',
+          boxWidth: 8,
+          boxHeight: 8,
+          usePointStyle: true,
+          pointStyle: 'circle',
+          padding: 10,
+          font: { size: 10, family: "'IBM Plex Sans', sans-serif" },
+        },
+      },
+      tooltip: {
+        backgroundColor: 'rgba(12,18,28,0.92)',
+        titleColor: '#e7ecf3',
+        bodyColor: '#c5d0e0',
+        borderColor: 'rgba(61,214,198,0.35)',
+        borderWidth: 1,
+        padding: 10,
+        displayColors: true,
+        cornerRadius: 8,
+      },
+    },
+    scales: {
+      x: {
+        border: { display: false },
+        ticks: {
+          color: '#7f8fa8', maxTicksLimit: 5, font: { size: 9 },
+          padding: 4,
+        },
+        grid: { color: 'rgba(58,77,102,0.28)', drawTicks: false },
+      },
+      y: {
+        border: { display: false },
+        ticks: {
+          color: '#7f8fa8', font: { size: 9 }, padding: 6,
+          callback: (v) => (Number.isFinite(v) ? (+v).toFixed(2) : v),
+        },
+        grid: { color: 'rgba(58,77,102,0.22)', drawTicks: false },
+      },
+    },
+    ...extra,
+  };
+}
+
+function setupCharts(DATA) {
+  const meta = DATA.meta;
+  const names = meta.joint_names;
+  const charts = [];
+
+  document.getElementById('errSub').textContent =
+    `mean ${meta.mean_l2.toFixed(2)} · max ${meta.max_l2.toFixed(2)}`;
+
+  const errCanvas = document.getElementById('errChart');
+  const errCtx = errCanvas.getContext('2d');
+  charts.push(new Chart(errCtx, {
+    type: 'line',
+    data: {
+      labels: DATA.series.t,
+      datasets: [{
+        label: '‖pred−gt‖₂',
+        data: DATA.series.err_l2,
+        borderColor: '#f87171',
+        borderWidth: 2,
+        backgroundColor: (c) => makeAreaGradient(
+          c.chart.ctx, 'rgba(248,113,113,0.35)', 'rgba(248,113,113,0.02)',
+        ),
+        fill: true,
+        tension: 0.35,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        pointHoverBackgroundColor: '#fecaca',
+      }],
+    },
+    options: {
+      ...baseChartOpts(),
+      plugins: {
+        ...baseChartOpts().plugins,
+        legend: { display: false },
+      },
+    },
+  }));
+
+  charts.push(new Chart(document.getElementById('maeChart'), {
+    type: 'bar',
+    data: {
+      labels: names.map((n) => n.split('_')[0]),
+      datasets: [{
+        label: 'MAE',
+        data: names.map((n) => meta.per_joint_mae[n]),
+        backgroundColor: 'rgba(61,214,198,0.72)',
+        borderColor: 'rgba(61,214,198,0.95)',
+        borderWidth: 1,
+        borderRadius: 3,
+        borderSkipped: false,
+        maxBarThickness: 10,
+        categoryPercentage: 0.55,
+        barPercentage: 0.45,
+      }],
+    },
+    options: {
+      ...baseChartOpts(),
+      plugins: {
+        ...baseChartOpts().plugins,
+        legend: { display: false },
+      },
+      scales: {
+        ...baseChartOpts().scales,
+        x: {
+          ...baseChartOpts().scales.x,
+          grid: { display: false },
+          ticks: { color: '#9db0c9', font: { size: 9 }, maxRotation: 0 },
+        },
+      },
+    },
+  }));
+
+  const sel = document.getElementById('jointSelect');
+  names.forEach((n, i) => {
+    const o = document.createElement('option');
+    o.value = i; o.textContent = n; sel.appendChild(o);
+  });
+
+  let trajChart;
+  function renderTraj(j) {
+    const line = (label, data, color, width = 2, dash = []) => ({
+      label,
+      data,
+      borderColor: color,
+      borderWidth: width,
+      borderDash: dash,
+      backgroundColor: 'transparent',
+      tension: 0.32,
+      pointRadius: 0,
+      pointHoverRadius: 3.5,
+      pointHoverBackgroundColor: color,
+    });
+    if (trajChart) trajChart.destroy();
+    trajChart = new Chart(document.getElementById('trajChart'), {
+      type: 'line',
+      data: {
+        labels: DATA.series.t,
+        datasets: [
+          line('current', DATA.series.current.map((r) => r[j]), '#9ca3af', 1.5, [4, 3]),
+          line('GT', DATA.series.next_gt.map((r) => r[j]), '#f87171', 2.2),
+          line('predict', DATA.series.next_pred.map((r) => r[j]), '#60a5fa', 2.2),
+        ],
+      },
+      options: baseChartOpts(),
+    });
+    charts[2] = trajChart;
+  }
+  sel.addEventListener('change', () => renderTraj(Number(sel.value)));
+  renderTraj(0);
+
+  document.querySelectorAll('details.drawer').forEach((d) => {
+    d.addEventListener('toggle', () => {
+      if (!d.open) return;
+      requestAnimationFrame(() => {
+        charts.forEach((c) => { try { c.resize(); } catch (_) {} });
+      });
+    });
+  });
+  return charts;
+}
+
+function formatMMSS(ms) {
+  const s = Math.floor(ms / 1000);
+  const mm = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+
+function pickMimeType() {
+  const cands = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  for (const t of cands) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return '';
+}
+
+try {
+  const DATA = await loadData();
+  const meta = DATA.meta;
+  const names = meta.joint_names;
+
+  document.getElementById('subtitle').textContent =
+    `${meta.source} · ${meta.n_frames}帧 · ${meta.generated_at}`;
+
+  const stats = document.getElementById('stats');
+  for (const [label, value] of [
+    ['平均 L2', meta.mean_l2.toFixed(3)],
+    ['最大 L2', meta.max_l2.toFixed(3)],
+    ['帧数', String(meta.n_frames)],
+    ['数据 FPS', String(meta.fps)],
+  ]) {
+    const d = document.createElement('div');
+    d.className = 'stat';
+    d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    stats.appendChild(d);
+  }
+
+  setupCharts(DATA);
+
+  const world = await initScene(document.getElementById('arm3d'), DATA.frames);
+  document.getElementById('loadHint')?.remove();
+  world.resize();
+
+  const slider = document.getElementById('frameSlider');
+  const frameLabel = document.getElementById('frameLabel');
+  const frameTable = document.getElementById('frameTable');
+  slider.max = String(meta.n_frames - 1);
+
+  let frameIdx = 0;
+  let playing = false;
+  const visibility = { cur: true, gt: true, pred: true };
+
+  function applyVisibility() {
+    world.armCur.visible = visibility.cur;
+    world.scatterCur.visible = visibility.cur;
+    world.tcpCur.visible = visibility.cur;
+    world.armGT.visible = visibility.gt;
+    world.scatterGT.visible = visibility.gt;
+    world.tcpGT.visible = visibility.gt;
+    world.armPred.visible = visibility.pred;
+    world.scatterPred.visible = visibility.pred;
+    world.tcpPred.visible = visibility.pred;
+  }
+
+  function wireToggle(btnId, key) {
+    const btn = document.getElementById(btnId);
+    btn.addEventListener('click', () => {
+      visibility[key] = !visibility[key];
+      btn.classList.toggle('on', visibility[key]);
+      btn.classList.toggle('off', !visibility[key]);
+      applyVisibility();
+    });
+  }
+  wireToggle('btnToggleCur', 'cur');
+  wireToggle('btnToggleGT', 'gt');
+  wireToggle('btnTogglePred', 'pred');
+
+  function showFrame(i) {
+    frameIdx = i;
+    slider.value = String(i);
+    const f = DATA.frames[i];
+    frameLabel.textContent = `t=${i} · err ${f.err_l2.toFixed(3)}`;
+
+    setPose(world.armCur, f.current);
+    setPose(world.armGT, f.next_gt);
+    setPose(world.armPred, f.next_pred);
+
+    updateScatter(world.scatterCur, world.paths.cur, i);
+    updateScatter(world.scatterGT, world.paths.gt, i);
+    updateScatter(world.scatterPred, world.paths.pred, i);
+
+    syncTcpAxes(world.tcpCur, world.armCur);
+    syncTcpAxes(world.tcpGT, world.armGT);
+    syncTcpAxes(world.tcpPred, world.armPred);
+
+    frameTable.innerHTML = names.map((n, j) =>
+      `<tr><td>${n}</td><td>${f.current[j].toFixed(2)}</td><td>${f.next_gt[j].toFixed(2)}</td><td>${f.next_pred[j].toFixed(2)}</td><td>${f.err[j].toFixed(2)}</td></tr>`
+    ).join('');
+  }
+
+  slider.addEventListener('input', () => {
+    playing = false;
+    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').classList.remove('active');
+    showFrame(Number(slider.value));
+  });
+  document.getElementById('btnPlay').addEventListener('click', () => {
+    playing = !playing;
+    const b = document.getElementById('btnPlay');
+    b.textContent = playing ? '暂停' : '播放';
+    b.classList.toggle('active', playing);
+  });
+  document.getElementById('btnReset').addEventListener('click', () => {
+    playing = false;
+    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').classList.remove('active');
+    showFrame(0);
+  });
+
+  // ---- Recording (canvas → WebM) ----
+  const btnRecStart = document.getElementById('btnRecStart');
+  const btnRecStop = document.getElementById('btnRecStop');
+  const btnRecSave = document.getElementById('btnRecSave');
+  const recStatus = document.getElementById('recStatus');
+  const recPill = document.getElementById('recPill');
+  const recTimerEl = document.getElementById('recTimer');
+
+  let mediaRecorder = null;
+  let recChunks = [];
+  let recBlob = null;
+  let recStartedAt = 0;
+  let recTimerId = null;
+
+  function setRecUI(state) {
+    // state: idle | recording | ready
+    btnRecStart.disabled = state === 'recording';
+    btnRecStop.disabled = state !== 'recording';
+    btnRecSave.disabled = state !== 'ready';
+    btnRecStart.classList.toggle('recording', state === 'recording');
+    btnRecStop.classList.toggle('recording', state === 'recording');
+    recPill.classList.toggle('on', state === 'recording');
+    recStatus.classList.toggle('hot', state === 'recording');
+  }
+
+  btnRecStart.addEventListener('click', () => {
+    if (!window.MediaRecorder) {
+      recStatus.textContent = '当前浏览器不支持 MediaRecorder';
+      return;
+    }
+    const mime = pickMimeType();
+    if (!mime) {
+      recStatus.textContent = '浏览器不支持 WebM 录制';
+      return;
+    }
+    try {
+      const stream = world.canvas.captureStream(30);
+      recChunks = [];
+      recBlob = null;
+      mediaRecorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) recChunks.push(e.data);
+      };
+      mediaRecorder.onstop = () => {
+        recBlob = new Blob(recChunks, { type: mime.split(';')[0] });
+        stream.getTracks().forEach((t) => t.stop());
+        if (recTimerId) { clearInterval(recTimerId); recTimerId = null; }
+        const sec = ((performance.now() - recStartedAt) / 1000).toFixed(1);
+        const mb = (recBlob.size / (1024 * 1024)).toFixed(2);
+        recStatus.textContent = `已停止 · ${sec}s · ${mb} MB · 可保存`;
+        setRecUI('ready');
+      };
+      mediaRecorder.start(200);
+      recStartedAt = performance.now();
+      recTimerEl.textContent = '00:00';
+      recTimerId = setInterval(() => {
+        recTimerEl.textContent = formatMMSS(performance.now() - recStartedAt);
+      }, 250);
+      recStatus.textContent = '录制中…';
+      setRecUI('recording');
+    } catch (e) {
+      console.error(e);
+      recStatus.textContent = '开始录制失败: ' + e.message;
+    }
+  });
+
+  btnRecStop.addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+      mediaRecorder.stop();
+    }
+  });
+
+  btnRecSave.addEventListener('click', () => {
+    if (!recBlob) return;
+    const a = document.createElement('a');
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    a.href = URL.createObjectURL(recBlob);
+    a.download = `embody_model_eval_${stamp}.webm`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+    recStatus.textContent = `已触发下载 · ${a.download}`;
+  });
+
+  setRecUI('idle');
+  applyVisibility();
+  showFrame(0);
+
+  const speedSlider = document.getElementById('speedSlider');
+  const speedLabel = document.getElementById('speedLabel');
+  let speedMul = Number(speedSlider.value);
+  function refreshSpeedLabel() {
+    speedMul = Number(speedSlider.value);
+    const fps = meta.fps * speedMul;
+    speedLabel.textContent = `${speedMul.toFixed(2)}× (${fps.toFixed(1)} fps)`;
+  }
+  speedSlider.addEventListener('input', refreshSpeedLabel);
+  refreshSpeedLabel();
+
+  let last = performance.now();
+  function loop(now) {
+    const frameMs = 1000 / Math.max(0.05, meta.fps * speedMul);
+    if (playing && now - last >= frameMs) {
+      last = now;
+      showFrame((frameIdx + 1) % meta.n_frames);
+    }
+    world.render();
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+} catch (err) {
+  document.getElementById('subtitle').textContent = '加载失败: ' + err.message;
+  const hint = document.getElementById('loadHint');
+  if (hint) hint.textContent = '加载失败: ' + err.message;
+  console.error(err);
+}
+</script>
+</body>
+</html>

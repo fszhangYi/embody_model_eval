@@ -1,0 +1,8 @@
+# Runtime: static eval viewer + stdlib HTTP server only.
+# Tested with Python 3.12.13 (conda env: lerobot).
+# No third-party packages are required to serve or open the page.
+#
+# Optional — only if you regenerate compare_result.json with
+# act_robot/scripts/compare_pose_offline.py (--mode simulate):
+# numpy>=1.24
+# pyarrow>=14.0
