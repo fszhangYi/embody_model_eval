@@ -1547,7 +1547,7 @@ try {
     if (!document.getElementById('chkExportShot')?.checked) return null;
     try {
       // downscale via temp canvas to limit memory
-      const src = world.renderer.domElement;
+      const src = world.canvas;
       const maxW = 960;
       const scale = Math.min(1, maxW / Math.max(1, src.width));
       const w = Math.max(1, Math.round(src.width * scale));
