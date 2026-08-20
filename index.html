@@ -217,6 +217,34 @@
   th { color: var(--muted); font-weight: 500; }
   .hint { color: var(--muted); font-size: 0.72rem; line-height: 1.45; margin: 0; }
 
+  .heatmap-wrap {
+    position: relative; margin-top: 6px; height: 16px;
+    border-radius: 4px; overflow: hidden;
+    border: 1px solid rgba(58,77,102,0.55);
+    cursor: pointer;
+  }
+  .heatmap-wrap canvas { display: block; width: 100%; height: 100%; }
+  .heatmap-cursor {
+    position: absolute; top: 0; bottom: 0; width: 2px;
+    background: #fff; box-shadow: 0 0 4px rgba(0,0,0,0.8);
+    pointer-events: none; transform: translateX(-1px);
+  }
+  .heatmap-legend {
+    display: flex; justify-content: space-between;
+    font-size: 0.65rem; color: var(--muted); margin-top: 3px;
+  }
+  .worst-list { list-style: none; margin: 0; padding: 0; }
+  .worst-list li {
+    display: flex; justify-content: space-between; gap: 8px;
+    padding: 5px 6px; border-radius: 6px; cursor: pointer;
+    font-size: 0.75rem; font-variant-numeric: tabular-nums;
+  }
+  .worst-list li:hover { background: rgba(61,214,198,0.12); color: var(--accent); }
+  .worst-list li .ep { color: var(--danger); }
+  .ws-wrap { position: relative; height: 168px; border-radius: 8px; overflow: hidden;
+    border: 1px solid rgba(58,77,102,0.45); background: rgba(12,18,28,0.65); }
+  .ws-wrap canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
   @media (max-width: 900px) {
     .topbar .meta { display: none; }
     .drawer { width: min(300px, 86vw); }
@@ -249,6 +277,11 @@
       <div class="ctrl-block">
         <div class="ctrl-label"><span>帧</span><strong id="frameLabel">t=0</strong></div>
         <input id="frameSlider" type="range" min="0" max="1" value="0"/>
+        <div class="heatmap-wrap" id="errHeatmapWrap" title="点击跳转到该帧（颜色 = TCP e_p）">
+          <canvas id="errHeatmap"></canvas>
+          <div class="heatmap-cursor" id="errHeatmapCursor"></div>
+        </div>
+        <div class="heatmap-legend"><span>低 e_p</span><span>高 e_p</span></div>
       </div>
       <div class="ctrl-block">
         <div class="ctrl-label"><span>速度</span><strong id="speedLabel">0.20×</strong></div>
@@ -265,6 +298,22 @@
         <button id="btnToggleGT" class="toggle gt on" type="button">红</button>
         <button id="btnTogglePred" class="toggle pred on" type="button">蓝</button>
       </div>
+      <div class="btn-grid" style="margin-top:8px">
+        <button id="btnTogglePaths" class="toggle on" type="button">整段轨迹</button>
+        <button id="btnToggleErrArrow" class="toggle on" type="button">误差矢量</button>
+      </div>
+    </div>
+  </details>
+
+  <details class="drawer compact" open>
+    <summary>相机</summary>
+    <div class="body">
+      <div class="btn-grid triple">
+        <button id="btnCamSide" type="button">侧视</button>
+        <button id="btnCamTop" type="button">顶视</button>
+        <button id="btnCamFollow" type="button">跟随 TCP</button>
+      </div>
+      <p class="hint" style="margin-top:8px" id="camHint">自由轨道 · Orbit 拖拽</p>
     </div>
   </details>
 
@@ -291,7 +340,7 @@
     </div>
   </details>
 
-  <details class="drawer" open>
+  <details class="drawer">
     <summary>TCP 指标</summary>
     <div class="body">
       <div class="chart-card">
@@ -355,13 +404,27 @@
         </thead>
         <tbody id="frameTable"></tbody>
       </table>
+      <div class="chart-card" style="margin-top:10px">
+        <div class="chart-head"><span class="name">关节→TCP 贡献</span><span class="sub">‖JᵢΔqᵢ‖ mm</span></div>
+        <div class="chart-wrap"><canvas id="jointContribChart" class="chart"></canvas></div>
+      </div>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary>最差帧 / 工作空间</summary>
+    <div class="body">
+      <p class="hint" style="margin-bottom:8px">Top‑K 按 TCP e_p；点击跳转。下方为俯视 XY，颜色=e_p。</p>
+      <ul class="worst-list" id="worstList"></ul>
+      <div class="ws-wrap" style="margin-top:10px"><canvas id="workspaceCanvas"></canvas></div>
+      <p class="hint" style="margin-top:6px" id="wsHint">红点 GT · 蓝点 pred · 点击点跳帧</p>
     </div>
   </details>
 
   <details class="drawer">
     <summary>说明</summary>
     <div class="body">
-      <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 为指尖中点 + xyz 轴；散点 ±15 帧。右侧「TCP 指标」含位置/姿态/分轴/速度/分段与时序对齐（DTW·滞后）。录制捕获 3D 画布为 WebM。</p>
+      <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。</p>
     </div>
   </details>
 </aside>
@@ -543,6 +606,95 @@ function syncTcpAxes(axes, robot) {
   axes.quaternion.copy(quat);
 }
 
+function heatColor(t, out = new THREE.Color()) {
+  // 0 → teal, 1 → red
+  const u = Math.max(0, Math.min(1, t));
+  out.setRGB(0.15 + 0.85 * u, 0.75 * (1 - u), 0.72 * (1 - u) + 0.15 * u);
+  return out;
+}
+
+function makeTimedPathLine(points, epMm, epMax) {
+  const n = points.length;
+  const positions = new Float32Array(n * 3);
+  const colors = new Float32Array(n * 3);
+  const c = new THREE.Color();
+  const denom = Math.max(1e-6, epMax || 1);
+  for (let i = 0; i < n; i++) {
+    const p = points[i];
+    positions[i * 3] = p.x;
+    positions[i * 3 + 1] = p.y;
+    positions[i * 3 + 2] = p.z;
+    heatColor((epMm?.[i] ?? 0) / denom, c);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.LineBasicMaterial({
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.92,
+    depthWrite: false,
+  });
+  const line = new THREE.Line(geo, mat);
+  line.frustumCulled = false;
+  line.renderOrder = 8;
+  return line;
+}
+
+function makeErrArrow() {
+  const dir = new THREE.Vector3(0, 1, 0);
+  const arrow = new THREE.ArrowHelper(dir, new THREE.Vector3(), 0.05, 0xfbbf24, 0.012, 0.008);
+  arrow.frustumCulled = false;
+  arrow.renderOrder = 40;
+  return arrow;
+}
+
+const _errDir = new THREE.Vector3();
+function syncErrArrow(arrow, from, to) {
+  _errDir.subVectors(to, from);
+  const len = _errDir.length();
+  if (len < 1e-5) {
+    arrow.visible = false;
+    return;
+  }
+  arrow.visible = true;
+  arrow.position.copy(from);
+  arrow.setDirection(_errDir.normalize());
+  const head = Math.min(0.014, len * 0.35);
+  arrow.setLength(len, head, head * 0.65);
+}
+
+/** Per-frame joint contribution ‖J_i Δq_i‖ in mm (finite-diff Jacobian at GT). */
+function computeJointTcpContrib(probe, frames) {
+  const epsDeg = 0.35;
+  const n = frames.length;
+  const out = Array.from({ length: n }, () => new Float32Array(JOINTS.length));
+  const p0 = new THREE.Vector3();
+  const p1 = new THREE.Vector3();
+  const qWork = new Array(JOINTS.length);
+
+  for (let fi = 0; fi < n; fi++) {
+    const qGt = frames[fi].next_gt;
+    const qPred = frames[fi].next_pred;
+    setPose(probe, qGt);
+    getTcp(probe, p0);
+    for (let j = 0; j < JOINTS.length; j++) qWork[j] = qGt[j];
+    for (let j = 0; j < JOINTS.length; j++) {
+      qWork[j] = qGt[j] + epsDeg;
+      setPose(probe, qWork);
+      getTcp(probe, p1);
+      const jLen = p1.distanceTo(p0) / epsDeg; // m/deg
+      out[fi][j] = jLen * Math.abs(qPred[j] - qGt[j]) * 1000;
+      qWork[j] = qGt[j];
+    }
+  }
+  setPose(probe, frames[0].next_gt);
+  return out;
+}
+
 function computeTcpPaths(probe, frames) {
   const cur = [], gt = [], pred = [];
   const gtQuat = [], predQuat = [];
@@ -609,6 +761,55 @@ async function initScene(container, frames) {
   const tcpPred = makeTcpAxes();
   scene.add(tcpCur, tcpGT, tcpPred);
 
+  // Placeholder ep coloring; caller can rebuild via setPathEpColors
+  const zeroEp = paths.gt.map(() => 0);
+  const pathLineGT = makeTimedPathLine(paths.gt, zeroEp, 1);
+  const pathLinePred = makeTimedPathLine(paths.pred, zeroEp, 1);
+  // Distinct base tints: GT slightly cooler via material — vertex colors set later
+  pathLineGT.material.opacity = 0.75;
+  pathLinePred.material.opacity = 0.95;
+  scene.add(pathLineGT, pathLinePred);
+
+  const errArrow = makeErrArrow();
+  scene.add(errArrow);
+
+  const followOffset = new THREE.Vector3(0.45, 0.28, 0.55);
+  let camMode = 'free'; // free | follow
+
+  function setPathEpColors(epMm) {
+    const epMax = Math.max(...epMm, 1e-6);
+    const c = new THREE.Color();
+    for (const [line, pts] of [[pathLineGT, paths.gt], [pathLinePred, paths.pred]]) {
+      const colors = line.geometry.getAttribute('color');
+      for (let i = 0; i < pts.length; i++) {
+        heatColor(epMm[i] / epMax, c);
+        colors.setXYZ(i, c.r, c.g, c.b);
+      }
+      colors.needsUpdate = true;
+    }
+  }
+
+  function applyCameraPreset(mode) {
+    camMode = mode === 'follow' ? 'follow' : 'free';
+    if (mode === 'side') {
+      camera.position.set(0.95, 0.28, 0.05);
+      controls.target.set(0.05, 0.14, 0);
+    } else if (mode === 'top') {
+      camera.position.set(0.05, 1.15, 0.001);
+      controls.target.set(0.05, 0, 0);
+    } else if (mode === 'follow') {
+      // position updated in showFrame / render
+    }
+    controls.update();
+  }
+
+  function updateFollowCam(lookAt) {
+    if (camMode !== 'follow' || !lookAt) return;
+    controls.target.lerp(lookAt, 0.35);
+    const desired = _errDir.copy(lookAt).add(followOffset);
+    camera.position.lerp(desired, 0.25);
+  }
+
   function resize() {
     const ww = container.clientWidth || window.innerWidth;
     const hh = container.clientHeight || window.innerHeight;
@@ -622,7 +823,12 @@ async function initScene(container, frames) {
     armCur, armGT, armPred,
     scatterCur, scatterGT, scatterPred,
     tcpCur, tcpGT, tcpPred,
+    pathLineGT, pathLinePred, errArrow,
+    setPathEpColors, applyCameraPreset, updateFollowCam,
+    getCamMode: () => camMode,
+    setCamMode: (m) => { camMode = m; },
     paths,
+    camera, controls,
     canvas: renderer.domElement,
     resize,
     render() { controls.update(); renderer.render(scene, camera); },
@@ -860,6 +1066,179 @@ function updateTcpFrameHint(tcp, i) {
     + `‖Δv‖ ${s.v_err_mps[i].toFixed(4)} m/s`;
 }
 
+function paintErrHeatmap(canvas, epMm) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, canvas.clientWidth || canvas.parentElement?.clientWidth || 200);
+  const h = Math.max(1, canvas.clientHeight || 16);
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const n = epMm.length;
+  const epMax = Math.max(...epMm, 1e-6);
+  for (let i = 0; i < n; i++) {
+    const t = epMm[i] / epMax;
+    const r = Math.round(40 + 200 * t);
+    const g = Math.round(190 * (1 - t));
+    const b = Math.round(180 * (1 - t) + 40 * t);
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    const x0 = (i / n) * w;
+    const x1 = ((i + 1) / n) * w;
+    ctx.fillRect(x0, 0, Math.max(1, x1 - x0), h);
+  }
+}
+
+function setHeatmapCursor(i, n) {
+  const el = document.getElementById('errHeatmapCursor');
+  if (!el || n <= 1) return;
+  el.style.left = `${(i / (n - 1)) * 100}%`;
+}
+
+function fillWorstList(epMm, topK = 8) {
+  const ul = document.getElementById('worstList');
+  if (!ul) return [];
+  const ranked = epMm
+    .map((v, i) => ({ i, v }))
+    .sort((a, b) => b.v - a.v)
+    .slice(0, topK);
+  ul.innerHTML = ranked.map((r, k) =>
+    `<li data-frame="${r.i}"><span>#${k + 1} · t=${r.i}</span><span class="ep">${r.v.toFixed(2)} mm</span></li>`
+  ).join('');
+  return ranked;
+}
+
+function paintWorkspace(canvas, gtPos, predPos, epMm, frameIdx) {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, canvas.clientWidth || 280);
+  const h = Math.max(1, canvas.clientHeight || 168);
+  canvas.width = Math.floor(w * dpr);
+  canvas.height = Math.floor(h * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  const consider = (p) => {
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+  };
+  gtPos.forEach(consider);
+  predPos.forEach(consider);
+  const pad = 0.04;
+  minX -= pad; maxX += pad; minY -= pad; maxY += pad;
+  const spanX = Math.max(1e-6, maxX - minX);
+  const spanY = Math.max(1e-6, maxY - minY);
+  const epMax = Math.max(...epMm, 1e-6);
+
+  const toXY = (p) => ({
+    x: ((p.x - minX) / spanX) * (w - 16) + 8,
+    y: h - (((p.y - minY) / spanY) * (h - 16) + 8),
+  });
+
+  // grid
+  ctx.strokeStyle = 'rgba(58,77,102,0.45)';
+  ctx.lineWidth = 1;
+  for (let g = 0; g <= 4; g++) {
+    const x = 8 + ((w - 16) * g) / 4;
+    const y = 8 + ((h - 16) * g) / 4;
+    ctx.beginPath(); ctx.moveTo(x, 8); ctx.lineTo(x, h - 8); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(8, y); ctx.lineTo(w - 8, y); ctx.stroke();
+  }
+
+  const drawPts = (pos, hollow) => {
+    for (let i = 0; i < pos.length; i++) {
+      const t = epMm[i] / epMax;
+      const { x, y } = toXY(pos[i]);
+      const r = 2.2 + 2.5 * t;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      if (hollow) {
+        ctx.strokeStyle = `rgba(59,130,246,${0.35 + 0.55 * t})`;
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = `rgba(239,68,68,${0.25 + 0.65 * t})`;
+        ctx.fill();
+      }
+    }
+  };
+  drawPts(gtPos, false);
+  drawPts(predPos, true);
+
+  // current frame markers
+  if (frameIdx >= 0 && frameIdx < gtPos.length) {
+    const a = toXY(gtPos[frameIdx]);
+    const b = toXY(predPos[frameIdx]);
+    ctx.strokeStyle = '#fbbf24';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(a.x, a.y, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#93c5fd';
+    ctx.beginPath(); ctx.arc(b.x, b.y, 3.5, 0, Math.PI * 2); ctx.fill();
+  }
+
+  canvas._wsMap = { minX, maxX, minY, maxY, w, h, gtPos, predPos };
+}
+
+function workspaceHitFrame(canvas, clientX, clientY) {
+  const map = canvas._wsMap;
+  if (!map) return -1;
+  const rect = canvas.getBoundingClientRect();
+  const x = ((clientX - rect.left) / rect.width) * map.w;
+  const y = ((clientY - rect.top) / rect.height) * map.h;
+  const spanX = map.maxX - map.minX;
+  const spanY = map.maxY - map.minY;
+  const wx = map.minX + ((x - 8) / (map.w - 16)) * spanX;
+  const wy = map.minY + ((map.h - 8 - y) / (map.h - 16)) * spanY;
+  let best = -1;
+  let bestD = 0.03 ** 2;
+  const consider = (pos, i) => {
+    const dx = pos[i].x - wx;
+    const dy = pos[i].y - wy;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = i; }
+  };
+  for (let i = 0; i < map.gtPos.length; i++) {
+    consider(map.gtPos, i);
+    consider(map.predPos, i);
+  }
+  return best;
+}
+
+function setupJointContribChart(names) {
+  const chart = new Chart(document.getElementById('jointContribChart'), {
+    type: 'bar',
+    data: {
+      labels: names.map((n) => n.split('_')[0]),
+      datasets: [{
+        label: 'contrib mm',
+        data: names.map(() => 0),
+        backgroundColor: 'rgba(251,191,36,0.75)',
+        borderRadius: 3,
+        maxBarThickness: 14,
+      }],
+    },
+    options: {
+      ...baseChartOpts(),
+      animation: { duration: 180 },
+      plugins: {
+        ...baseChartOpts().plugins,
+        legend: { display: false },
+      },
+      scales: {
+        ...baseChartOpts().scales,
+        x: {
+          ...baseChartOpts().scales.x,
+          grid: { display: false },
+          ticks: { color: '#9db0c9', font: { size: 9 }, maxRotation: 0 },
+        },
+      },
+    },
+  });
+  return chart;
+}
+
 function setupCharts(DATA) {
   const meta = DATA.meta;
   const names = meta.joint_names;
@@ -1039,6 +1418,67 @@ try {
   });
   fillTcpOverview(tcp);
   setupTcpCharts(DATA, tcp);
+  world.setPathEpColors(tcp.series.ep_mm);
+
+  // C13-ish: TCP threshold attainment (fixed defaults; override via meta.tcp_thresholds)
+  const thrEp = meta.tcp_thresholds?.ep_mm ?? 5;
+  const thrEr = meta.tcp_thresholds?.eR_deg ?? 5;
+  const passEp = tcp.series.ep_mm.filter((v) => v < thrEp).length / tcp.n;
+  const passEr = tcp.series.eR_deg.filter((v) => v < thrEr).length / tcp.n;
+  const passBoth = tcp.series.ep_mm.filter((v, i) => v < thrEp && tcp.series.eR_deg[i] < thrEr).length / tcp.n;
+  for (const [label, value] of [
+    [`e_p<${thrEp}mm`, `${(passEp * 100).toFixed(1)}%`],
+    [`e_R<${thrEr}°`, `${(passEr * 100).toFixed(1)}%`],
+    ['双阈值达标', `${(passBoth * 100).toFixed(1)}%`],
+    ['action', String(meta.action_mode ?? '—')],
+  ]) {
+    const d = document.createElement('div');
+    d.className = 'stat';
+    d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+    document.getElementById('tcpStats').appendChild(d);
+  }
+
+  const jointContrib = computeJointTcpContrib(world.armGT, DATA.frames);
+  const contribChart = setupJointContribChart(names);
+
+  const heatCanvas = document.getElementById('errHeatmap');
+  const paintHeat = () => paintErrHeatmap(heatCanvas, tcp.series.ep_mm);
+  paintHeat();
+  window.addEventListener('resize', paintHeat);
+  fillWorstList(tcp.series.ep_mm);
+  document.getElementById('worstList').addEventListener('click', (e) => {
+    const li = e.target.closest('li[data-frame]');
+    if (!li) return;
+    playing = false;
+    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').classList.remove('active');
+    showFrame(Number(li.dataset.frame));
+  });
+
+  const wsCanvas = document.getElementById('workspaceCanvas');
+  const paintWs = (idx) => paintWorkspace(
+    wsCanvas, world.paths.gt, world.paths.pred, tcp.series.ep_mm, idx,
+  );
+  paintWs(0);
+  window.addEventListener('resize', () => paintWs(frameIdx));
+  wsCanvas.addEventListener('click', (e) => {
+    const hit = workspaceHitFrame(wsCanvas, e.clientX, e.clientY);
+    if (hit < 0) return;
+    playing = false;
+    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').classList.remove('active');
+    showFrame(hit);
+  });
+
+  document.getElementById('errHeatmapWrap').addEventListener('click', (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const t = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const idx = Math.round(t * (meta.n_frames - 1));
+    playing = false;
+    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').classList.remove('active');
+    showFrame(idx);
+  });
 
   const slider = document.getElementById('frameSlider');
   const frameLabel = document.getElementById('frameLabel');
@@ -1047,7 +1487,7 @@ try {
 
   let frameIdx = 0;
   let playing = false;
-  const visibility = { cur: true, gt: true, pred: true };
+  const visibility = { cur: true, gt: true, pred: true, paths: true, errArrow: true };
 
   function applyVisibility() {
     world.armCur.visible = visibility.cur;
@@ -1059,6 +1499,9 @@ try {
     world.armPred.visible = visibility.pred;
     world.scatterPred.visible = visibility.pred;
     world.tcpPred.visible = visibility.pred;
+    world.pathLineGT.visible = visibility.paths;
+    world.pathLinePred.visible = visibility.paths;
+    world.errArrow.visible = visibility.errArrow;
   }
 
   function wireToggle(btnId, key) {
@@ -1073,12 +1516,44 @@ try {
   wireToggle('btnToggleCur', 'cur');
   wireToggle('btnToggleGT', 'gt');
   wireToggle('btnTogglePred', 'pred');
+  wireToggle('btnTogglePaths', 'paths');
+  wireToggle('btnToggleErrArrow', 'errArrow');
+
+  const camHint = document.getElementById('camHint');
+  function setCamButtons(activeId) {
+    for (const id of ['btnCamSide', 'btnCamTop', 'btnCamFollow']) {
+      document.getElementById(id).classList.toggle('active', id === activeId);
+    }
+  }
+  document.getElementById('btnCamSide').addEventListener('click', () => {
+    world.applyCameraPreset('side');
+    setCamButtons('btnCamSide');
+    camHint.textContent = '侧视 · 可继续 Orbit';
+  });
+  document.getElementById('btnCamTop').addEventListener('click', () => {
+    world.applyCameraPreset('top');
+    setCamButtons('btnCamTop');
+    camHint.textContent = '顶视 · 可继续 Orbit';
+  });
+  document.getElementById('btnCamFollow').addEventListener('click', () => {
+    const on = world.getCamMode() !== 'follow';
+    world.applyCameraPreset(on ? 'follow' : 'free');
+    setCamButtons(on ? 'btnCamFollow' : '');
+    camHint.textContent = on ? '跟随 TCP（GT）中…' : '自由轨道 · Orbit 拖拽';
+  });
+  world.controls.addEventListener('start', () => {
+    if (world.getCamMode() === 'follow') {
+      world.setCamMode('free');
+      setCamButtons('');
+      camHint.textContent = '自由轨道 · Orbit 拖拽';
+    }
+  });
 
   function showFrame(i) {
     frameIdx = i;
     slider.value = String(i);
     const f = DATA.frames[i];
-    frameLabel.textContent = `t=${i} · err ${f.err_l2.toFixed(3)}`;
+    frameLabel.textContent = `t=${i} · err ${f.err_l2.toFixed(3)} · e_p ${tcp.series.ep_mm[i].toFixed(1)}mm`;
 
     setPose(world.armCur, f.current);
     setPose(world.armGT, f.next_gt);
@@ -1092,7 +1567,18 @@ try {
     syncTcpAxes(world.tcpGT, world.armGT);
     syncTcpAxes(world.tcpPred, world.armPred);
 
+    syncErrArrow(world.errArrow, world.paths.gt[i], world.paths.pred[i]);
+    if (!visibility.errArrow) world.errArrow.visible = false;
+
+    world.updateFollowCam(world.paths.gt[i]);
+
     updateTcpFrameHint(tcp, i);
+    setHeatmapCursor(i, meta.n_frames);
+    paintWs(i);
+
+    const row = jointContrib[i];
+    contribChart.data.datasets[0].data = Array.from(row);
+    contribChart.update('none');
 
     frameTable.innerHTML = names.map((n, j) =>
       `<tr><td>${n}</td><td>${f.current[j].toFixed(2)}</td><td>${f.next_gt[j].toFixed(2)}</td><td>${f.next_pred[j].toFixed(2)}</td><td>${f.err[j].toFixed(2)}</td></tr>`
