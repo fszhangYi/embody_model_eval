@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Embody Model Eval">
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="#0b1018"/>
+  <!-- current / GT / predict arms -->
+  <g stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-width="5">
+    <path d="M29 42 L18 18" stroke="#9ca3af" opacity="0.9"/>
+    <path d="M32 42 L32 14" stroke="#ef4444" opacity="0.9"/>
+    <path d="M35 42 L46 18" stroke="#3b82f6" opacity="0.9"/>
+  </g>
+  <circle cx="32" cy="42" r="5" fill="#3dd6c6"/>
+  <circle cx="32" cy="14" r="3.2" fill="#3dd6c6"/>
+</svg>

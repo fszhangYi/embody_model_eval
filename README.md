@@ -27,6 +27,7 @@ python3 -V   # 建议 >= 3.10，推荐 3.12
 embody_model_eval/
 ├── index.html              # 评测主页面
 ├── hub.html
+├── favicon.svg / .ico / .png
 ├── compare_result.json     # 评测对比数据
 ├── vendor/                 # 离线前端依赖（Three / Chart.js / urdf-loader）
 ├── serve.sh
@@ -89,8 +90,58 @@ python /root/autodl-tmp/act_robot/scripts/compare_pose_offline.py \
 - **速度**：默认约 `0.2×`（相对数据 fps）
 - **录制**：仅 Three.js 画布 → WebM；侧栏不进入录像
 - **TCP**：gripper 系指尖中点约 `(0, -0.1062, 0)`
+- **浏览器图标**：`favicon.svg` / `favicon.ico` / `favicon.png`（标签页与书签）
+
+## 更换机械臂
+
+默认可视化机型是 **SO-100**（`so100_colored/` 下三份着色 URDF + STL）。换成其它臂时，除替换模型文件外，还必须让 **关节名、关节顺序、TCP、评测 JSON** 与页面代码一致，否则会出现「加载成功但姿态错 / TCP 飞掉 / 图表关节对不上」。
+
+### 1. 替换模型资源
+
+1. 准备新臂的 URDF（或 xacro 已展开的 `.urdf`）及 mesh（`.stl` / `.dae` 等）。
+2. 复制出 **三份** URDF（或在同一 URDF 上改材质），分别给 current / GT / predict 着色，便于叠画区分，例如：
+   - 灰（current）· 红（GT）· 蓝（predict）——与现有 `so100_cur|gt|pred.urdf` 一致即可。
+3. 把新目录放到仓库根下（可改名，例如 `my_arm_colored/`），保证 URDF 内 `mesh filename="..."` 相对路径能找到 `assets/`。
+4. 在 `index.html` 中改加载路径：
+
+```js
+const URDF_CUR = './my_arm_colored/xxx_cur.urdf';
+const URDF_GT  = './my_arm_colored/xxx_gt.urdf';
+const URDF_PRED = './my_arm_colored/xxx_pred.urdf';
+```
+
+加载文案（如「加载 3× SO-100 URDF…」）可顺手改成新机型名。
+
+### 2. 必须同步修改的内容（清单）
+
+| 位置 | 改什么 | 为何 |
+|------|--------|------|
+| `index.html` → `JOINTS` | 关节名数组，顺序与控制量一致 | `setPose` 按此名写 `robot.joints[name]` |
+| `compare_result.json` → `meta.joint_names` | 与 `JOINTS` **同名、同序** | 右侧图表 / 数值面板依赖该字段 |
+| `compare_result.json` → `frames[].current|next_gt|next_pred` | 每帧关节角数组长度与顺序 = `JOINTS` | 单位默认按 **度**（页面内 `* DEG2RAD`） |
+| `compare_result.json` → `meta.per_joint_mae` / `series` | 键名或曲线通道与关节一致 | 概览 MAE、关节轨迹图 |
+| `index.html` → `getTcpPose` / `TCP_OFFSET_GRIPPER` | TCP 所在 **link 名** + 指尖相对该 link 的偏移 | 默认 link=`gripper`，偏移 `(0, -0.1062, 0)`（米，gripper 系） |
+| `index.html` → `loadRobot` 里 `robot.rotation.x` | 坐标系朝向（当前 `-π/2` 适配 SO-100） | 换臂后若模型躺倒/倒置，调此旋转或在 URDF 里改 root |
+| 生成脚本（可选） | `act_robot/scripts/compare_pose_offline.py` 等 | 重新导出 JSON 时关节定义要与新臂一致 |
+| `README.md` / 页面标题文案 | 机型名、TCP 说明、许可来源 | 文档与实际机型一致 |
+
+关节自由度变化时（例如 7 轴），除改 `JOINTS` 外，还需保证 JSON 每帧数组长度、MAE 与 series 维度一并更新；自由度减少则删掉多余通道。
+
+### 3. 建议自检
+
+1. `./serve.sh` 打开页面，确认三色臂均加载、无 mesh 404。
+2. 拖时间轴：灰/红/蓝姿态是否随 `current` / `next_gt` / `next_pred` 合理变化。
+3. TCP 轴与散点是否落在末端执行器附近（不对则改 link 名或 `TCP_OFFSET_GRIPPER`）。
+4. 右侧「关节」下拉与曲线名称是否等于新 `joint_names`。
+
+### 4. 不必改的部分
+
+- `vendor/`（Three.js / Chart.js / urdf-loader）
+- 播放 / 显隐 / 录制等 UI 逻辑（与具体机型无关）
+- `serve.sh` / 端口托管方式
 
 ## 许可与来源
 
 - mesh / URDF 骨架：[TheRobotStudio/SO-ARM100](https://github.com/TheRobotStudio/SO-ARM100)
 - `so100_*.urdf` 仅改材质色以便叠画区分
+- 浏览器图标为本仓库自绘资源（灰/红/蓝三臂示意）
