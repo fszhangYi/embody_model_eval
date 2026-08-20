@@ -7,7 +7,7 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 - 左侧：播放 / 显隐 / 画布录制（WebM）
 - 右侧：概览、误差、关节轨迹、数值（可折叠）
 
-浏览器经 CDN 加载 Three.js / Chart.js / urdf-loader，**不依赖 Node.js**；本仓库用 Python 标准库静态托管即可。
+浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库静态托管即可。
 
 ## 环境
 
@@ -28,6 +28,7 @@ embody_model_eval/
 ├── index.html              # 评测主页面
 ├── hub.html
 ├── compare_result.json     # 评测对比数据
+├── vendor/                 # 离线前端依赖（Three / Chart.js / urdf-loader）
 ├── serve.sh
 ├── requirements.txt
 ├── README.md
@@ -71,6 +72,16 @@ python /root/autodl-tmp/act_robot/scripts/compare_pose_offline.py \
 ```
 
 会覆盖本目录的 `compare_result.json`，并同步当前页面模板。
+
+## 离线说明
+
+`vendor/` 已内置固定版本前端库，断网也可打开页面。目标机只需任意 **Python 3.8+**（推荐 3.10/3.12）执行 `./serve.sh`，无需 pip 安装。
+
+| 库 | 版本 |
+|----|------|
+| three | 0.160.0 |
+| chart.js | 4.4.1 |
+| urdf-loader | 0.12.5 |
 
 ## 使用提示
 
