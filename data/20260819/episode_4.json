@@ -46,7 +46,38 @@
     },
     "policy": "act_v1",
     "model": "act_v1",
-    "robot": "so100"
+    "robot": "so100",
+    "cameras": [
+      {
+        "id": "wrist",
+        "stream": "rgb",
+        "width": 320,
+        "height": 180,
+        "fps": 30,
+        "mount": "wrist"
+      },
+      {
+        "id": "front",
+        "stream": "rgb",
+        "width": 320,
+        "height": 180,
+        "fps": 30,
+        "mount": "base"
+      },
+      {
+        "id": "wrist_depth",
+        "stream": "depth",
+        "width": 320,
+        "height": 180,
+        "fps": 30,
+        "mount": "wrist"
+      }
+    ],
+    "obs_alignment": {
+      "mode": "frame_index",
+      "max_skew_ms": 50,
+      "action_time_field": "timestamp"
+    }
   },
   "series": {
     "t": [
@@ -292,7 +323,72 @@
         65.14647772654214,
         -0.0,
         0.5
-      ]
+      ],
+      "obs": {
+        "wrist": {
+          "path": "./data/20260819/media/episode_4/wrist_000.png",
+          "t": 0.0,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "object",
+              "xyxy": [
+                30,
+                62,
+                86,
+                104
+              ],
+              "color": "#3dd6c6",
+              "score": 0.7
+            },
+            {
+              "type": "keypoints",
+              "points": [
+                [
+                  38,
+                  72
+                ],
+                [
+                  78,
+                  72
+                ],
+                [
+                  58.0,
+                  98
+                ]
+              ],
+              "color": "#fbbf24"
+            },
+            {
+              "type": "heatmap",
+              "path": "./data/20260819/media/episode_4/attn_000.png"
+            }
+          ]
+        },
+        "front": {
+          "path": "./data/20260819/media/episode_4/front_000.png",
+          "t": 0.0,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "goal",
+              "xyxy": [
+                130,
+                66,
+                190,
+                114
+              ],
+              "color": "#60a5fa",
+              "score": 0.9
+            }
+          ]
+        },
+        "wrist_depth": {
+          "path": "./data/20260819/media/episode_4/depth_000.png",
+          "t": 0.0,
+          "overlays": []
+        }
+      }
     },
     {
       "t": 1,
@@ -353,7 +449,72 @@
         63.959947173838614,
         -1.0606601717798212,
         0.5
-      ]
+      ],
+      "obs": {
+        "wrist": {
+          "path": "./data/20260819/media/episode_4/wrist_001.png",
+          "t": 0.03333333333333333,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "object",
+              "xyxy": [
+                81,
+                72,
+                137,
+                114
+              ],
+              "color": "#3dd6c6",
+              "score": 0.7625
+            },
+            {
+              "type": "keypoints",
+              "points": [
+                [
+                  89,
+                  82
+                ],
+                [
+                  129,
+                  82
+                ],
+                [
+                  109.0,
+                  108
+                ]
+              ],
+              "color": "#fbbf24"
+            },
+            {
+              "type": "heatmap",
+              "path": "./data/20260819/media/episode_4/attn_001.png"
+            }
+          ]
+        },
+        "front": {
+          "path": "./data/20260819/media/episode_4/front_001.png",
+          "t": 0.03333333333333333,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "goal",
+              "xyxy": [
+                130,
+                66,
+                190,
+                114
+              ],
+              "color": "#60a5fa",
+              "score": 0.9
+            }
+          ]
+        },
+        "wrist_depth": {
+          "path": "./data/20260819/media/episode_4/depth_001.png",
+          "t": 0.03333333333333333,
+          "overlays": []
+        }
+      }
     },
     {
       "t": 2,
@@ -414,7 +575,72 @@
         59.254382641195015,
         -2.401561146012848,
         0.5
-      ]
+      ],
+      "obs": {
+        "wrist": {
+          "path": "./data/20260819/media/episode_4/wrist_002.png",
+          "t": 0.06666666666666667,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "object",
+              "xyxy": [
+                132,
+                74,
+                188,
+                116
+              ],
+              "color": "#3dd6c6",
+              "score": 0.825
+            },
+            {
+              "type": "keypoints",
+              "points": [
+                [
+                  140,
+                  84
+                ],
+                [
+                  180,
+                  84
+                ],
+                [
+                  160.0,
+                  110
+                ]
+              ],
+              "color": "#fbbf24"
+            },
+            {
+              "type": "heatmap",
+              "path": "./data/20260819/media/episode_4/attn_002.png"
+            }
+          ]
+        },
+        "front": {
+          "path": "./data/20260819/media/episode_4/front_002.png",
+          "t": 0.06666666666666667,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "goal",
+              "xyxy": [
+                130,
+                66,
+                190,
+                114
+              ],
+              "color": "#60a5fa",
+              "score": 0.9
+            }
+          ]
+        },
+        "wrist_depth": {
+          "path": "./data/20260819/media/episode_4/depth_002.png",
+          "t": 0.06666666666666667,
+          "overlays": []
+        }
+      }
     },
     {
       "t": 3,
@@ -475,7 +701,72 @@
         57.59786401905194,
         -3.1019871458907424,
         0.5
-      ]
+      ],
+      "obs": {
+        "wrist": {
+          "path": "./data/20260819/media/episode_4/wrist_003.png",
+          "t": 0.18,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "object",
+              "xyxy": [
+                183,
+                68,
+                239,
+                110
+              ],
+              "color": "#3dd6c6",
+              "score": 0.8875
+            },
+            {
+              "type": "keypoints",
+              "points": [
+                [
+                  191,
+                  78
+                ],
+                [
+                  231,
+                  78
+                ],
+                [
+                  211.0,
+                  104
+                ]
+              ],
+              "color": "#fbbf24"
+            },
+            {
+              "type": "heatmap",
+              "path": "./data/20260819/media/episode_4/attn_003.png"
+            }
+          ]
+        },
+        "front": {
+          "path": "./data/20260819/media/episode_4/front_003.png",
+          "t": 0.1,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "goal",
+              "xyxy": [
+                130,
+                66,
+                190,
+                114
+              ],
+              "color": "#60a5fa",
+              "score": 0.9
+            }
+          ]
+        },
+        "wrist_depth": {
+          "path": "./data/20260819/media/episode_4/depth_003.png",
+          "t": 0.1,
+          "overlays": []
+        }
+      }
     },
     {
       "t": 4,
@@ -536,7 +827,72 @@
         57.59786401905194,
         -3.1019871458907424,
         0.5
-      ]
+      ],
+      "obs": {
+        "wrist": {
+          "path": "./data/20260819/media/episode_4/wrist_004.png",
+          "t": 0.21333333333333332,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "object",
+              "xyxy": [
+                234,
+                57,
+                290,
+                99
+              ],
+              "color": "#3dd6c6",
+              "score": 0.95
+            },
+            {
+              "type": "keypoints",
+              "points": [
+                [
+                  242,
+                  67
+                ],
+                [
+                  282,
+                  67
+                ],
+                [
+                  262.0,
+                  93
+                ]
+              ],
+              "color": "#fbbf24"
+            },
+            {
+              "type": "heatmap",
+              "path": "./data/20260819/media/episode_4/attn_004.png"
+            }
+          ]
+        },
+        "front": {
+          "path": "./data/20260819/media/episode_4/front_004.png",
+          "t": 0.13333333333333333,
+          "overlays": [
+            {
+              "type": "box",
+              "label": "goal",
+              "xyxy": [
+                130,
+                66,
+                190,
+                114
+              ],
+              "color": "#60a5fa",
+              "score": 0.9
+            }
+          ]
+        },
+        "wrist_depth": {
+          "path": "./data/20260819/media/episode_4/depth_004.png",
+          "t": 0.13333333333333333,
+          "overlays": []
+        }
+      }
     }
   ]
 }

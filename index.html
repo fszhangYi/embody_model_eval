@@ -356,6 +356,13 @@
   }
   .worst-list li:hover { background: rgba(61,214,198,0.12); color: var(--accent); }
   .worst-list li .ep { color: var(--danger); }
+  .obs-wrap {
+    position: relative; height: 168px; border-radius: 8px; overflow: hidden;
+    border: 1px solid rgba(58,77,102,0.55); background: #0c121c;
+  }
+  .obs-wrap canvas { display: block; width: 100%; height: 100%; }
+  .obs-toggles { display: flex; flex-wrap: wrap; gap: 8px 12px; margin-top: 8px; font-size: 0.72rem; color: var(--muted); }
+  .obs-toggles label { display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
   .ws-wrap { position: relative; height: 168px; border-radius: 8px; overflow: hidden;
     border: 1px solid rgba(58,77,102,0.45); background: rgba(12,18,28,0.65); }
   .ws-wrap canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
@@ -372,6 +379,7 @@
     border: 1px solid var(--border); color: var(--muted); margin-right: 4px;
   }
   .tag.ok { color: #4ade80; border-color: rgba(74,222,128,0.45); }
+  .tag.warn { color: #fbbf24; border-color: rgba(251,191,36,0.45); }
   .tag.bad { color: var(--danger); border-color: rgba(248,113,113,0.45); }
 
   /* 术语悬停浮窗：固定左下角、半透明 */
@@ -547,6 +555,25 @@
       </div>
     </details>
 
+    <details class="drawer" id="obsDrawer">
+      <summary><span class="tip" data-tip="obs_f" tabindex="0">观测相机 (F)</span></summary>
+      <div class="body">
+        <p class="hint tip" id="obsAlignHint" data-tip="obs_align" style="margin-bottom:8px" tabindex="0">加载观测对齐…</p>
+        <div class="row-ctrl">
+          <label class="tip" data-tip="obs_cam" tabindex="0">流
+            <select id="obsCamSelect"></select>
+          </label>
+        </div>
+        <div class="obs-wrap tip" data-tip="obs_sync" tabindex="0"><canvas id="obsCanvas"></canvas></div>
+        <div class="obs-toggles tip" data-tip="obs_overlay" tabindex="0">
+          <label><input type="checkbox" id="chkObsBox" checked /> 目标框</label>
+          <label><input type="checkbox" id="chkObsKp" checked /> 关键点</label>
+          <label><input type="checkbox" id="chkObsHeat" checked /> 注意力</label>
+        </div>
+        <p class="hint" style="margin-top:6px" id="obsFrameHint">与关节 / TCP 同帧同步</p>
+      </div>
+    </details>
+
     <details class="drawer compact">
       <summary><span class="tip" data-tip="record" tabindex="0">录制</span></summary>
       <div class="body">
@@ -701,7 +728,7 @@
     <details class="drawer">
       <summary><span class="tip" data-tip="help" tabindex="0">说明</span></summary>
       <div class="body">
-        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹（同色浅→深）与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。带虚下划线的名词可悬停查看左下角解释。</p>
+        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹（同色浅→深）与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随；「观测相机 (F)」同步 RGB/Depth 与框/注意力叠加。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。带虚下划线的名词可悬停查看左下角解释。</p>
       </div>
     </details>
   </div>
@@ -736,6 +763,12 @@ import {
   jointNamesMismatch,
   validateEpisodeAgainstRegistry,
 } from './robots_registry.js';
+import {
+  hasObservation,
+  getCameras,
+  auditObsAlignment,
+  paintObsCanvas,
+} from './obs_align.js';
 
 const DEG2RAD = Math.PI / 180;
 const COLOR_CUR = 0x9ca3af;
@@ -892,6 +925,26 @@ const TERM_GLOSSARY = {
   cam_follow: {
     title: '跟随 TCP',
     body: '相机目标锁定 GT 末端。便于近距离看抓取姿态；手动 Orbit 后自动回到自由模式。',
+  },
+  obs_f: {
+    title: '观测相机 (F)',
+    body: 'F25：RGB/Depth 与关节/TCP 同帧回放。数据来自 meta.cameras + frames[].obs。无观测时本栏提示缺失。',
+  },
+  obs_align: {
+    title: 'obs 时间戳对齐 (F26)',
+    body: 'meta.obs_alignment：frame_index 按帧号一一对应；nearest_timestamp 按 timestamp 最近邻。|skew| 超过 max_skew_ms 会告警。',
+  },
+  obs_cam: {
+    title: '观测流',
+    body: '切换 wrist / front / depth 等相机 id。stream 可为 rgb、depth、attention。',
+  },
+  obs_sync: {
+    title: '同步画面',
+    body: '画布随帧滑条与播放器更新；角标显示该帧观测相对 action 时钟的 skew（ms）。',
+  },
+  obs_overlay: {
+    title: '关键帧叠加 (F27)',
+    body: '在 RGB 上叠加目标框 (xyxy)、关键点与注意力热图（overlays[].type = box / keypoints / heatmap）。',
   },
   record: {
     title: '录制',
@@ -2454,6 +2507,74 @@ try {
     }
   });
 
+  // ---- Observation sync (F25–F27) ----
+  const obsCamSelect = document.getElementById('obsCamSelect');
+  const obsCanvas = document.getElementById('obsCanvas');
+  const obsAlignHint = document.getElementById('obsAlignHint');
+  const obsFrameHint = document.getElementById('obsFrameHint');
+  const obsImageCache = new Map();
+  const obsAudit = auditObsAlignment(DATA);
+  const obsCams = getCameras(meta);
+  let obsPaintToken = 0;
+
+  if (obsAlignHint) {
+    if (!obsAudit.available) {
+      obsAlignHint.innerHTML = '<span class="tag">无 cameras</span> 本条未声明观测流';
+    } else {
+      const issueTags = obsAudit.issues.slice(0, 4).map((x) => {
+        const cls = x.level === 'error' ? 'bad' : x.level === 'warn' ? 'warn' : 'ok';
+        return `<span class="tag ${cls}">${x.code}</span>`;
+      }).join('') || '<span class="tag ok">aligned</span>';
+      obsAlignHint.innerHTML = `${issueTags}<br>mode=${obsAudit.align.mode} · max_skew=${obsAudit.align.max_skew_ms}ms · ${obsCams.map((c) => c.id).join(', ')}`;
+    }
+  }
+  if (obsCamSelect) {
+    obsCamSelect.innerHTML = obsCams.length
+      ? obsCams.map((c) => `<option value="${c.id}">${c.id} · ${c.stream || 'rgb'}</option>`).join('')
+      : '<option value="">—</option>';
+  }
+
+  function refreshObsView(i) {
+    if (!obsCanvas) return;
+    const camId = obsCamSelect?.value || '';
+    if (!camId || !hasObservation(DATA)) {
+      const ctx = obsCanvas.getContext('2d');
+      const w = obsCanvas.clientWidth || 320;
+      const h = obsCanvas.clientHeight || 168;
+      obsCanvas.width = w;
+      obsCanvas.height = h;
+      ctx.fillStyle = '#0c121c';
+      ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#8b9bb4';
+      ctx.font = '12px sans-serif';
+      ctx.fillText('无 frames[].obs', 12, 28);
+      if (obsFrameHint) obsFrameHint.textContent = '本条 episode 无观测媒体';
+      return;
+    }
+    const token = ++obsPaintToken;
+    paintObsCanvas(obsCanvas, {
+      data: DATA,
+      frameIdx: i,
+      cameraId: camId,
+      episodePath: DATA.__data_path || null,
+      showBoxes: document.getElementById('chkObsBox')?.checked !== false,
+      showKeypoints: document.getElementById('chkObsKp')?.checked !== false,
+      showHeatmap: document.getElementById('chkObsHeat')?.checked !== false,
+      imageCache: obsImageCache,
+    }).then((r) => {
+      if (token !== obsPaintToken || !obsFrameHint) return;
+      const skew = r.skew_ms == null ? '—' : `${r.skew_ms >= 0 ? '+' : ''}${r.skew_ms.toFixed(1)}ms`;
+      obsFrameHint.textContent = r.ok
+        ? `帧 ${i} · ${camId} · ${r.reason} · skew ${skew}`
+        : `帧 ${i} · ${camId} · ${r.reason || '失败'} · skew ${skew}`;
+    });
+  }
+  obsCamSelect?.addEventListener('change', () => refreshObsView(frameIdx));
+  for (const id of ['chkObsBox', 'chkObsKp', 'chkObsHeat']) {
+    document.getElementById(id)?.addEventListener('change', () => refreshObsView(frameIdx));
+  }
+  window.addEventListener('resize', () => refreshObsView(frameIdx));
+
   function showFrame(i) {
     frameIdx = i;
     slider.value = String(i);
@@ -2480,6 +2601,7 @@ try {
     updateTcpFrameHint(tcp, i);
     setHeatmapCursor(i, meta.n_frames);
     paintWs(i);
+    refreshObsView(i);
 
     const row = jointContrib[i];
     contribChart.data.datasets[0].data = Array.from(row);

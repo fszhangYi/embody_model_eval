@@ -119,7 +119,7 @@
           <tr>
             <th>ID</th><th>标题</th><th>机型</th><th>模型</th><th>n</th>
             <th>mean L2</th><th>TCP e_p μ</th><th>双阈值达标</th>
-            <th>单位</th><th>action</th><th>打开</th>
+            <th>单位</th><th>action</th><th>obs</th><th>打开</th>
           </tr>
         </thead>
         <tbody id="epBody"></tbody>
@@ -150,6 +150,7 @@ import {
   listRobots,
   validateEpisodeAgainstRegistry,
 } from './robots_registry.js';
+import { hasObservation, getCameras } from './obs_align.js';
 
 const DATA_ROOT = './data';
 const SKIP_JSON = new Set(['index.json', 'catalog.json', 'manifest.json']);
@@ -261,6 +262,9 @@ function render() {
   $('epBody').innerHTML = rows.map((r) => {
     const u = r.summary.unit;
     const unitCls = u.ok ? 'ok' : 'bad';
+    const obsLabel = r.has_obs
+      ? (r.obs_cams?.length ? r.obs_cams.join(',') : 'yes')
+      : '—';
     return `<tr>
       <td>${r.id}</td>
       <td>${r.label}</td>
@@ -272,9 +276,10 @@ function render() {
       <td>${pct(r.summary.pass_both_rate)}</td>
       <td class="${unitCls}">${u.inferred_unit || '—'}${u.issues.length ? '!' : ''}</td>
       <td>${r.summary.provenance.action_mode || '—'}</td>
+      <td class="muted">${obsLabel}</td>
       <td><a href="./index.html?data=${encodeURIComponent(r.path)}">评测</a></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="11" class="muted">暂无 episode</td></tr>';
+  }).join('') || '<tr><td colspan="12" class="muted">暂无 episode</td></tr>';
 
   const byModel = new Map();
   for (const r of rows) {
@@ -325,6 +330,8 @@ async function ingest(path, { id, label, model } = {}) {
     model: model || data.meta?.policy || data.meta?.model || 'default',
     path,
     summary,
+    has_obs: hasObservation(data),
+    obs_cams: getCameras(data.meta).map((c) => c.id),
   });
 }
 
@@ -353,6 +360,8 @@ async function loadSuite(suiteId) {
         model: data.meta?.policy || data.meta?.model || 'default',
         path,
         summary,
+        has_obs: hasObservation(data),
+        obs_cams: getCameras(data.meta).map((c) => c.id),
       });
     } catch (e) {
       skipped.push(`${name}（${e.message}）`);

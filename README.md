@@ -4,8 +4,9 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 
 - 全屏 Three.js（官方 mesh + 灰/红/蓝三份着色 URDF）
 - TCP（指尖中点）xyz 轴 + 当前帧 ±15 散点
-- 左侧：播放 / 显隐 / 画布录制（WebM）
+- 左侧：播放 / 显隐 / 观测相机同步 (F) / 画布录制（WebM）
 - 右侧：概览、误差、关节轨迹、数值（可折叠）
+- Hub：多 episode 汇总，含 obs 列与机型防呆
 
 浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库静态托管即可。
 
@@ -30,18 +31,20 @@ embody_model_eval/
 ├── robots.json             # 当前可用机械臂型号注册表
 ├── robots_registry.js      # 机型解析辅助
 ├── tcp_metrics.js          # TCP / 任务误差指标
+├── obs_align.js            # 观测对齐 / 相机同步 / 叠加 (F)
 ├── export_report.js        # HTML/JSON 报告与门禁
 ├── favicon.svg / .ico / .png
 ├── data/                   # 比对数据（按套件分子目录）
 │   ├── index.json          # 启动时由 serve.sh 实时刷新
-│   ├── 20260819/episode_*.json
-│   ├── 20260405/episode_*.json
-│   └── short/episode_*.json   # 5–10 帧短轨迹
+│   ├── 20260819/episode_*.json + media/   # 含观测演示 (F)
+│   ├── 20260405/episode_*.json + media/
+│   └── short/episode_*.json + media/      # 5–10 帧短轨迹
 ├── vendor/                 # 离线前端依赖（Three / Chart.js / urdf-loader）
 ├── scripts/
 │   ├── batch_score.py      # 批量跑分 + 门禁
 │   ├── bag_to_compare.py   # 日志 → episode JSON
-│   ├── gen_sim_episodes.py # 生成多条模拟 episode
+│   ├── gen_sim_episodes.py # 生成模拟 episode（--short 默认附带观测）
+│   ├── gen_obs_media.py    # 为套件补 RGB/Depth/注意力媒体 (F)
 │   ├── refresh_data_index.py
 │   └── thresholds.example.json
 ├── serve.sh
@@ -115,10 +118,11 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 - 批量生成模拟数据：
 
 ```bash
-python3 scripts/gen_sim_episodes.py --short          # 5–10 帧短轨迹（推荐演示）
-python3 scripts/gen_sim_episodes.py --preset         # 较长默认布局
+python3 scripts/gen_sim_episodes.py --short          # 5–10 帧短轨迹（推荐演示，默认附带 obs）
+python3 scripts/gen_sim_episodes.py --preset --with-obs
+python3 scripts/gen_obs_media.py --all               # 仅为已有 episode 补观测媒体
 # 或指定套件 / 机型：
-python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --n-frames 8 --robot so100 --overwrite
+python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --n-frames 8 --robot so100 --overwrite --with-obs
 ```
 
 重新生成模拟评测数据（可选，在 `act_robot` 中）：
@@ -147,6 +151,7 @@ python /root/autodl-tmp/act_robot/scripts/compare_pose_offline.py \
 - **速度**：默认约 `0.2×`（相对数据 fps）
 - **录制**：仅 Three.js 画布 → WebM；侧栏不进入录像
 - **导出**：左侧「导出 / 门禁」可下载 HTML 报告或 `eval_summary.json`（供批量门禁）
+- **观测 (F)**：左侧「观测相机 (F)」与帧滑条/播放同步；Hub Episode 表有 `obs` 列
 - **TCP**：gripper 系指尖中点约 `(0, -0.1062, 0)`；任务误差需 `meta.goal_pose = {pos, quat, approach?}`
 - **浏览器图标**：`favicon.svg` / `favicon.ico` / `favicon.png`（标签页与书签）
 
@@ -219,6 +224,30 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 | E22 | 批量跑分 CLI → JSON/CSV（`scripts/batch_score.py`） | ✅ |
 | E23 | 阈值门禁（页面 + CLI `--fail-on-gate`） | ✅ |
 | E24 | 真机 / 遥操作日志回放（`scripts/bag_to_compare.py`：JSONL/CSV→评测 JSON） | ✅ 需先导出关节轨迹；不直接解析 ROS bag 二进制 |
+
+### F. 观测与多模态对齐
+
+| # | 项 | 状态 |
+|---|----|------|
+| F25 | 同步回放相机（RGB/Depth）与关节/TCP | ✅ 左侧「观测相机 (F)」；各套件 `media/` 含 demo |
+| F26 | `obs` 时间戳对齐协议（frame ↔ image ↔ action） | ✅ `meta.obs_alignment` + `obs_align.js` 审计 / skew |
+| F27 | 关键帧叠加投影（目标框 / 深度 / 注意力） | ✅ `overlays`: box / keypoints / heatmap |
+
+**协议字段**
+
+- `meta.cameras[]`：声明流（`id` / `stream`: rgb|depth|attention / 分辨率）
+- `meta.obs_alignment`：`mode` = `frame_index` | `nearest_timestamp`，`max_skew_ms`，`action_time_field`（默认 `timestamp`）
+- `frames[i].obs[camId]`：`{ path, t?, overlays? }`；`overlays` 支持 `box` / `keypoints` / `heatmap`
+
+**如何在页面上看到**
+
+| 项 | 操作 / 现象 |
+|----|-------------|
+| F25 | 打开任意套件 episode → 左侧「观测相机 (F)」→ 拖帧或播放：图像与 3D 关节/TCP **同帧切换**；可切 `wrist` / `front` / `wrist_depth` |
+| F26 | 面板顶部显示对齐审计（`mode` / `max_skew`）；画布角标与底部 hint 显示 `skew ±ms`；演示数据在 **wrist 末两帧** 故意约 +80ms，超 50ms 阈值会出现 `skew` 告警 |
+| F27 | 勾选「目标框 / 关键点 / 注意力」在 RGB 上叠加；depth 流为灰度深度图 |
+
+逻辑在 `obs_align.js`；补媒体：`python3 scripts/gen_obs_media.py --all`（`--short` 生成模拟数据时默认附带）。
 
 **建议后续优先：** 用真实多 episode manifest 填满 Hub；按机型写准 `meta.joint_limits`；碰撞粗检可再换成凸包/URDF collision。
 

@@ -211,7 +211,22 @@ def main() -> int:
         action="store_true",
         help="write/overwrite short demos (5–10 frames) under short/ + refresh existing suites",
     )
+    ap.add_argument(
+        "--with-obs",
+        dest="with_obs",
+        action="store_true",
+        default=None,
+        help="生成后附加 RGB/Depth/注意力媒体（F）；--short 默认开启",
+    )
+    ap.add_argument(
+        "--no-obs",
+        dest="with_obs",
+        action="store_false",
+        help="不生成观测媒体",
+    )
     args = ap.parse_args()
+    if args.with_obs is None:
+        args.with_obs = bool(args.short)
 
     robots_path = ROOT / "robots.json"
     if robots_path.is_file():
@@ -309,6 +324,15 @@ def main() -> int:
         )
         write_episode(out, payload)
         written.append(f"{out.relative_to(ROOT)} (n={n_frames})")
+        if args.with_obs:
+            scripts_dir = Path(__file__).resolve().parent
+            if str(scripts_dir) not in sys.path:
+                sys.path.insert(0, str(scripts_dir))
+            from gen_obs_media import patch_episode
+
+            media_root = out.parent / "media"
+            rel_prefix = f"./data/{suite}/media"
+            patch_episode(out, media_root, rel_prefix)
 
     print(f"wrote {len(written)} file(s)")
     for p in written:
@@ -317,6 +341,8 @@ def main() -> int:
         print(f"skipped {len(skipped)} existing (use --overwrite):")
         for p in skipped:
             print(f"  · {p}")
+    if args.with_obs and written:
+        print("obs media attached (F25–F27)")
     return 0
 
 
