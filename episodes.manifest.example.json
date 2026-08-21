@@ -1,0 +1,23 @@
+{
+  "title": "Embody multi-episode / multi-model hub",
+  "thresholds": {
+    "pass_ep_mm": 5,
+    "pass_eR_deg": 5
+  },
+  "episodes": [
+    {
+      "id": "ep0",
+      "label": "simulate · default",
+      "path": "./compare_result.json",
+      "model": "baseline"
+    }
+  ],
+  "models": [
+    {
+      "id": "baseline",
+      "label": "Baseline",
+      "episodes": ["ep0"]
+    }
+  ],
+  "_comment": "C13/C14: list multiple compare_result.json paths; hub.html loads this manifest."
+}

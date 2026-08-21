@@ -1,9 +1,244 @@
-<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"/>
-<title>Embody Model Eval</title>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Embody Eval Hub · C 高级汇总</title>
 <link rel="icon" href="./favicon.svg" type="image/svg+xml"/>
-<link rel="icon" href="./favicon.ico" sizes="any"/>
-<link rel="apple-touch-icon" href="./favicon.png"/>
-<meta http-equiv="refresh" content="0; url=./index.html"/>
-</head><body>
-<p><a href="./index.html">打开 Embody 模型评测页</a></p>
-</body></html>
+<style>
+  :root {
+    --bg: #0b1018; --panel: #121a26; --border: #3a4d66;
+    --text: #e7ecf3; --muted: #8b9bb4; --accent: #3dd6c6; --danger: #f87171;
+  }
+  * { box-box: border-box; box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100vh;
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    background: radial-gradient(900px 480px at 10% -10%, #1a2740, var(--bg) 55%);
+    color: var(--text);
+  }
+  header {
+    padding: 18px 22px 8px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 1.15rem; }
+  header a { color: var(--accent); font-size: 0.85rem; }
+  .muted { color: var(--muted); font-size: 0.8rem; }
+  main { padding: 8px 22px 40px; max-width: 1100px; }
+  .card {
+    background: rgba(18,26,38,0.92); border: 1px solid var(--border);
+    border-radius: 12px; padding: 14px 16px; margin-top: 14px;
+  }
+  .stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+  .stat { background: rgba(12,18,28,0.7); border-radius: 8px; padding: 8px 10px; }
+  .stat .l { font-size: 0.68rem; color: var(--muted); }
+  .stat .v { font-size: 0.95rem; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  th, td { border-bottom: 1px solid rgba(58,77,102,0.55); padding: 7px 8px; text-align: left; }
+  th { color: var(--muted); font-weight: 500; }
+  tr:hover td { background: rgba(61,214,198,0.06); }
+  input, button {
+    background: #243247; color: var(--text); border: 1px solid #354a66;
+    border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 0.8rem;
+  }
+  button { cursor: pointer; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .ok { color: #4ade80; } .bad { color: var(--danger); }
+  .warn { color: #fbbf24; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Embody Eval Hub</h1>
+  <span class="muted">C13 多 episode 汇总 · C14 多模型对比 · C15/C16 元数据</span>
+  <a href="./index.html">← 单轨迹评测页</a>
+</header>
+<main>
+  <div class="card">
+    <div class="muted">加载 manifest（默认 <code>episodes.manifest.example.json</code>），或手动填多个 JSON 路径。</div>
+    <div class="row">
+      <input id="manifestPath" style="flex:1;min-width:220px" value="./episodes.manifest.example.json"/>
+      <button id="btnLoad" type="button">加载</button>
+    </div>
+    <div class="row">
+      <input id="extraPaths" style="flex:1;min-width:220px" placeholder="额外 compare JSON，逗号分隔，如 ./a.json,./b.json"/>
+      <button id="btnAdd" type="button">加入对比</button>
+    </div>
+    <p class="muted" id="status">尚未加载</p>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px;font-size:0.95rem">汇总（C13）</h3>
+    <div class="stats" id="aggStats"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px;font-size:0.95rem">Episode 表</h3>
+    <div style="overflow:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>标题</th><th>模型</th><th>n</th>
+            <th>mean L2</th><th>TCP e_p μ</th><th>双阈值达标</th>
+            <th>单位</th><th>action</th><th>打开</th>
+          </tr>
+        </thead>
+        <tbody id="epBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px;font-size:0.95rem">模型对比（C14）</h3>
+    <div style="overflow:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>模型</th><th>episodes</th><th>mean L2</th>
+            <th>TCP e_p μ</th><th>双阈值达标</th><th>ckpt / policy</th>
+          </tr>
+        </thead>
+        <tbody id="modelBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { summarizeEpisode, aggregateEpisodes, extractProvenance } from './advanced_cd.js';
+
+const $ = (id) => document.getElementById(id);
+const rows = []; // { id, label, model, path, summary }
+
+function fmt(x, d = 2) {
+  return Number.isFinite(x) ? x.toFixed(d) : '—';
+}
+function pct(x) {
+  return Number.isFinite(x) ? `${(x * 100).toFixed(1)}%` : '—';
+}
+
+async function fetchJson(path) {
+  const res = await fetch(path + (path.includes('?') ? '&' : '?') + '_=' + Date.now());
+  if (!res.ok) throw new Error(`${path} → ${res.status}`);
+  return res.json();
+}
+
+function render() {
+  const agg = aggregateEpisodes(rows.map((r) => r.summary));
+  $('aggStats').innerHTML = [
+    ['episodes', agg.n],
+    ['mean L2', fmt(agg.mean_l2, 3)],
+    ['TCP e_p μ', fmt(agg.tcp_ep_mean_mm)],
+    ['双阈值达标', pct(agg.pass_both_rate)],
+    ['高达标 episode', `${agg.success_episodes ?? 0}`],
+  ].map(([l, v]) => `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+
+  $('epBody').innerHTML = rows.map((r) => {
+    const u = r.summary.unit;
+    const unitCls = u.ok ? 'ok' : 'bad';
+    return `<tr>
+      <td>${r.id}</td>
+      <td>${r.label}</td>
+      <td>${r.model || '—'}</td>
+      <td>${r.summary.n_frames}</td>
+      <td>${fmt(r.summary.mean_l2, 3)}</td>
+      <td>${fmt(r.summary.tcp_ep_mean_mm)}</td>
+      <td>${pct(r.summary.pass_both_rate)}</td>
+      <td class="${unitCls}">${u.inferred_unit || '—'}${u.issues.length ? '!' : ''}</td>
+      <td>${r.summary.provenance.action_mode || '—'}</td>
+      <td><a href="./index.html?data=${encodeURIComponent(r.path)}">评测</a></td>
+    </tr>`;
+  }).join('');
+
+  // group by model
+  const byModel = new Map();
+  for (const r of rows) {
+    const m = r.model || 'default';
+    if (!byModel.has(m)) byModel.set(m, []);
+    byModel.get(m).push(r);
+  }
+  $('modelBody').innerHTML = [...byModel.entries()].map(([mid, list]) => {
+    const aggM = aggregateEpisodes(list.map((x) => x.summary));
+    const prov = list[0]?.summary.provenance || {};
+    return `<tr>
+      <td>${mid}</td>
+      <td>${list.length}</td>
+      <td>${fmt(aggM.mean_l2, 3)}</td>
+      <td>${fmt(aggM.tcp_ep_mean_mm)}</td>
+      <td>${pct(aggM.pass_both_rate)}</td>
+      <td class="muted">${prov.ckpt || '—'} / ${prov.policy || '—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+async function ingest(path, { id, label, model } = {}) {
+  const data = await fetchJson(path);
+  // Hub stays light: joint-level summary only (no URDF FK / TCP) to save memory.
+  const summary = summarizeEpisode(data, null);
+  // If export sidecar exists, enrich TCP fields
+  try {
+    const side = path.replace(/compare_result\.json$/, 'eval_summary.json');
+    if (side !== path) {
+      const s = await fetchJson(side);
+      if (s?.tcp?.summary) {
+        summary.tcp_ep_mean_mm = s.tcp.summary.ep_mm?.mean ?? null;
+        summary.tcp_eR_mean_deg = s.tcp.summary.eR_deg?.mean ?? null;
+        const thr = 5;
+        // pass rates unknown without series — leave null
+      }
+    }
+  } catch (_) { /* optional */ }
+
+  const epId = id || `ep${rows.length}`;
+  rows.push({
+    id: epId,
+    label: label || data.meta?.title || epId,
+    model: model || data.meta?.policy || 'default',
+    path,
+    summary,
+  });
+}
+
+async function loadManifest(path) {
+  rows.length = 0;
+  $('status').textContent = `加载 ${path} …`;
+  const man = await fetchJson(path);
+  const thr = man.thresholds || {};
+  for (const ep of man.episodes || []) {
+    const data = await fetchJson(ep.path);
+    const summary = summarizeEpisode(data, null, thr);
+    rows.push({
+      id: ep.id,
+      label: ep.label || summary.title,
+      model: ep.model || summary.provenance.policy || 'default',
+      path: ep.path,
+      summary,
+    });
+  }
+  $('status').textContent = `已加载 ${rows.length} episode · ${man.title || path}`;
+  render();
+}
+
+$('btnLoad').onclick = () => loadManifest($('manifestPath').value.trim()).catch((e) => {
+  $('status').innerHTML = `<span class="bad">${e.message}</span>`;
+});
+$('btnAdd').onclick = async () => {
+  const raw = $('extraPaths').value.trim();
+  if (!raw) return;
+  try {
+    for (const p of raw.split(',').map((s) => s.trim()).filter(Boolean)) {
+      await ingest(p);
+    }
+    $('status').textContent = `当前 ${rows.length} 条`;
+    render();
+  } catch (e) {
+    $('status').innerHTML = `<span class="bad">${e.message}</span>`;
+  }
+};
+
+loadManifest($('manifestPath').value.trim()).catch((e) => {
+  $('status').innerHTML = `<span class="warn">默认 manifest 未加载：${e.message}</span>`;
+});
+</script>
+</body>
+</html>

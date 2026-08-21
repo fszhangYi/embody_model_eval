@@ -144,19 +144,21 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 
 | # | 项 | 状态 |
 |---|----|------|
-| C13 | 多 episode / 多任务汇总页；阈值达标率 | 🔶 单轨迹达标率已有；多 episode 汇总页未做 |
-| C14 | 多模型 / 多 checkpoint 同页对比 | ❌ |
-| C15 | `action_mode` 明示 + 单位校验 | 🔶 UI 已显示；单位/语义校验未做 |
-| C16 | dataset / 策略 / ckpt / obs 等 meta 可导出 | 🔶 导出 JSON 已带部分 meta 字段；采集侧约定未强制 |
-| C17 | 失败帧自动挑出 + 一键跳转 | ✅ Top‑K 最差帧（按 \(e_p\)） |
+| C13 | 多 episode / 多任务汇总页；阈值达标率 | ✅ `hub.html` + manifest；单页达标率亦有 |
+| C14 | 多模型 / 多 checkpoint 同页对比 | ✅ Hub 按 model 聚合对比表 |
+| C15 | `action_mode` 明示 + 单位校验 | ✅ 启发式 deg/rad 与 mode 告警 |
+| C16 | dataset / 策略 / ckpt / obs 等 meta 可导出 | ✅ 页面 provenance + 导出 JSON 字段 |
+| C17 | 失败帧自动挑出 + 一键跳转 | ✅ Top‑K + 失败分类（e_p / e_R / 抖动） |
 
 ### D. 物理 / 安全合理性（具身特有）
 
 | # | 项 | 状态 |
 |---|----|------|
-| D18 | 关节限位 / 奇异附近告警 | ❌ |
-| D19 | 自碰 / 桌面碰撞粗检 | ❌ |
-| D20 | 平滑性与可执行性（关节跳跃、超速占比） | ❌ |
+| D18 | 关节限位 / 奇异附近告警 | ✅ 限位越界 + 可操作度抽样 |
+| D19 | 自碰 / 桌面碰撞粗检 | ✅ link 球心距 + 桌面平面（粗检） |
+| D20 | 平滑性与可执行性（关节跳跃、超速占比） | ✅ |
+
+> C/D 为高级功能：逻辑在 `advanced_cd.js`，汇总页 `hub.html`。
 
 ### E. 工程与工作流
 
@@ -167,7 +169,7 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 | E23 | 阈值门禁（页面 + CLI `--fail-on-gate`） | ✅ |
 | E24 | 真机 / 遥操作日志回放（`scripts/bag_to_compare.py`：JSONL/CSV→评测 JSON） | ✅ 需先导出关节轨迹；不直接解析 ROS bag 二进制 |
 
-**建议后续优先：** C14 多模型对比 → C13 多 episode 汇总 → D18 / D20 安全与可执行性告警。
+**建议后续优先：** 用真实多 episode manifest 填满 Hub；按机型写准 `meta.joint_limits`；碰撞粗检可再换成凸包/URDF collision。
 
 ## 更换机械臂
 

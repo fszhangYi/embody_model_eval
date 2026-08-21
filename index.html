@@ -244,6 +244,20 @@
   .ws-wrap { position: relative; height: 168px; border-radius: 8px; overflow: hidden;
     border: 1px solid rgba(58,77,102,0.45); background: rgba(12,18,28,0.65); }
   .ws-wrap canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+  .adv-list { list-style: none; margin: 0; padding: 0; max-height: 160px; overflow: auto; }
+  .adv-list li {
+    font-size: 0.72rem; padding: 4px 6px; border-radius: 5px;
+    font-variant-numeric: tabular-nums; cursor: pointer;
+  }
+  .adv-list li:hover { background: rgba(61,214,198,0.1); color: var(--accent); }
+  .adv-list li.warn { color: #fbbf24; }
+  .adv-list li.bad { color: var(--danger); }
+  .tag {
+    display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 0.65rem;
+    border: 1px solid var(--border); color: var(--muted); margin-right: 4px;
+  }
+  .tag.ok { color: #4ade80; border-color: rgba(74,222,128,0.45); }
+  .tag.bad { color: var(--danger); border-color: rgba(248,113,113,0.45); }
 
   @media (max-width: 900px) {
     .topbar .meta { display: none; }
@@ -264,6 +278,7 @@
     <i class="dot" style="background:var(--gt)"></i>GT
     <i class="dot" style="background:var(--pred)"></i>pred
   </span>
+  <a class="pill" href="./hub.html" style="text-decoration:none;color:inherit">Hub · 多episode</a>
 </div>
 
 <aside class="hud drawer-rail left">
@@ -440,6 +455,26 @@
   </details>
 
   <details class="drawer">
+    <summary>高级 · 协议 / 元数据 (C)</summary>
+    <div class="body">
+      <p class="hint" id="unitHint">单位 / action_mode 校验…</p>
+      <p class="hint" id="provHint" style="margin-top:6px">provenance…</p>
+      <p class="hint" style="margin-top:8px">失败分类（大 e_p / e_R / 抖动）· 点击跳转</p>
+      <ul class="adv-list" id="failClassList"></ul>
+    </div>
+  </details>
+
+  <details class="drawer">
+    <summary>高级 · 安全 / 可执行 (D)</summary>
+    <div class="body">
+      <div class="stats-row" id="safetyStats"></div>
+      <p class="hint" style="margin-top:8px">越限 / 近奇异 / 超速 · 点击跳转（抽样计算以控内存）</p>
+      <ul class="adv-list" id="safetyList"></ul>
+      <p class="hint" style="margin-top:6px" id="collisionHint">碰撞粗检…</p>
+    </div>
+  </details>
+
+  <details class="drawer">
     <summary>说明</summary>
     <div class="body">
       <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。</p>
@@ -458,6 +493,12 @@ import {
   evaluateGates,
   downloadText,
 } from './export_report.js';
+import {
+  validateUnitsAndActionMode,
+  extractProvenance,
+  classifyFailureFrames,
+  buildSafetyReport,
+} from './advanced_cd.js';
 
 const JOINTS = [
   'shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'
@@ -473,9 +514,13 @@ const TCP_WINDOW = 15;
 const TCP_MAX = TCP_WINDOW * 2 + 1;
 
 async function loadData() {
-  const res = await fetch('./compare_result.json?_=' + Date.now());
-  if (!res.ok) throw new Error('无法加载 compare_result.json');
-  return res.json();
+  const qs = new URLSearchParams(location.search);
+  const dataPath = qs.get('data') || './compare_result.json';
+  const res = await fetch(dataPath + (dataPath.includes('?') ? '&' : '?') + '_=' + Date.now());
+  if (!res.ok) throw new Error(`无法加载 ${dataPath}`);
+  const json = await res.json();
+  json.__data_path = dataPath;
+  return json;
 }
 
 function softMaterial(robot) {
@@ -1724,6 +1769,157 @@ try {
       `<tr><td>${n}</td><td>${f.current[j].toFixed(2)}</td><td>${f.next_gt[j].toFixed(2)}</td><td>${f.next_pred[j].toFixed(2)}</td><td>${f.err[j].toFixed(2)}</td></tr>`
     ).join('');
   }
+
+  // ---- Advanced C / D (local-only features; not pushed) ----
+  function pauseJump(i) {
+    playing = false;
+    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').classList.remove('active');
+    showFrame(i);
+  }
+
+  const unitCheck = validateUnitsAndActionMode(DATA);
+  const provenance = extractProvenance(meta);
+  const unitEl = document.getElementById('unitHint');
+  if (unitEl) {
+    const tags = [
+      `<span class="tag ${unitCheck.ok ? 'ok' : 'bad'}">${unitCheck.ok ? '校验通过' : '校验异常'}</span>`,
+      `<span class="tag">推断 ${unitCheck.inferred_unit}</span>`,
+      `<span class="tag">声明 ${unitCheck.declared_unit || '—'}</span>`,
+      `<span class="tag">mode ${unitCheck.action_mode || '—'}</span>`,
+    ].join('');
+    const msgs = [...unitCheck.issues, ...unitCheck.warnings].map((x) => x.msg).join('；') || '无额外告警';
+    unitEl.innerHTML = `${tags}<br>${msgs}`;
+  }
+  const provEl = document.getElementById('provHint');
+  if (provEl) {
+    provEl.textContent = [
+      `dataset=${provenance.dataset_id || '—'}`,
+      `policy=${provenance.policy || '—'}`,
+      `ckpt=${provenance.ckpt || '—'}`,
+      `obs=${provenance.obs_modality || '—'}`,
+      `seed=${provenance.seed ?? '—'}`,
+      `episode=${provenance.episode_id || '—'}`,
+      `task=${provenance.task || '—'}`,
+      `src=${DATA.__data_path || provenance.source || '—'}`,
+    ].join(' · ');
+  }
+
+  const fails = classifyFailureFrames(tcp, { epMm: Math.max(12, thrEp * 2), eRDeg: Math.max(12, thrEr * 2) });
+  const failList = document.getElementById('failClassList');
+  if (failList) {
+    failList.innerHTML = fails.slice(0, 24).map((f) =>
+      `<li data-frame="${f.i}" class="${f.reasons.includes('large_ep') ? 'bad' : 'warn'}">`
+      + `t=${f.i} · e_p ${f.ep_mm.toFixed(1)} · e_R ${f.eR_deg.toFixed(1)} · ${f.reasons.join('+')}`
+      + `</li>`
+    ).join('') || '<li class="hint">未触发失败阈值</li>';
+    failList.addEventListener('click', (e) => {
+      const li = e.target.closest('li[data-frame]');
+      if (li) pauseJump(Number(li.dataset.frame));
+    });
+  }
+
+  const qPredSeries = DATA.frames.map((f) => f.next_pred);
+  const probeQ = DATA.frames[0].next_pred.slice();
+  const _tmp = new THREE.Vector3();
+  const fkPos = (qDeg) => {
+    setPose(world.armGT, qDeg);
+    const { pos } = getTcpPose(world.armGT);
+    return { x: pos.x, y: pos.y, z: pos.z };
+  };
+  const LINK_SAMPLE = ['base', 'shoulder', 'upper_arm', 'lower_arm', 'wrist', 'gripper'];
+  const stride = Math.max(1, Math.ceil(DATA.frames.length / 60));
+  const linkSeries = [];
+  for (let i = 0; i < DATA.frames.length; i += stride) {
+    setPose(world.armPred, DATA.frames[i].next_pred);
+    world.armPred.updateMatrixWorld(true);
+    const links = [];
+    for (const name of LINK_SAMPLE) {
+      const link = world.armPred.links?.[name];
+      if (!link) continue;
+      link.getWorldPosition(_tmp);
+      links.push({ name, pos: { x: _tmp.x, y: _tmp.y, z: _tmp.z } });
+    }
+    linkSeries.push(links);
+    // map collision frame index: store actual i on first link marker via parallel array
+    if (links.length) links._frame = i;
+  }
+  // Remap collision hits: analyzeCollisions uses linkSeries index; convert via stride
+  const safety = buildSafetyReport({
+    qPredSeries,
+    names,
+    meta,
+    fps: meta.fps || 30,
+    fkPos,
+    linkSeries,
+    stride,
+  });
+  // restore poses for current frame later via showFrame(0)
+  setPose(world.armGT, probeQ);
+
+  // rewrite collision frame indices from subsampled → real
+  const mapHit = (hits) => hits.map((h) => {
+    const real = (linkSeries[h.i] && linkSeries[h.i]._frame != null)
+      ? linkSeries[h.i]._frame
+      : h.i * stride;
+    return { ...h, i: real };
+  });
+  safety.collision.table_hits = mapHit(safety.collision.table_hits || []);
+  safety.collision.self_hits = mapHit(safety.collision.self_hits || []);
+
+  const sBox = document.getElementById('safetyStats');
+  if (sBox) {
+    sBox.innerHTML = '';
+    for (const [label, value] of [
+      ['越限', String(safety.limits.n_over)],
+      ['近限位', String(safety.limits.n_near)],
+      ['近奇异', String(safety.limits.n_sing)],
+      ['超速事件', String(safety.smooth.n_over_speed)],
+      ['桌面碰', String(safety.collision.n_table)],
+      ['自碰', String(safety.collision.n_self)],
+    ]) {
+      const d = document.createElement('div');
+      d.className = 'stat';
+      d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
+      sBox.appendChild(d);
+    }
+  }
+  const sList = document.getElementById('safetyList');
+  if (sList) {
+    const items = [];
+    for (const h of safety.limits.over_limit.slice(0, 12)) {
+      items.push({ i: h.i, cls: 'bad', text: `越限 t=${h.i} ${h.joint}=${h.q.toFixed(1)}°` });
+    }
+    for (const h of safety.limits.singularity_frames.slice(0, 8)) {
+      items.push({ i: h.i, cls: 'warn', text: `近奇异 t=${h.i} w=${h.manipulability.toExponential(2)}` });
+    }
+    for (const h of safety.smooth.over_speed.slice(0, 8)) {
+      items.push({ i: h.i, cls: 'warn', text: `超速 t=${h.i} ${h.joint} ${h.deg_s.toFixed(0)}°/s` });
+    }
+    for (const h of safety.smooth.jump_frames.slice(0, 6)) {
+      items.push({ i: h.i, cls: 'warn', text: `关节跳变 t=${h.i} L2=${h.l2_deg.toFixed(1)}°` });
+    }
+    sList.innerHTML = items.map((x) =>
+      `<li data-frame="${x.i}" class="${x.cls}">${x.text}</li>`
+    ).join('') || '<li>未发现明显安全/可执行告警</li>';
+    sList.addEventListener('click', (e) => {
+      const li = e.target.closest('li[data-frame]');
+      if (li) pauseJump(Number(li.dataset.frame));
+    });
+  }
+  const colHint = document.getElementById('collisionHint');
+  if (colHint) {
+    const th = safety.collision.table_hits[0];
+    const sh = safety.collision.self_hits[0];
+    colHint.textContent =
+      `碰撞粗检 stride=${stride} · 桌面命中 ${safety.collision.n_table}`
+      + (th ? `（例 t=${th.i} ${th.link} z=${th.z.toFixed(3)}）` : '')
+      + ` · 自碰 ${safety.collision.n_self}`
+      + (sh ? `（例 t=${sh.i} ${sh.a}/${sh.b} ${sh.dist_mm.toFixed(1)}mm）` : '')
+      + ' · 简化球体，仅供参考';
+  }
+
+  // enrich export provenance into gates summary path already uses meta
 
   slider.addEventListener('input', () => {
     playing = false;
