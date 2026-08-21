@@ -518,6 +518,16 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt: str, *args: Any) -> None:
         print("[%s] %s" % (self.log_date_time_string(), fmt % args), file=sys.stderr)
 
+    def end_headers(self) -> None:  # noqa: N802
+        # Dev-friendly: avoid stale ES modules / HTML after deploys
+        try:
+            path = unquote(urlparse(self.path).path).lower()
+            if path.endswith((".js", ".mjs", ".css", ".html", ".json", ".svg")):
+                self.send_header("Cache-Control", "no-store")
+        except Exception:
+            pass
+        super().end_headers()
+
     def _send(self, status: int, body: bytes, content_type: str) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)

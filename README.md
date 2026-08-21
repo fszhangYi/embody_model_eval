@@ -192,8 +192,8 @@ python /root/autodl-tmp/act_robot/scripts/compare_pose_offline.py \
 - **快捷键（评测页）**：空格 播放/暂停 · ←/→ 切帧 · Home 重置 · R 开始录制 · T 停止 · S 保存
 - **页面入口**：顶栏「页面」下拉（`nav_pages.js`）；含评测 / Hub / **模型数据流** / Chat / **机械臂 3D**
 - **机械臂 3D**：`robots.html` — 下拉选 SO-100 / EC616，拖拽旋转、关节滑条、home / 零位
-- **数据流画布**：`pipeline.html` — 下拉选 SAM2Grasp / 纯 ACT(CVAE)，再切训练·推理；可拖拽与流动演示
-- **录制**：仅 Three.js 画布 → WebM；侧栏不进入录像
+- **数据流画布**：`pipeline.html` — 下拉选 SAM2Grasp / 纯 ACT(CVAE)，再切训练·推理；可拖拽、流动演示与画布录像（WebM）
+- **录制**：评测页录 Three.js 画布；数据流页合成录制节点图（连线 + 节点）→ WebM；侧栏说明不进入录像
 - **导出**：左侧「导出 / 门禁」可下载 HTML 报告或 `eval_summary.json`（供批量门禁）
 - **观测 (F)**：左侧「观测相机 (F)」与帧滑条/播放同步；Hub Episode 表有 `obs` 列
 - **任务 (G)**：右侧「任务 / 接触 (G)」看 success/fail、力事件与动态物体；Hub 有「任务」列

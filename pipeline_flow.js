@@ -644,6 +644,174 @@ export class FlowCanvas {
     this.draw();
   }
 
+  /**
+   * Composite stage (wires canvas + DOM nodes) onto an offscreen canvas stream for MediaRecorder.
+   * @param {number} [fps=30]
+   * @returns {{ stream: MediaStream, stop: () => void }}
+   */
+  beginCapture(fps = 30) {
+    this.endCapture();
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    let cssW = Math.max(1, this.stage.clientWidth);
+    let cssH = Math.max(1, this.stage.clientHeight);
+    const cap = document.createElement('canvas');
+    cap.width = Math.max(1, Math.floor(cssW * dpr));
+    cap.height = Math.max(1, Math.floor(cssH * dpr));
+    const ctx = cap.getContext('2d');
+    this._cap = { canvas: cap, ctx, dpr, cssW, cssH, raf: 0, active: true };
+
+    const paint = () => {
+      const c = this._cap;
+      if (!c || !c.active) return;
+      const w = Math.max(1, this.stage.clientWidth);
+      const h = Math.max(1, this.stage.clientHeight);
+      if (w !== c.cssW || h !== c.cssH) {
+        c.cssW = w;
+        c.cssH = h;
+        c.dpr = Math.min(window.devicePixelRatio || 1, 2);
+        c.canvas.width = Math.max(1, Math.floor(w * c.dpr));
+        c.canvas.height = Math.max(1, Math.floor(h * c.dpr));
+      }
+      this.paintComposite(c.ctx, c.cssW, c.cssH, c.dpr);
+      c.raf = requestAnimationFrame(paint);
+    };
+    paint();
+
+    const stream = cap.captureStream(fps);
+    return {
+      stream,
+      stop: () => this.endCapture(),
+    };
+  }
+
+  endCapture() {
+    if (!this._cap) return;
+    this._cap.active = false;
+    cancelAnimationFrame(this._cap.raf);
+    this._cap = null;
+  }
+
+  /**
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {number} cssW
+   * @param {number} cssH
+   * @param {number} dpr
+   */
+  paintComposite(ctx, cssW, cssH, dpr) {
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.fillStyle = '#0b1018';
+    ctx.fillRect(0, 0, cssW, cssH);
+    // Wires + grid (already CSS-pixel sized via ctx transform on flow canvas)
+    try {
+      ctx.drawImage(this.canvas, 0, 0, cssW, cssH);
+    } catch (_) { /* tainted / zero size */ }
+
+    const stageRect = this.stage.getBoundingClientRect();
+    for (const el of this.nodeEls.values()) {
+      const r = el.getBoundingClientRect();
+      const x = r.left - stageRect.left;
+      const y = r.top - stageRect.top;
+      if (r.width < 2 || r.height < 2) continue;
+      if (x + r.width < 0 || y + r.height < 0 || x > cssW || y > cssH) continue;
+      this._paintNodeCard(ctx, el, x, y, r.width, r.height);
+    }
+  }
+
+  /**
+   * Approximate DOM node card for the recording composite.
+   * @param {CanvasRenderingContext2D} ctx
+   * @param {HTMLElement} el
+   * @param {number} x
+   * @param {number} y
+   * @param {number} w
+   * @param {number} h
+   */
+  _paintNodeCard(ctx, el, x, y, w, h) {
+    const kind = (getComputedStyle(el).getPropertyValue('--kind') || '#64748b').trim() || '#64748b';
+    const selected = el.classList.contains('selected');
+    const title = el.querySelector('.flow-node-title')?.textContent?.trim() || '';
+    const kindLabel = el.querySelector('.flow-node-kind')?.textContent?.trim() || '';
+    const file = el.querySelector('.flow-node-file')?.textContent?.trim() || '';
+    const radius = Math.min(10, w * 0.06);
+
+    ctx.save();
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') ctx.roundRect(x, y, w, h, radius);
+    else {
+      ctx.rect(x, y, w, h);
+    }
+    ctx.fillStyle = 'rgba(18, 26, 38, 0.96)';
+    ctx.fill();
+    ctx.lineWidth = selected ? 2 : 1;
+    ctx.strokeStyle = selected ? '#3dd6c6' : 'rgba(58, 77, 102, 0.85)';
+    ctx.stroke();
+
+    // Title bar
+    const titleH = Math.max(28, Math.min(36, h * 0.28));
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, w, titleH, [radius, radius, 0, 0]);
+    } else {
+      ctx.rect(x, y, w, titleH);
+    }
+    ctx.fillStyle = 'rgba(12, 18, 28, 0.65)';
+    ctx.fill();
+    ctx.fillStyle = kind;
+    ctx.fillRect(x, y, 3, titleH);
+
+    ctx.fillStyle = '#e7ecf3';
+    ctx.font = `600 ${Math.max(11, Math.min(13, w * 0.062))}px "IBM Plex Sans", "Segoe UI", sans-serif`;
+    ctx.textBaseline = 'middle';
+    ctx.fillText(truncateCanvasText(ctx, title, w - 52), x + 10, y + titleH / 2);
+
+    if (kindLabel) {
+      ctx.fillStyle = kind;
+      ctx.font = `600 ${Math.max(9, Math.min(10, w * 0.05))}px "IBM Plex Sans", "Segoe UI", sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.fillText(kindLabel.toUpperCase(), x + w - 8, y + titleH / 2);
+      ctx.textAlign = 'left';
+    }
+
+    // Ports
+    const inPorts = [...el.querySelectorAll('.flow-ports-in .flow-port span')].map((s) => s.textContent.trim());
+    const outPorts = [...el.querySelectorAll('.flow-ports-out .flow-port span')].map((s) => s.textContent.trim());
+    const portSize = Math.max(9, Math.min(11, w * 0.05));
+    ctx.font = `${portSize}px "IBM Plex Sans", "Segoe UI", sans-serif`;
+    ctx.fillStyle = '#8b9bb4';
+    ctx.textBaseline = 'middle';
+    let py = y + titleH + 14;
+    const rows = Math.max(inPorts.length, outPorts.length, 1);
+    for (let i = 0; i < rows; i++) {
+      if (inPorts[i]) {
+        ctx.beginPath();
+        ctx.fillStyle = kind;
+        ctx.arc(x + 12, py, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#8b9bb4';
+        ctx.textAlign = 'left';
+        ctx.fillText(truncateCanvasText(ctx, inPorts[i], w * 0.4), x + 20, py);
+      }
+      if (outPorts[i]) {
+        ctx.beginPath();
+        ctx.fillStyle = kind;
+        ctx.arc(x + w - 12, py, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#8b9bb4';
+        ctx.textAlign = 'right';
+        ctx.fillText(truncateCanvasText(ctx, outPorts[i], w * 0.4), x + w - 20, py);
+      }
+      py += portSize + 8;
+    }
+    ctx.textAlign = 'left';
+
+    if (file) {
+      ctx.fillStyle = '#7f8fa8';
+      ctx.font = `${Math.max(9, Math.min(10, w * 0.048))}px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace`;
+      ctx.fillText(truncateCanvasText(ctx, file, w - 20), x + 10, y + h - 12);
+    }
+    ctx.restore();
+  }
+
   fitView() {
     if (!this.graph?.nodes.length) return;
     let minX = Infinity; let minY = Infinity; let maxX = -Infinity; let maxY = -Infinity;
@@ -683,4 +851,15 @@ function escapeHtml(s) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+/** @param {CanvasRenderingContext2D} ctx */
+function truncateCanvasText(ctx, text, maxW) {
+  const s = String(text || '');
+  if (ctx.measureText(s).width <= maxW) return s;
+  let out = s;
+  while (out.length > 1 && ctx.measureText(`${out}…`).width > maxW) {
+    out = out.slice(0, -1);
+  }
+  return `${out}…`;
 }

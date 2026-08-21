@@ -104,7 +104,7 @@
   .page-nav-item-desc { display: block; margin-top: 2px; font-size: 0.68rem; color: var(--muted); }
 
   .toolbar {
-    display: flex; gap: 8px; flex-wrap: nowrap; align-items: center;
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
     min-width: 0;
     justify-self: start;
   }
@@ -273,6 +273,34 @@
     width: 10px; height: 10px; border-radius: 3px; display: inline-block;
   }
   .hint-list { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 0.75rem; line-height: 1.55; }
+
+  .rec-pill {
+    display: none; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid rgba(248,113,113,0.55);
+    background: rgba(80, 20, 28, 0.75);
+    color: #fecaca; font-size: 0.72rem; font-variant-numeric: tabular-nums;
+  }
+  .rec-pill.on { display: inline-flex; }
+  .rec-pill .blink {
+    width: 7px; height: 7px; border-radius: 50%; background: #f87171;
+    animation: blink 1s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  button.danger { border-color: rgba(248,113,113,0.45); color: #fecaca; }
+  button.danger:hover { border-color: #f87171; color: #f87171; }
+  button.recording, button.danger.recording {
+    background: rgba(80, 20, 28, 0.65);
+    border-color: #f87171; color: #fecaca;
+  }
+  .rec-status {
+    font-size: 0.72rem; color: var(--muted); max-width: 220px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .rec-status.hot { color: #fecaca; }
+  .rec-group {
+    display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  }
 </style>
 <link rel="stylesheet" href="./ui_motion.css"/>
 </head>
@@ -291,6 +319,13 @@
     </div>
     <button type="button" id="btnAnim">流动演示</button>
     <button type="button" id="btnFit">适配视图</button>
+    <span class="rec-pill" id="recPill"><i class="blink"></i>REC <span id="recTimer">00:00</span></span>
+    <div class="rec-group" aria-label="录像">
+      <button type="button" id="btnRecStart" title="快捷键 R：开始录制画布">录像</button>
+      <button type="button" id="btnRecStop" class="danger" disabled title="快捷键 T：停止">停止</button>
+      <button type="button" id="btnRecSave" disabled title="快捷键 S：保存 WebM">保存</button>
+      <span class="rec-status" id="recStatus">未录制 · WebM · R/T/S</span>
+    </div>
   </div>
   <div id="pageNavRoot"></div>
 </header>
@@ -323,13 +358,14 @@
       <li>下拉切换 <strong>SAM2Grasp</strong> 与 <strong>纯 ACT (CVAE)</strong>；再选训练 / 推理。</li>
       <li>连线表示张量 / 控制流，结构对齐 <code>act_robot</code> 源码路径。</li>
       <li>SAM2Grasp：冻 SAM2 + 轻量 ACT 头；纯 ACT：ResNet 骨干端到端 + CVAE。</li>
+      <li>顶栏 <strong>录像</strong> 可录制当前画布为 WebM（快捷键 R 开始 / T 停止 / S 保存）；录制时自动开流动演示。</li>
     </ul>
   </aside>
 </div>
 
 <script type="module">
-import { mountPageNav } from './nav_pages.js';
-import { FlowCanvas, PIPELINES, graphKey } from './pipeline_flow.js';
+import { mountPageNav } from './nav_pages.js?v=2';
+import { FlowCanvas, PIPELINES, graphKey } from './pipeline_flow.js?v=3';
 
 mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'pipeline' });
 
@@ -395,6 +431,170 @@ btnAnim.addEventListener('click', () => {
     btnAnim.classList.add('active');
   }
 });
+
+// ---- Recording (composite stage → WebM) ----
+const btnRecStart = document.getElementById('btnRecStart');
+const btnRecStop = document.getElementById('btnRecStop');
+const btnRecSave = document.getElementById('btnRecSave');
+const recStatus = document.getElementById('recStatus');
+const recPill = document.getElementById('recPill');
+const recTimerEl = document.getElementById('recTimer');
+
+let mediaRecorder = null;
+let recChunks = [];
+let recBlob = null;
+let recStartedAt = 0;
+let recTimerId = null;
+let captureHandle = null;
+let recAutoAnim = false;
+
+function formatMMSS(ms) {
+  const s = Math.floor(ms / 1000);
+  const mm = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(s % 60).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+
+function pickMimeType() {
+  const cands = [
+    'video/webm;codecs=vp9',
+    'video/webm;codecs=vp8',
+    'video/webm',
+  ];
+  for (const t of cands) {
+    if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return '';
+}
+
+function setRecUI(state) {
+  btnRecStart.disabled = state === 'recording';
+  btnRecStop.disabled = state !== 'recording';
+  btnRecSave.disabled = state !== 'ready';
+  btnRecStart.classList.toggle('recording', state === 'recording');
+  btnRecStop.classList.toggle('recording', state === 'recording');
+  recPill.classList.toggle('on', state === 'recording');
+  recStatus.classList.toggle('hot', state === 'recording');
+}
+
+function syncAnimButton() {
+  btnAnim.textContent = flow.animating ? '停止流动' : '流动演示';
+  btnAnim.classList.toggle('active', flow.animating);
+}
+
+function isTypingTarget(el) {
+  if (!el) return false;
+  const tag = (el.tagName || '').toLowerCase();
+  return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+}
+
+btnRecStart.addEventListener('click', () => {
+  if (typeof flow.beginCapture !== 'function') {
+    recStatus.textContent = '录像模块未加载，请强制刷新页面（Ctrl+Shift+R）';
+    return;
+  }
+  if (!window.MediaRecorder) {
+    recStatus.textContent = '当前浏览器不支持 MediaRecorder';
+    return;
+  }
+  const mime = pickMimeType();
+  if (!mime) {
+    recStatus.textContent = '浏览器不支持 WebM 录制';
+    return;
+  }
+  try {
+    recAutoAnim = !flow.animating;
+    if (recAutoAnim) {
+      flow.startAnim();
+      syncAnimButton();
+    }
+    captureHandle = flow.beginCapture(30);
+    if (!captureHandle || !captureHandle.stream) {
+      throw new Error('beginCapture 未返回可用视频流（请强制刷新页面清除缓存）');
+    }
+    const stream = captureHandle.stream;
+    recChunks = [];
+    recBlob = null;
+    mediaRecorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 5_000_000 });
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) recChunks.push(e.data);
+    };
+    mediaRecorder.onstop = () => {
+      recBlob = new Blob(recChunks, { type: mime.split(';')[0] });
+      stream.getTracks().forEach((t) => t.stop());
+      captureHandle?.stop();
+      captureHandle = null;
+      if (recAutoAnim) {
+        flow.stopAnim();
+        syncAnimButton();
+        recAutoAnim = false;
+      }
+      if (recTimerId) { clearInterval(recTimerId); recTimerId = null; }
+      const sec = ((performance.now() - recStartedAt) / 1000).toFixed(1);
+      const mb = (recBlob.size / (1024 * 1024)).toFixed(2);
+      recStatus.textContent = `已停止 · ${sec}s · ${mb} MB · 可保存`;
+      setRecUI('ready');
+    };
+    mediaRecorder.start(200);
+    recStartedAt = performance.now();
+    recTimerEl.textContent = '00:00';
+    recTimerId = setInterval(() => {
+      recTimerEl.textContent = formatMMSS(performance.now() - recStartedAt);
+    }, 250);
+    recStatus.textContent = '录制中…';
+    setRecUI('recording');
+  } catch (e) {
+    console.error(e);
+    captureHandle?.stop();
+    captureHandle = null;
+    if (recAutoAnim) {
+      flow.stopAnim();
+      syncAnimButton();
+      recAutoAnim = false;
+    }
+    recStatus.textContent = '开始录制失败: ' + (e && e.message ? e.message : e);
+    setRecUI('idle');
+  }
+});
+
+btnRecStop.addEventListener('click', () => {
+  if (mediaRecorder && mediaRecorder.state === 'recording') {
+    mediaRecorder.stop();
+  }
+});
+
+btnRecSave.addEventListener('click', () => {
+  if (!recBlob) return;
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  a.href = URL.createObjectURL(recBlob);
+  a.download = `embody_pipeline_${stamp}.webm`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  recStatus.textContent = `已触发下载 · ${a.download}`;
+});
+
+window.addEventListener('keydown', (e) => {
+  if (isTypingTarget(e.target)) return;
+  if (e.altKey || e.ctrlKey || e.metaKey) return;
+  const key = (e.key || '').toLowerCase();
+  if (key === 'r' && !e.shiftKey) {
+    e.preventDefault();
+    if (!btnRecStart.disabled) btnRecStart.click();
+    return;
+  }
+  if (key === 't') {
+    e.preventDefault();
+    if (!btnRecStop.disabled) btnRecStop.click();
+    return;
+  }
+  if (key === 's') {
+    e.preventDefault();
+    if (!btnRecSave.disabled) btnRecSave.click();
+  }
+});
+
+setRecUI('idle');
 
 refresh();
 </script>
