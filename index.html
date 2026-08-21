@@ -778,12 +778,6 @@ function setupAutoCollapsingRails() {
     const setOpen = (on) => {
       rail.classList.toggle('is-open', on);
       tab?.setAttribute('aria-expanded', on ? 'true' : 'false');
-      if (on) {
-        requestAnimationFrame(() => {
-          // 首次展开时若全部折叠，默认打开首个面板，避免空白栏
-          if (!drawers.some((d) => d.open) && drawers[0]) drawers[0].open = true;
-        });
-      }
     };
 
     const scheduleClose = () => {
@@ -1298,7 +1292,7 @@ function updateScatter(pointsObj, path, frameIdx) {
   pointsObj.geometry.computeBoundingSphere();
 }
 
-function makeTcpAxes(axisLen = 0.048, shaftR = 0.0024) {
+function makeTcpAxes(originColor = 0xffffff, axisLen = 0.048, shaftR = 0.0024) {
   const g = new THREE.Group();
   const yUp = new THREE.Vector3(0, 1, 0);
   const addAxis = (dir, color) => {
@@ -1324,7 +1318,7 @@ function makeTcpAxes(axisLen = 0.048, shaftR = 0.0024) {
   addAxis(new THREE.Vector3(0, 0, 1), 0x3388ff);
   g.add(new THREE.Mesh(
     new THREE.SphereGeometry(0.0038, 12, 10),
-    new THREE.MeshBasicMaterial({ color: 0xffffff }),
+    new THREE.MeshBasicMaterial({ color: originColor }),
   ));
   g.renderOrder = 30;
   return g;
@@ -1539,9 +1533,9 @@ async function initScene(container, frames, robotCfg) {
   const scatterPred = makeScatter(colorPred);
   scene.add(scatterCur, scatterGT, scatterPred);
 
-  const tcpCur = makeTcpAxes();
-  const tcpGT = makeTcpAxes();
-  const tcpPred = makeTcpAxes();
+  const tcpCur = makeTcpAxes(colorCur);
+  const tcpGT = makeTcpAxes(colorGt);
+  const tcpPred = makeTcpAxes(colorPred);
   scene.add(tcpCur, tcpGT, tcpPred);
 
   const pathLineCur = makeTimedPathLine(paths.cur, colorCur);
