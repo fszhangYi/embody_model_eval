@@ -345,6 +345,65 @@
   .tag.ok { color: #4ade80; border-color: rgba(74,222,128,0.45); }
   .tag.bad { color: var(--danger); border-color: rgba(248,113,113,0.45); }
 
+  /* 术语悬停浮窗：固定左下角、半透明 */
+  .tip {
+    cursor: help;
+    border-bottom: 1px dotted rgba(139, 155, 180, 0.55);
+  }
+  .tip:hover, .tip:focus-visible, .tip.is-active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+    outline: none;
+  }
+  .stat .label.tip { border-bottom-color: rgba(139, 155, 180, 0.4); }
+  .drawer > summary .tip { border-bottom-color: transparent; }
+  .drawer > summary .tip:hover,
+  .drawer > summary .tip.is-active { border-bottom-color: var(--accent); }
+
+  .term-tip {
+    position: fixed;
+    left: 14px;
+    bottom: 14px;
+    z-index: 40;
+    width: min(380px, calc(100vw - 28px));
+    padding: 12px 14px 13px;
+    border-radius: 12px;
+    background: rgba(14, 22, 34, 0.72);
+    border: 1px solid rgba(58, 77, 102, 0.55);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 10px 32px rgba(0,0,0,0.4);
+    color: var(--text);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(6px);
+    transition: opacity 0.16s ease, visibility 0.16s ease, transform 0.16s ease;
+  }
+  .term-tip.show {
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+  }
+  .term-tip .term-tip-kicker {
+    font-size: 0.65rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+  .term-tip .term-tip-title {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  .term-tip .term-tip-body {
+    font-size: 0.76rem;
+    color: #c8d4e4;
+    line-height: 1.55;
+  }
+
   @media (max-width: 900px) {
     .topbar .meta { display: none; }
     .rail-panels { width: min(300px, 86vw); }
@@ -360,68 +419,68 @@
   <span class="meta" id="subtitle">加载中…</span>
   <span class="rec-pill" id="recPill"><i class="blink"></i>REC <span id="recTimer">00:00</span></span>
   <span class="pill">
-    <i class="dot" style="background:var(--cur)"></i>cur
-    <i class="dot" style="background:var(--gt)"></i>GT
-    <i class="dot" style="background:var(--pred)"></i>pred
+    <i class="dot" style="background:var(--cur)"></i><span class="tip" data-tip="cur" tabindex="0">cur</span>
+    <i class="dot" style="background:var(--gt)"></i><span class="tip" data-tip="gt" tabindex="0">GT</span>
+    <i class="dot" style="background:var(--pred)"></i><span class="tip" data-tip="pred" tabindex="0">pred</span>
   </span>
-  <a class="pill" href="./hub.html" style="text-decoration:none;color:inherit">Hub · 多episode</a>
+  <a class="pill tip" href="./hub.html" data-tip="hub" style="text-decoration:none;color:inherit" tabindex="0">Hub · 多episode</a>
 </div>
 
 <aside class="hud drawer-rail left" id="railLeft" data-side="left">
   <button type="button" class="rail-tab" id="railTabLeft" aria-expanded="false" aria-pressed="false" title="悬停展开 · 点击钉住左侧栏">控制</button>
   <div class="rail-panels">
     <details class="drawer compact">
-      <summary>播放控制</summary>
+      <summary><span class="tip" data-tip="play" tabindex="0">播放控制</span></summary>
       <div class="body">
         <div class="btn-grid">
           <button id="btnPlay" type="button">播放</button>
           <button id="btnReset" type="button">重置</button>
         </div>
         <div class="ctrl-block">
-          <div class="ctrl-label"><span>帧</span><strong id="frameLabel">t=0</strong></div>
+          <div class="ctrl-label"><span class="tip" data-tip="frame" tabindex="0">帧</span><strong id="frameLabel">t=0</strong></div>
           <input id="frameSlider" type="range" min="0" max="1" value="0"/>
-          <div class="heatmap-wrap" id="errHeatmapWrap" title="点击跳转到该帧（颜色 = TCP e_p）">
+          <div class="heatmap-wrap tip" id="errHeatmapWrap" data-tip="heatmap" tabindex="0">
             <canvas id="errHeatmap"></canvas>
             <div class="heatmap-cursor" id="errHeatmapCursor"></div>
           </div>
-          <div class="heatmap-legend"><span>低 e_p</span><span>高 e_p</span></div>
+          <div class="heatmap-legend"><span class="tip" data-tip="ep" tabindex="0">低 e_p</span><span class="tip" data-tip="ep" tabindex="0">高 e_p</span></div>
         </div>
         <div class="ctrl-block">
-          <div class="ctrl-label"><span>速度</span><strong id="speedLabel">0.20×</strong></div>
+          <div class="ctrl-label"><span class="tip" data-tip="speed" tabindex="0">速度</span><strong id="speedLabel">0.20×</strong></div>
           <input id="speedSlider" type="range" min="0.05" max="1.5" step="0.05" value="0.2"/>
         </div>
       </div>
     </details>
 
     <details class="drawer compact">
-      <summary>显示机械臂</summary>
+      <summary><span class="tip" data-tip="visibility" tabindex="0">显示机械臂</span></summary>
       <div class="body">
         <div class="btn-grid triple">
-          <button id="btnToggleCur" class="toggle cur on" type="button">灰</button>
-          <button id="btnToggleGT" class="toggle gt on" type="button">红</button>
-          <button id="btnTogglePred" class="toggle pred on" type="button">蓝</button>
+          <button id="btnToggleCur" class="toggle cur on tip" type="button" data-tip="cur">灰</button>
+          <button id="btnToggleGT" class="toggle gt on tip" type="button" data-tip="gt">红</button>
+          <button id="btnTogglePred" class="toggle pred on tip" type="button" data-tip="pred">蓝</button>
         </div>
         <div class="btn-grid" style="margin-top:8px">
-          <button id="btnTogglePaths" class="toggle on" type="button">整段轨迹</button>
-          <button id="btnToggleErrArrow" class="toggle on" type="button">误差矢量</button>
+          <button id="btnTogglePaths" class="toggle on tip" type="button" data-tip="full_path">整段轨迹</button>
+          <button id="btnToggleErrArrow" class="toggle on tip" type="button" data-tip="err_arrow">误差矢量</button>
         </div>
       </div>
     </details>
 
     <details class="drawer compact">
-      <summary>相机</summary>
+      <summary><span class="tip" data-tip="camera" tabindex="0">相机</span></summary>
       <div class="body">
         <div class="btn-grid triple">
-          <button id="btnCamSide" type="button">侧视</button>
-          <button id="btnCamTop" type="button">顶视</button>
-          <button id="btnCamFollow" type="button">跟随 TCP</button>
+          <button id="btnCamSide" type="button" class="tip" data-tip="cam_side">侧视</button>
+          <button id="btnCamTop" type="button" class="tip" data-tip="cam_top">顶视</button>
+          <button id="btnCamFollow" type="button" class="tip" data-tip="cam_follow">跟随 TCP</button>
         </div>
         <p class="hint" style="margin-top:8px" id="camHint">自由轨道 · Orbit 拖拽</p>
       </div>
     </details>
 
     <details class="drawer compact">
-      <summary>录制</summary>
+      <summary><span class="tip" data-tip="record" tabindex="0">录制</span></summary>
       <div class="body">
         <div class="btn-grid triple">
           <button id="btnRecStart" type="button">开始</button>
@@ -433,16 +492,16 @@
     </details>
 
     <details class="drawer compact">
-      <summary>导出 / 门禁</summary>
+      <summary><span class="tip" data-tip="gate" tabindex="0">导出 / 门禁</span></summary>
       <div class="body">
         <div class="btn-grid">
-          <button id="btnExportHtml" type="button">导出 HTML</button>
-          <button id="btnExportJson" type="button">导出 JSON</button>
+          <button id="btnExportHtml" type="button" class="tip" data-tip="export_html">导出 HTML</button>
+          <button id="btnExportJson" type="button" class="tip" data-tip="export_json">导出 JSON</button>
         </div>
-        <label class="hint" style="display:flex;gap:6px;align-items:center;margin-top:8px">
+        <label class="hint tip" data-tip="export_shot" style="display:flex;gap:6px;align-items:center;margin-top:8px" tabindex="0">
           <input id="chkExportShot" type="checkbox"/> 附带当前画布缩略图（更占内存）
         </label>
-        <p class="hint" id="gateHint" style="margin-top:8px">门禁：加载 thresholds…</p>
+        <p class="hint tip" id="gateHint" data-tip="gate" style="margin-top:8px" tabindex="0">门禁：加载 thresholds…</p>
       </div>
     </details>
   </div>
@@ -452,127 +511,139 @@
   <button type="button" class="rail-tab" id="railTabRight" aria-expanded="false" aria-pressed="false" title="悬停展开 · 点击钉住右侧栏">评测</button>
   <div class="rail-panels">
     <details class="drawer compact">
-      <summary>概览</summary>
+      <summary><span class="tip" data-tip="overview" tabindex="0">概览</span></summary>
       <div class="body">
         <div class="stats-row" id="stats"></div>
         <div class="stats-row" id="tcpStats" style="margin-top:8px"></div>
-        <p class="hint" id="tcpTemporalHint" style="margin-top:8px"></p>
+        <p class="hint tip" id="tcpTemporalHint" data-tip="temporal" style="margin-top:8px" tabindex="0"></p>
       </div>
     </details>
 
     <details class="drawer">
-      <summary>TCP 指标</summary>
+      <summary><span class="tip" data-tip="tcp" tabindex="0">TCP 指标</span></summary>
       <div class="body">
         <div class="chart-card">
-          <div class="chart-head"><span class="name">TCP 位置 / 姿态误差</span><span class="sub" id="tcpErrSub">mm · deg</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="ep_er" tabindex="0">TCP 位置 / 姿态误差</span><span class="sub" id="tcpErrSub">mm · deg</span></div>
           <div class="chart-wrap tall"><canvas id="tcpErrChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name">TCP 分轴 Δxyz</span><span class="sub">mm</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="dxyz" tabindex="0">TCP 分轴 Δxyz</span><span class="sub">mm</span></div>
           <div class="chart-wrap"><canvas id="tcpAxisChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name">TCP 姿态分轴 Δrpy</span><span class="sub">°</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="drpy" tabindex="0">TCP 姿态分轴 Δrpy</span><span class="sub">°</span></div>
           <div class="chart-wrap"><canvas id="tcpRpyChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name">TCP 速度 / 加速度误差</span><span class="sub">m/s · °/s · m/s²</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="vel_acc" tabindex="0">TCP 速度 / 加速度误差</span><span class="sub">m/s · °/s · m/s²</span></div>
           <div class="chart-wrap"><canvas id="tcpVelChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name">分段 TCP 误差</span><span class="sub">路径等长四段</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="segments" tabindex="0">分段 TCP 误差</span><span class="sub">路径等长四段</span></div>
           <div class="chart-wrap"><canvas id="tcpSegChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name">任务 / 接近向量误差</span><span class="sub">相对 meta.goal_pose</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="task" tabindex="0">任务 / 接近向量误差</span><span class="sub">相对 meta.goal_pose</span></div>
           <div class="chart-wrap"><canvas id="tcpTaskChart" class="chart"></canvas></div>
         </div>
-        <p class="hint" id="tcpTaskHint" style="margin-top:6px"></p>
+        <p class="hint tip" id="tcpTaskHint" data-tip="task" style="margin-top:6px" tabindex="0"></p>
       </div>
     </details>
 
     <details class="drawer">
-      <summary>误差曲线</summary>
+      <summary><span class="tip" data-tip="err_curves" tabindex="0">误差曲线</span></summary>
       <div class="body">
         <div class="chart-card">
-          <div class="chart-head"><span class="name">L2 误差随时间</span><span class="sub" id="errSub">—</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="l2" tabindex="0">L2 误差随时间</span><span class="sub" id="errSub">—</span></div>
           <div class="chart-wrap"><canvas id="errChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name">逐关节 MAE</span><span class="sub">deg</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="mae" tabindex="0">逐关节 MAE</span><span class="sub">deg</span></div>
           <div class="chart-wrap"><canvas id="maeChart" class="chart"></canvas></div>
         </div>
       </div>
     </details>
 
     <details class="drawer">
-      <summary>关节轨迹</summary>
+      <summary><span class="tip" data-tip="joint_traj" tabindex="0">关节轨迹</span></summary>
       <div class="body">
         <div class="row-ctrl">
           <label>关节 <select id="jointSelect"></select></label>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name">位姿轨迹</span><span class="sub">current · GT · pred</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="joint_traj" tabindex="0">位姿轨迹</span><span class="sub">current · GT · pred</span></div>
           <div class="chart-wrap tall"><canvas id="trajChart" class="chart"></canvas></div>
         </div>
       </div>
     </details>
 
     <details class="drawer">
-      <summary>当前帧数值</summary>
+      <summary><span class="tip" data-tip="frame_values" tabindex="0">当前帧数值</span></summary>
       <div class="body">
-        <p class="hint" id="tcpFrameHint" style="margin-bottom:8px"></p>
+        <p class="hint tip" id="tcpFrameHint" data-tip="tcp" style="margin-bottom:8px" tabindex="0"></p>
         <table>
           <thead>
-            <tr><th>关节</th><th>当前</th><th>GT</th><th>pred</th><th>误差</th></tr>
+            <tr>
+              <th class="tip" data-tip="joint" tabindex="0">关节</th>
+              <th class="tip" data-tip="cur" tabindex="0">当前</th>
+              <th class="tip" data-tip="gt" tabindex="0">GT</th>
+              <th class="tip" data-tip="pred" tabindex="0">pred</th>
+              <th class="tip" data-tip="joint_err" tabindex="0">误差</th>
+            </tr>
           </thead>
           <tbody id="frameTable"></tbody>
         </table>
         <div class="chart-card" style="margin-top:10px">
-          <div class="chart-head"><span class="name">关节→TCP 贡献</span><span class="sub">‖JᵢΔqᵢ‖ mm</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="contrib" tabindex="0">关节→TCP 贡献</span><span class="sub">‖JᵢΔqᵢ‖ mm</span></div>
           <div class="chart-wrap"><canvas id="jointContribChart" class="chart"></canvas></div>
         </div>
       </div>
     </details>
 
     <details class="drawer">
-      <summary>最差帧 / 工作空间</summary>
+      <summary><span class="tip" data-tip="worst_ws" tabindex="0">最差帧 / 工作空间</span></summary>
       <div class="body">
-        <p class="hint" style="margin-bottom:8px">Top‑K 按 TCP e_p；点击跳转。下方为俯视 XY，颜色=e_p。</p>
+        <p class="hint tip" data-tip="worst_ws" style="margin-bottom:8px" tabindex="0">Top‑K 按 TCP e_p；点击跳转。下方为俯视 XY，颜色=e_p。</p>
         <ul class="worst-list" id="worstList"></ul>
-        <div class="ws-wrap" style="margin-top:10px"><canvas id="workspaceCanvas"></canvas></div>
+        <div class="ws-wrap tip" style="margin-top:10px" data-tip="workspace" tabindex="0"><canvas id="workspaceCanvas"></canvas></div>
         <p class="hint" style="margin-top:6px" id="wsHint">红点 GT · 蓝点 pred · 点击点跳帧</p>
       </div>
     </details>
 
     <details class="drawer">
-      <summary>高级 · 协议 / 元数据 (C)</summary>
+      <summary><span class="tip" data-tip="protocol_c" tabindex="0">高级 · 协议 / 元数据 (C)</span></summary>
       <div class="body">
-        <p class="hint" id="unitHint">单位 / action_mode 校验…</p>
-        <p class="hint" id="provHint" style="margin-top:6px">provenance…</p>
-        <p class="hint" style="margin-top:8px">失败分类（大 e_p / e_R / 抖动）· 点击跳转</p>
+        <p class="hint tip" id="unitHint" data-tip="action_mode" tabindex="0">单位 / action_mode 校验…</p>
+        <p class="hint tip" id="provHint" data-tip="provenance" style="margin-top:6px" tabindex="0">provenance…</p>
+        <p class="hint tip" data-tip="fail_class" style="margin-top:8px" tabindex="0">失败分类（大 e_p / e_R / 抖动）· 点击跳转</p>
         <ul class="adv-list" id="failClassList"></ul>
       </div>
     </details>
 
     <details class="drawer">
-      <summary>高级 · 安全 / 可执行 (D)</summary>
+      <summary><span class="tip" data-tip="safety_d" tabindex="0">高级 · 安全 / 可执行 (D)</span></summary>
       <div class="body">
         <div class="stats-row" id="safetyStats"></div>
-        <p class="hint" style="margin-top:8px">越限 / 近奇异 / 超速 · 点击跳转（抽样计算以控内存）</p>
+        <p class="hint tip" data-tip="safety_d" style="margin-top:8px" tabindex="0">越限 / 近奇异 / 超速 · 点击跳转（抽样计算以控内存）</p>
         <ul class="adv-list" id="safetyList"></ul>
-        <p class="hint" style="margin-top:6px" id="collisionHint">碰撞粗检…</p>
+        <p class="hint tip" id="collisionHint" data-tip="collision" style="margin-top:6px" tabindex="0">碰撞粗检…</p>
       </div>
     </details>
 
     <details class="drawer">
-      <summary>说明</summary>
+      <summary><span class="tip" data-tip="help" tabindex="0">说明</span></summary>
       <div class="body">
-        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。</p>
+        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。带虚下划线的名词可悬停查看左下角解释。</p>
       </div>
     </details>
   </div>
 </aside>
+
+<div class="term-tip" id="termTip" role="tooltip" aria-hidden="true">
+  <div class="term-tip-kicker">名词解释</div>
+  <div class="term-tip-title" id="termTipTitle"></div>
+  <div class="term-tip-body" id="termTipBody"></div>
+</div>
 
 <script type="module">
 import * as THREE from 'three';
@@ -678,6 +749,316 @@ function setupAutoCollapsingRails() {
 }
 
 setupAutoCollapsingRails();
+
+/** 名词 / 指标释义：悬停带 data-tip 的文字时，在左下角半透明浮窗展示。 */
+const TERM_GLOSSARY = {
+  cur: {
+    title: 'cur（current）',
+    body: '当前时刻观测到的机械臂状态（灰色）。用于对照「此刻真实在哪」，不参与 pred vs GT 的主误差计算。',
+  },
+  gt: {
+    title: 'GT（Ground Truth）',
+    body: '下一时刻的真值关节 / TCP（红色）。评测时作为正确目标，与 predict 对比。',
+  },
+  pred: {
+    title: 'pred（predict）',
+    body: '模型预测的下一时刻关节 / TCP（蓝色）。与 GT 的差即策略误差，是本页评测核心。',
+  },
+  hub: {
+    title: 'Hub · 多 episode',
+    body: '跨多条轨迹 / 多模型的汇总对比页（C13/C14）。可加载 manifest，看达标率与模型均值。',
+  },
+  play: {
+    title: '播放控制',
+    body: '按数据 FPS×速度倍率逐帧播放。帧滑条可 scrub；下方热力轴按 TCP e_p 着色，点击跳帧。',
+  },
+  frame: {
+    title: '帧索引 t',
+    body: '当前评测时间步。标签中的 err 为关节 L2，e_p 为该帧 TCP 位置误差（mm）。',
+  },
+  speed: {
+    title: '播放速度',
+    body: '相对原始数据 FPS 的倍率。0.2× 表示以约 1/5 实时速度回放，便于观察偏差。',
+  },
+  heatmap: {
+    title: 'e_p 热力时间轴',
+    body: '整段轨迹的 TCP 位置误差条带：颜色越红/亮表示该帧 e_p 越大。点击即可跳到对应帧。',
+  },
+  visibility: {
+    title: '显示机械臂',
+    body: '切换灰/红/蓝三臂显隐，以及整段 TCP 轨迹与 GT→pred 误差矢量，减少画面遮挡。',
+  },
+  full_path: {
+    title: '整段轨迹',
+    body: '绘制整条 TCP 路径；颜色按各点 e_p 映射，便于一眼看到误差在空间中的分布。',
+  },
+  err_arrow: {
+    title: '误差矢量',
+    body: '当前帧从 GT TCP 指向 pred TCP 的箭头，直观显示「差在哪个方向、差多远」。',
+  },
+  camera: {
+    title: '相机',
+    body: '预设视角与 Orbit 自由旋转。跟随模式下相机会跟踪 GT 的 TCP；拖拽画面会退出跟随。',
+  },
+  cam_side: { title: '侧视', body: '从侧面观察臂体与 TCP，适合看高度与前后伸展。' },
+  cam_top: { title: '顶视', body: '俯视工作平面，适合看 XY 平面上的轨迹与横向偏差。' },
+  cam_follow: {
+    title: '跟随 TCP',
+    body: '相机目标锁定 GT 末端。便于近距离看抓取姿态；手动 Orbit 后自动回到自由模式。',
+  },
+  record: {
+    title: '录制',
+    body: '把当前 3D 画布录成 WebM，便于汇报或对比不同模型回放。',
+  },
+  gate: {
+    title: '导出 / 门禁',
+    body: '导出 HTML/JSON 报告，并按阈值文件（或 meta.thresholds）判定 PASS/FAIL。未过项会列在提示里。',
+  },
+  export_html: { title: '导出 HTML', body: '生成可读评测报告网页，含 TCP 汇总与门禁结果，便于分享。' },
+  export_json: { title: '导出 JSON', body: '导出结构化摘要（eval_summary），可供 batch_score / 门禁 CLI 继续使用。' },
+  export_shot: {
+    title: '附带画布缩略图',
+    body: '把当前渲染画面编码进报告。方便肉眼对照，但会明显增加内存与文件体积。',
+  },
+  overview: {
+    title: '概览',
+    body: '整段评测的关键标量：关节 L2、TCP 误差分位数、阈值达标率、action_mode，以及时间对齐提示。',
+  },
+  tcp: {
+    title: 'TCP（Tool Center Point）',
+    body: '末端执行器参考点。本页取夹爪指尖中点，在世界系下比较 pred 与 GT 的位置与姿态。',
+  },
+  ep: {
+    title: 'e_p · TCP 位置误差',
+    body: '‖p_pred − p_gt‖，单位 mm。衡量末端位置偏了多少；μ/p95/max 分别是均值、95 分位与最差。',
+  },
+  er: {
+    title: 'e_R · TCP 姿态误差',
+    body: 'pred 与 GT 姿态之间的测地角（旋转最短角），单位 °。对抓取朝向、吸盘/夹爪对准很敏感。',
+  },
+  ep_er: {
+    title: 'TCP 位置 / 姿态误差',
+    body: '同图展示 e_p（mm）与 e_R（°）随时间变化，用于判断是「位置飘」还是「姿态拧」。',
+  },
+  ep_mean: {
+    title: 'TCP e_p μ',
+    body: '整段 TCP 位置误差的算术平均（mm）。越低越好；常与 p95 一起看，避免被少数尖峰掩盖。',
+  },
+  ep_p95: {
+    title: 'TCP e_p p95',
+    body: '位置误差的第 95 百分位（mm）。比均值更能反映「偶尔严重失手」的尾部风险。',
+  },
+  er_mean: {
+    title: 'TCP e_R μ',
+    body: '整段姿态误差均值（°）。',
+  },
+  er_p95: {
+    title: 'TCP e_R p95',
+    body: '姿态误差第 95 百分位（°），关注最差约 5% 帧的朝向偏差。',
+  },
+  dxyz: {
+    title: '分轴 Δxyz',
+    body: 'TCP 位置误差在世界系 x/y/z 上的分量（mm）。可区分高度飘、前后偏或左右偏。',
+  },
+  dx: { title: '|Δx| μ', body: 'x 轴位置误差绝对值的均值（mm）。' },
+  dy: { title: '|Δy| μ', body: 'y 轴位置误差绝对值的均值（mm）。' },
+  dz: { title: '|Δz| μ', body: 'z 轴（常为高度）位置误差绝对值的均值（mm）。' },
+  drpy: {
+    title: '姿态分轴 Δrpy',
+    body: '把姿态差分解为 roll / pitch / yaw（°），便于定位「绕哪根轴拧错了」。',
+  },
+  vel_acc: {
+    title: '速度 / 加速度误差',
+    body: '对 TCP 轨迹求导后，比较 pred 与 GT 的线速度、角速度、线加速度差。更能暴露抖动、过冲与滞后。',
+  },
+  dv: { title: '‖Δv‖ μ', body: 'TCP 线速度误差范数的均值（m/s）。' },
+  dw: { title: '‖Δω‖ μ', body: 'TCP 角速度误差范数的均值（°/s）。' },
+  da: { title: '‖Δa‖ μ', body: 'TCP 线加速度误差范数的均值（m/s²）。' },
+  segments: {
+    title: '分段 TCP 误差',
+    body: '按路径弧长等分为接近 / 接触 / 搬运 / 回撤四段，分别统计 e_p、e_R，避免全程平均掩盖关键阶段失败。',
+  },
+  task: {
+    title: '任务 / 接近向量误差',
+    body: '相对 meta.goal_pose 的目标位姿误差：位置、姿态，以及接近方向夹角。需数据提供 goal_pose 才可算。',
+  },
+  task_ep: { title: '任务 e_p μ', body: '相对目标物/抓取目标位姿的位置误差均值（mm），不只是相对 GT TCP。' },
+  approach: {
+    title: '接近角',
+    body: 'pred 接近向量与目标接近向量的夹角（°）。接近方向错了，即使 TCP 位置接近也可能抓偏。',
+  },
+  task_ep_final: { title: '末帧任务 e_p', body: '最后一帧相对 goal 的位置误差（mm），常对应放下/抓取瞬间。' },
+  approach_final: { title: '末帧接近角', body: '最后一帧的接近方向夹角（°）。' },
+  temporal: {
+    title: '时间对齐（DTW / 滞后）',
+    body: '除逐帧误差外，用 DTW 或最佳帧滞后估计「形状对但慢半拍」还是「系统性偏置」。正滞后表示 pred 偏晚。',
+  },
+  err_curves: {
+    title: '误差曲线',
+    body: '关节空间总误差 L2 随时间，以及各关节 MAE 柱图，与 TCP 指标互补。',
+  },
+  l2: {
+    title: 'L2 误差',
+    body: '关节角向量的欧氏范数 ‖pred − gt‖₂（通常以度为单位汇总）。反映整体关节偏差大小。',
+  },
+  l2_mean: { title: '平均 L2', body: '全时段关节 L2 误差的平均值。' },
+  l2_max: { title: '最大 L2', body: '全时段关节 L2 误差的峰值，对应最差一帧。' },
+  n_frames: { title: '帧数', body: '本条 episode 的采样帧数 n。' },
+  fps: { title: '数据 FPS', body: '评测数据标注的采样帧率，用于播放与速度/加速度差分。' },
+  mae: {
+    title: '逐关节 MAE',
+    body: '每个关节角的平均绝对误差（deg）。可看出是肩/肘/腕哪一轴系统性偏大。',
+  },
+  joint_traj: {
+    title: '关节轨迹',
+    body: '选定关节上 current / GT / pred 三条角度曲线，检查跟踪形状、相位与幅值。',
+  },
+  frame_values: {
+    title: '当前帧数值',
+    body: '列出当前帧各关节角与误差，并给出关节扰动对 TCP 的贡献分解。',
+  },
+  joint: { title: '关节', body: 'URDF 中的可控自由度名称，顺序须与评测 JSON 一致。' },
+  joint_err: { title: '关节误差', body: '该关节 pred − GT（deg）。正负表示相对真值的方向。' },
+  contrib: {
+    title: '关节→TCP 贡献',
+    body: '用雅可比近似 ‖Jᵢ Δqᵢ‖：各关节角误差对 TCP 位置偏移的贡献（mm）。高柱关节更「拖累」末端。',
+  },
+  worst_ws: {
+    title: '最差帧 / 工作空间',
+    body: '按 e_p Top‑K 列出最差帧可点击跳转；下方俯视 XY 散点用颜色表示 e_p，观察误差的空间聚集。',
+  },
+  workspace: {
+    title: '工作空间俯视',
+    body: 'GT（红）与 pred（蓝）TCP 在 XY 平面的投影。点击最近点可跳转到对应帧。',
+  },
+  protocol_c: {
+    title: '协议 / 元数据 (C)',
+    body: '检查单位与 action_mode、导出 provenance，并按大 e_p / 大 e_R / 抖动做失败帧分类。',
+  },
+  action_mode: {
+    title: 'action_mode / 单位',
+    body: '策略输出是绝对角还是增量、deg 还是 rad。不一致会导致「数值看起来对、姿态全错」。',
+  },
+  provenance: {
+    title: 'provenance',
+    body: '数据来源元信息：数据集、策略名、checkpoint、观测配置等，保证评测可复现、可对比。',
+  },
+  fail_class: {
+    title: '失败分类',
+    body: '自动挑出位置失败、姿态失败或抖动帧，点击可跳转排查，而不是只看全程平均。',
+  },
+  safety_d: {
+    title: '安全 / 可执行 (D)',
+    body: '关节限位、近奇异、超速/跳变、桌面与自碰粗检。偏部署前风险筛查，抽样计算以控内存。',
+  },
+  limit_over: { title: '越限', body: '关节角超出 URDF/配置限位的帧次数。真机上可能导致力矩饱和或保护停机。' },
+  limit_near: { title: '近限位', body: '接近限位但尚未越界的帧数，提示工作空间余量不足。' },
+  sing: {
+    title: '近奇异',
+    body: '可操作度过低的姿态附近。此时小关节变化会引起大 TCP 跳动，控制变脆。',
+  },
+  overspeed: { title: '超速事件', body: '关节角速度超过阈值的次数，反映指令是否过于激进、难跟踪。' },
+  table_hit: { title: '桌面碰', body: '链路近似球心距桌面过近/穿透的粗检命中次数（非精确物理仿真）。' },
+  self_hit: { title: '自碰', body: '臂体 link 之间球心距过近的粗检命中次数，用于发现明显自干涉。' },
+  collision: {
+    title: '碰撞粗检',
+    body: '用简化几何（球/平面）估计桌面碰撞与自碰，便于快速筛问题帧；精确碰撞需 URDF collision/凸包。',
+  },
+  pass_ep: {
+    title: 'e_p 阈值达标率',
+    body: 'TCP 位置误差低于阈值（默认 5 mm）的帧占比。越高说明位置跟踪越稳。',
+  },
+  pass_er: {
+    title: 'e_R 阈值达标率',
+    body: 'TCP 姿态误差低于阈值（默认 5°）的帧占比。',
+  },
+  pass_both: {
+    title: '双阈值达标',
+    body: '同一帧同时满足 e_p 与 e_R 阈值的比例，比单指标更能代表「位姿都合格」。',
+  },
+  action: {
+    title: 'action',
+    body: 'meta.action_mode 的简写展示，例如绝对关节角 / delta 等，需与模型训练设定一致。',
+  },
+  gate_stat: {
+    title: '门禁结果',
+    body: '综合阈值检查是否全部通过。FAIL 时请看导出报告或门禁提示中的未过项。',
+  },
+  help: {
+    title: '说明',
+    body: '使用导读。带虚下划线的文字可悬停，解释会出现在左下角半透明浮窗。',
+  },
+};
+
+function setupTermTips() {
+  const tipEl = document.getElementById('termTip');
+  const titleEl = document.getElementById('termTipTitle');
+  const bodyEl = document.getElementById('termTipBody');
+  if (!tipEl || !titleEl || !bodyEl) return;
+
+  let hideTimer = null;
+  let activeEl = null;
+
+  const hide = () => {
+    tipEl.classList.remove('show');
+    tipEl.setAttribute('aria-hidden', 'true');
+    if (activeEl) activeEl.classList.remove('is-active');
+    activeEl = null;
+  };
+
+  const show = (el) => {
+    const key = el.getAttribute('data-tip');
+    const entry = TERM_GLOSSARY[key];
+    if (!entry) return;
+    clearTimeout(hideTimer);
+    if (activeEl && activeEl !== el) activeEl.classList.remove('is-active');
+    activeEl = el;
+    el.classList.add('is-active');
+    titleEl.textContent = entry.title;
+    bodyEl.textContent = entry.body;
+    tipEl.classList.add('show');
+    tipEl.setAttribute('aria-hidden', 'false');
+  };
+
+  const scheduleHide = () => {
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(hide, 120);
+  };
+
+  document.addEventListener('pointerover', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (!el || !TERM_GLOSSARY[el.getAttribute('data-tip')]) return;
+    show(el);
+  });
+  document.addEventListener('pointerout', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (!el) return;
+    const to = e.relatedTarget instanceof Element ? e.relatedTarget.closest('[data-tip]') : null;
+    if (to === el) return;
+    scheduleHide();
+  });
+  document.addEventListener('focusin', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (el && TERM_GLOSSARY[el.getAttribute('data-tip')]) show(el);
+  });
+  document.addEventListener('focusout', (e) => {
+    const el = e.target.closest('[data-tip]');
+    if (el) scheduleHide();
+  });
+}
+
+function appendStat(box, label, value, tipKey) {
+  if (!box) return;
+  const d = document.createElement('div');
+  d.className = 'stat';
+  const labelHtml = tipKey
+    ? `<div class="label tip" data-tip="${tipKey}" tabindex="0">${label}</div>`
+    : `<div class="label">${label}</div>`;
+  d.innerHTML = `${labelHtml}<div class="value">${value}</div>`;
+  box.appendChild(d);
+}
+
+setupTermTips();
 
 async function loadData() {
   const qs = new URLSearchParams(location.search);
@@ -1307,30 +1688,27 @@ function fillTcpOverview(tcp) {
   const box = document.getElementById('tcpStats');
   box.innerHTML = '';
   const rows = [
-    ['TCP e_p μ', `${tcp.summary.ep_mm.mean.toFixed(2)} mm`],
-    ['TCP e_p p95', `${tcp.summary.ep_mm.p95.toFixed(2)} mm`],
-    ['TCP e_R μ', `${tcp.summary.eR_deg.mean.toFixed(2)}°`],
-    ['TCP e_R p95', `${tcp.summary.eR_deg.p95.toFixed(2)}°`],
-    ['|Δx| μ', `${tcp.summary.dx_mm.mean.toFixed(2)} mm`],
-    ['|Δy| μ', `${tcp.summary.dy_mm.mean.toFixed(2)} mm`],
-    ['|Δz| μ', `${tcp.summary.dz_mm.mean.toFixed(2)} mm`],
-    ['‖Δv‖ μ', `${tcp.summary.v_err_mps.mean.toFixed(4)} m/s`],
-    ['‖Δω‖ μ', `${tcp.summary.w_err_dps.mean.toFixed(2)} °/s`],
-    ['‖Δa‖ μ', `${tcp.summary.a_err_mps2.mean.toFixed(3)} m/s²`],
+    ['TCP e_p μ', `${tcp.summary.ep_mm.mean.toFixed(2)} mm`, 'ep_mean'],
+    ['TCP e_p p95', `${tcp.summary.ep_mm.p95.toFixed(2)} mm`, 'ep_p95'],
+    ['TCP e_R μ', `${tcp.summary.eR_deg.mean.toFixed(2)}°`, 'er_mean'],
+    ['TCP e_R p95', `${tcp.summary.eR_deg.p95.toFixed(2)}°`, 'er_p95'],
+    ['|Δx| μ', `${tcp.summary.dx_mm.mean.toFixed(2)} mm`, 'dx'],
+    ['|Δy| μ', `${tcp.summary.dy_mm.mean.toFixed(2)} mm`, 'dy'],
+    ['|Δz| μ', `${tcp.summary.dz_mm.mean.toFixed(2)} mm`, 'dz'],
+    ['‖Δv‖ μ', `${tcp.summary.v_err_mps.mean.toFixed(4)} m/s`, 'dv'],
+    ['‖Δω‖ μ', `${tcp.summary.w_err_dps.mean.toFixed(2)} °/s`, 'dw'],
+    ['‖Δa‖ μ', `${tcp.summary.a_err_mps2.mean.toFixed(3)} m/s²`, 'da'],
   ];
   if (tcp.task?.available) {
     rows.push(
-      ['任务 e_p μ', `${tcp.task.pred.ep_mm.mean.toFixed(2)} mm`],
-      ['接近角 μ', `${tcp.task.pred.approach_deg.mean.toFixed(2)}°`],
-      ['末帧任务 e_p', `${tcp.task.pred.final.ep_mm.toFixed(2)} mm`],
-      ['末帧接近角', `${tcp.task.pred.final.approach_deg.toFixed(2)}°`],
+      ['任务 e_p μ', `${tcp.task.pred.ep_mm.mean.toFixed(2)} mm`, 'task_ep'],
+      ['接近角 μ', `${tcp.task.pred.approach_deg.mean.toFixed(2)}°`, 'approach'],
+      ['末帧任务 e_p', `${tcp.task.pred.final.ep_mm.toFixed(2)} mm`, 'task_ep_final'],
+      ['末帧接近角', `${tcp.task.pred.final.approach_deg.toFixed(2)}°`, 'approach_final'],
     );
   }
-  for (const [label, value] of rows) {
-    const d = document.createElement('div');
-    d.className = 'stat';
-    d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
-    box.appendChild(d);
+  for (const [label, value, tipKey] of rows) {
+    appendStat(box, label, value, tipKey);
   }
 }
 
@@ -1676,16 +2054,13 @@ try {
     `${meta.source} · ${meta.n_frames}帧 · ${meta.generated_at}`;
 
   const stats = document.getElementById('stats');
-  for (const [label, value] of [
-    ['平均 L2', meta.mean_l2.toFixed(3)],
-    ['最大 L2', meta.max_l2.toFixed(3)],
-    ['帧数', String(meta.n_frames)],
-    ['数据 FPS', String(meta.fps)],
+  for (const [label, value, tipKey] of [
+    ['平均 L2', meta.mean_l2.toFixed(3), 'l2_mean'],
+    ['最大 L2', meta.max_l2.toFixed(3), 'l2_max'],
+    ['帧数', String(meta.n_frames), 'n_frames'],
+    ['数据 FPS', String(meta.fps), 'fps'],
   ]) {
-    const d = document.createElement('div');
-    d.className = 'stat';
-    d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
-    stats.appendChild(d);
+    appendStat(stats, label, value, tipKey);
   }
 
   setupCharts(DATA);
@@ -1714,16 +2089,13 @@ try {
   const passEp = tcp.series.ep_mm.filter((v) => v < thrEp).length / tcp.n;
   const passEr = tcp.series.eR_deg.filter((v) => v < thrEr).length / tcp.n;
   const passBoth = tcp.series.ep_mm.filter((v, i) => v < thrEp && tcp.series.eR_deg[i] < thrEr).length / tcp.n;
-  for (const [label, value] of [
-    [`e_p<${thrEp}mm`, `${(passEp * 100).toFixed(1)}%`],
-    [`e_R<${thrEr}°`, `${(passEr * 100).toFixed(1)}%`],
-    ['双阈值达标', `${(passBoth * 100).toFixed(1)}%`],
-    ['action', String(meta.action_mode ?? '—')],
+  for (const [label, value, tipKey] of [
+    [`e_p<${thrEp}mm`, `${(passEp * 100).toFixed(1)}%`, 'pass_ep'],
+    [`e_R<${thrEr}°`, `${(passEr * 100).toFixed(1)}%`, 'pass_er'],
+    ['双阈值达标', `${(passBoth * 100).toFixed(1)}%`, 'pass_both'],
+    ['action', String(meta.action_mode ?? '—'), 'action'],
   ]) {
-    const d = document.createElement('div');
-    d.className = 'stat';
-    d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
-    document.getElementById('tcpStats').appendChild(d);
+    appendStat(document.getElementById('tcpStats'), label, value, tipKey);
   }
 
   // E23: load thresholds (meta.thresholds overrides example file)
@@ -1748,10 +2120,12 @@ try {
       : '门禁：未配置阈值';
   }
   {
-    const d = document.createElement('div');
-    d.className = 'stat';
-    d.innerHTML = `<div class="label">门禁</div><div class="value">${gates.checks.length ? (gates.passed ? 'PASS' : 'FAIL') : '—'}</div>`;
-    document.getElementById('tcpStats').appendChild(d);
+    appendStat(
+      document.getElementById('tcpStats'),
+      '门禁',
+      gates.checks.length ? (gates.passed ? 'PASS' : 'FAIL') : '—',
+      'gate_stat',
+    );
   }
 
   function captureShot() {
@@ -2036,18 +2410,15 @@ try {
   const sBox = document.getElementById('safetyStats');
   if (sBox) {
     sBox.innerHTML = '';
-    for (const [label, value] of [
-      ['越限', String(safety.limits.n_over)],
-      ['近限位', String(safety.limits.n_near)],
-      ['近奇异', String(safety.limits.n_sing)],
-      ['超速事件', String(safety.smooth.n_over_speed)],
-      ['桌面碰', String(safety.collision.n_table)],
-      ['自碰', String(safety.collision.n_self)],
+    for (const [label, value, tipKey] of [
+      ['越限', String(safety.limits.n_over), 'limit_over'],
+      ['近限位', String(safety.limits.n_near), 'limit_near'],
+      ['近奇异', String(safety.limits.n_sing), 'sing'],
+      ['超速事件', String(safety.smooth.n_over_speed), 'overspeed'],
+      ['桌面碰', String(safety.collision.n_table), 'table_hit'],
+      ['自碰', String(safety.collision.n_self), 'self_hit'],
     ]) {
-      const d = document.createElement('div');
-      d.className = 'stat';
-      d.innerHTML = `<div class="label">${label}</div><div class="value">${value}</div>`;
-      sBox.appendChild(d);
+      appendStat(sBox, label, value, tipKey);
     }
   }
   const sList = document.getElementById('safetyList');
