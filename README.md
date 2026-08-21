@@ -5,8 +5,8 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 - 全屏 Three.js（官方 mesh + 灰/红/蓝三份着色 URDF）
 - TCP（指尖中点）xyz 轴 + 当前帧 ±15 散点
 - 左侧：播放 / 显隐 / 观测相机同步 (F) / 画布录制（WebM）
-- 右侧：概览、误差、关节轨迹、数值（可折叠）
-- Hub：多 episode 汇总，含 obs 列与机型防呆
+- 右侧：概览、误差、关节轨迹、任务/接触 (G)、数值（可折叠）
+- Hub：多 episode 汇总，含 obs / 任务列与机型防呆
 
 浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库静态托管即可。
 
@@ -32,19 +32,21 @@ embody_model_eval/
 ├── robots_registry.js      # 机型解析辅助
 ├── tcp_metrics.js          # TCP / 任务误差指标
 ├── obs_align.js            # 观测对齐 / 相机同步 / 叠加 (F)
+├── task_events.js          # 任务成功 / 接触事件 / 动态目标 (G)
 ├── export_report.js        # HTML/JSON 报告与门禁
 ├── favicon.svg / .ico / .png
 ├── data/                   # 比对数据（按套件分子目录）
 │   ├── index.json          # 启动时由 serve.sh 实时刷新
-│   ├── 20260819/episode_*.json + media/   # 含观测演示 (F)
+│   ├── 20260819/episode_*.json + media/   # 含观测演示 (F) + 任务/接触 (G)
 │   ├── 20260405/episode_*.json + media/
 │   └── short/episode_*.json + media/      # 5–10 帧短轨迹
 ├── vendor/                 # 离线前端依赖（Three / Chart.js / urdf-loader）
 ├── scripts/
 │   ├── batch_score.py      # 批量跑分 + 门禁
 │   ├── bag_to_compare.py   # 日志 → episode JSON
-│   ├── gen_sim_episodes.py # 生成模拟 episode（--short 默认附带观测）
+│   ├── gen_sim_episodes.py # 生成模拟 episode（--short 默认附带观测+任务）
 │   ├── gen_obs_media.py    # 为套件补 RGB/Depth/注意力媒体 (F)
+│   ├── gen_task_demo.py    # 为套件补任务成功/接触/物体轨迹 (G)
 │   ├── refresh_data_index.py
 │   └── thresholds.example.json
 ├── serve.sh
@@ -118,9 +120,10 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 - 批量生成模拟数据：
 
 ```bash
-python3 scripts/gen_sim_episodes.py --short          # 5–10 帧短轨迹（推荐演示，默认附带 obs）
+python3 scripts/gen_sim_episodes.py --short          # 5–10 帧短轨迹（推荐演示，默认附带 obs+任务）
 python3 scripts/gen_sim_episodes.py --preset --with-obs
 python3 scripts/gen_obs_media.py --all               # 仅为已有 episode 补观测媒体
+python3 scripts/gen_task_demo.py --all               # 仅为已有 episode 补任务/接触/物体 (G)
 # 或指定套件 / 机型：
 python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --n-frames 8 --robot so100 --overwrite --with-obs
 ```
@@ -152,6 +155,7 @@ python /root/autodl-tmp/act_robot/scripts/compare_pose_offline.py \
 - **录制**：仅 Three.js 画布 → WebM；侧栏不进入录像
 - **导出**：左侧「导出 / 门禁」可下载 HTML 报告或 `eval_summary.json`（供批量门禁）
 - **观测 (F)**：左侧「观测相机 (F)」与帧滑条/播放同步；Hub Episode 表有 `obs` 列
+- **任务 (G)**：右侧「任务 / 接触 (G)」看 success/fail、力事件与动态物体；Hub 有「任务」列
 - **TCP**：gripper 系指尖中点约 `(0, -0.1062, 0)`；任务误差需 `meta.goal_pose = {pos, quat, approach?}`
 - **浏览器图标**：`favicon.svg` / `favicon.ico` / `favicon.png`（标签页与书签）
 
@@ -248,6 +252,37 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 | F27 | 勾选「目标框 / 关键点 / 注意力」在 RGB 上叠加；depth 流为灰度深度图 |
 
 逻辑在 `obs_align.js`；补媒体：`python3 scripts/gen_obs_media.py --all`（`--short` 生成模拟数据时默认附带）。
+
+### G. 任务成功与接触事件
+
+| # | 项 | 状态 |
+|---|----|------|
+| G28 | 任务成功标签（grasp/place/success/fail + 原因码） | ✅ `meta.task_outcome` + 右侧「任务 / 接触 (G)」 |
+| G29 | 接触/力事件流（接触时刻、夹紧力、滑移） | ✅ `events[]` + `frames[].contact` + 力/滑移曲线 |
+| G30 | 物体/夹取目标位姿序列（不只静态 `goal_pose`） | ✅ `frames[].objects` / 抓取后才移动；接近段物体静止 |
+
+**协议字段**
+
+- G28：`meta.task_outcome = { task, outcome, labels[], reason_code, reason, score, judged_at_frame }`
+- G29：`events[{ frame|t, type, force_n?, slip_mm?, width_mm?, object? }]`；可选稠密 `frames[i].contact`
+- G30：`meta.objects[]`；`frames[i].objects[id] = { pos, quat?, grasp? }`；演示数据中物体在抓取前保持桌面静止，臂从 home→approach→grasp 靠近
+
+**演示数据约定（`gen_task_demo.py`）**
+
+- 物体：抓取前固定在桌面；仅抬升 / 放置 / 滑落阶段才离开原位。
+- 机械臂：重写关节轨迹为 home → approach → grasp → lift → place（或 miss/slip 分支），pred 相对 GT 带小滞后。
+- 事件：含 `approach` / `contact_start` / `grasp_force` / `lift` / `place` / `slip` / `miss_grasp` 等，可点击跳帧。
+- 与 F 共存：脚本只改关节与任务字段，保留已有 `frames[].obs` / `media/`。
+
+**如何在页面上看到**
+
+| 项 | 操作 / 现象 |
+|----|-------------|
+| G28 | 右侧「任务 / 接触 (G)」顶部标签：`success`/`fail`/`partial` + 原因码；Hub「任务」列汇总 |
+| G29 | 事件列表可点击跳帧（含 `approach` / `contact_start` / `slip`…）；力/滑移曲线 |
+| G30 | 播放前半段：黄球不动、臂靠近；抓取抬升后物体才随任务移动；绿点为固定 grasp 目标 |
+
+补演示：`python3 scripts/gen_task_demo.py --all`。
 
 **建议后续优先：** 用真实多 episode manifest 填满 Hub；按机型写准 `meta.joint_limits`；碰撞粗检可再换成凸包/URDF collision。
 

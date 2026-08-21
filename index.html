@@ -706,6 +706,25 @@
     </details>
 
     <details class="drawer">
+      <summary><span class="tip" data-tip="task_g" tabindex="0">任务 / 接触 (G)</span></summary>
+      <div class="body">
+        <p class="hint tip" id="taskOutcomeHint" data-tip="task_outcome" style="margin-bottom:8px" tabindex="0">任务结果…</p>
+        <div class="stats-row" id="taskStats"></div>
+        <p class="hint tip" data-tip="contact_events" style="margin-top:8px" tabindex="0">接触 / 力事件 · 点击跳帧</p>
+        <ul class="adv-list" id="taskEventList"></ul>
+        <div class="chart-card" style="margin-top:10px">
+          <div class="chart-head"><span class="name tip" data-tip="contact_force" tabindex="0">接触力 / 滑移</span><span class="sub">N · mm</span></div>
+          <div class="chart-wrap"><canvas id="contactChart" class="chart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span class="name tip" data-tip="object_pose" tabindex="0">物体→TCP 距离</span><span class="sub">mm · 动态目标</span></div>
+          <div class="chart-wrap"><canvas id="objectDistChart" class="chart"></canvas></div>
+        </div>
+        <p class="hint" style="margin-top:6px" id="objectFrameHint">物体位姿随帧更新；3D 黄球=物体</p>
+      </div>
+    </details>
+
+    <details class="drawer">
       <summary><span class="tip" data-tip="protocol_c" tabindex="0">高级 · 协议 / 元数据 (C)</span></summary>
       <div class="body">
         <p class="hint tip" id="unitHint" data-tip="action_mode" tabindex="0">单位 / action_mode 校验…</p>
@@ -728,7 +747,7 @@
     <details class="drawer">
       <summary><span class="tip" data-tip="help" tabindex="0">说明</span></summary>
       <div class="body">
-        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹（同色浅→深）与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随；「观测相机 (F)」同步 RGB/Depth 与框/注意力叠加。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。带虚下划线的名词可悬停查看左下角解释。</p>
+        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹（同色浅→深）与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随；「观测相机 (F)」同步 RGB/Depth。「任务 / 接触 (G)」含成功标签、力事件与动态物体目标。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。带虚下划线的名词可悬停查看左下角解释。</p>
       </div>
     </details>
   </div>
@@ -769,6 +788,12 @@ import {
   auditObsAlignment,
   paintObsCanvas,
 } from './obs_align.js';
+import {
+  analyzeTaskEpisode,
+  outcomeTagClass,
+  buildObjectTcpDistances,
+  resolveGoalAtFrame,
+} from './task_events.js';
 
 const DEG2RAD = Math.PI / 180;
 const COLOR_CUR = 0x9ca3af;
@@ -945,6 +970,26 @@ const TERM_GLOSSARY = {
   obs_overlay: {
     title: '关键帧叠加 (F27)',
     body: '在 RGB 上叠加目标框 (xyxy)、关键点与注意力热图（overlays[].type = box / keypoints / heatmap）。',
+  },
+  task_g: {
+    title: '任务 / 接触 (G)',
+    body: 'G28 任务成功标签；G29 接触与力事件流；G30 物体/夹取目标动态位姿。与纯 GT 位姿误差互补，面向成功率评测。',
+  },
+  task_outcome: {
+    title: '任务成功标签 (G28)',
+    body: 'meta.task_outcome：outcome（success/fail/partial）+ labels（grasp/place…）+ reason_code。产业评测最终看成功率与失败原因码。',
+  },
+  contact_events: {
+    title: '接触 / 力事件 (G29)',
+    body: 'episode.events 与 frames[].contact：接触时刻、夹紧力、滑移、夹爪宽度。点击事件跳到对应帧。',
+  },
+  contact_force: {
+    title: '接触力 / 滑移',
+    body: '逐帧 force_n（N）与 slip_mm。许多失败发生在接触之后，开环 e_p 覆盖不到。',
+  },
+  object_pose: {
+    title: '物体 / 夹取目标位姿 (G30)',
+    body: 'frames[].objects 与可选 frames[].goal_pose 动态目标序列；曲线为 pred TCP 到物体/grasp 的距离（mm）。',
   },
   record: {
     title: '录制',
@@ -1644,6 +1689,7 @@ async function initScene(container, frames, robotCfg) {
   setLoadProgress(1, '加载完成', `${robotCfg.label} · 进入评测视图`);
   return {
     robot: robotCfg,
+    scene,
     armCur, armGT, armPred,
     scatterCur, scatterGT, scatterPred,
     tcpCur, tcpGT, tcpPred,
@@ -1890,6 +1936,186 @@ function setupTcpCharts(DATA, tcp) {
     });
   });
   return charts;
+}
+
+/** G28–G30: task outcome, contact timeline, object markers + charts. */
+function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
+  const analysis = analyzeTaskEpisode(DATA);
+  const outcome = analysis.outcome;
+  const hint = document.getElementById('taskOutcomeHint');
+  const stats = document.getElementById('taskStats');
+  const list = document.getElementById('taskEventList');
+  const objHint = document.getElementById('objectFrameHint');
+
+  if (hint) {
+    if (!outcome.available) {
+      hint.innerHTML = '<span class="tag">无 task_outcome</span> 本条未标注任务成功/失败';
+    } else {
+      const cls = outcomeTagClass(outcome.outcome);
+      const labels = (outcome.labels || []).map((l) => `<span class="tag">${l}</span>`).join('') || '—';
+      hint.innerHTML =
+        `<span class="tag ${cls}">${outcome.outcome}</span>`
+        + `<span class="tag">${outcome.reason_code || '—'}</span>`
+        + ` ${outcome.task || 'task'} · score ${outcome.score ?? '—'}<br>`
+        + `labels: ${labels}<br>${outcome.reason || ''}`;
+    }
+  }
+  if (stats) {
+    stats.innerHTML = '';
+    for (const [label, value, tipKey] of [
+      ['结果', outcome.available ? outcome.outcome : '—', 'task_outcome'],
+      ['原因码', outcome.reason_code || '—', 'task_outcome'],
+      ['接触帧', String(analysis.contact.n_contact_frames), 'contact_events'],
+      ['事件', String(analysis.events.length), 'contact_events'],
+      ['物体', analysis.objects.ids.join(',') || '—', 'object_pose'],
+    ]) {
+      appendStat(stats, label, value, tipKey);
+    }
+  }
+  if (list) {
+    list.innerHTML = analysis.events.length
+      ? analysis.events.map((ev) => {
+        const bits = [
+          `t=${ev.frame}`,
+          ev.type,
+          ev.force_n != null ? `F=${ev.force_n.toFixed(1)}N` : null,
+          ev.slip_mm != null ? `slip=${ev.slip_mm.toFixed(1)}mm` : null,
+          ev.note,
+        ].filter(Boolean).join(' · ');
+        const cls = /slip|miss|fail|collision/i.test(ev.type) ? 'bad'
+          : /place|success|grasp_force|contact_end/i.test(ev.type) ? '' : 'warn';
+        return `<li class="${cls}" data-frame="${ev.frame}">${bits}</li>`;
+      }).join('')
+      : '<li class="muted">无 events[]</li>';
+    list.onclick = (e) => {
+      const li = e.target.closest('li[data-frame]');
+      if (li && onJumpFrame) onJumpFrame(Number(li.dataset.frame));
+    };
+  }
+
+  const labels = DATA.series?.t || analysis.contact.force_n.map((_, i) => i);
+  const line = (label, data, color, width = 1.8, dash = []) => ({
+    label,
+    data,
+    borderColor: color,
+    borderWidth: width,
+    borderDash: dash,
+    backgroundColor: 'transparent',
+    tension: 0.25,
+    pointRadius: 0,
+    spanGaps: true,
+  });
+
+  const contactCtx = document.getElementById('contactChart');
+  if (contactCtx) {
+    new Chart(contactCtx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          line('force (N)', analysis.contact.force_n, '#fbbf24', 2),
+          line('slip (mm)', analysis.contact.slip_mm, '#f87171', 1.6, [4, 3]),
+          line('width (mm)', analysis.contact.width_mm, '#60a5fa', 1.2, [2, 2]),
+        ],
+      },
+      options: baseChartOpts(),
+    });
+  }
+
+  const dist = buildObjectTcpDistances(
+    DATA,
+    (tcp && world?.paths?.pred) ? world.paths.pred.map((p) => ({ x: p.x, y: p.y, z: p.z })) : [],
+  );
+  const distCtx = document.getElementById('objectDistChart');
+  if (distCtx) {
+    const datasets = [];
+    if (dist.available) {
+      for (const id of dist.trajectories.ids) {
+        datasets.push(line(`${id}→TCP`, dist.series[id].to_object_mm, '#fbbf24', 2));
+        datasets.push(line(`${id} grasp→TCP`, dist.series[id].to_grasp_mm, '#34d399', 1.5, [4, 3]));
+      }
+    }
+    new Chart(distCtx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: baseChartOpts({
+        plugins: {
+          ...baseChartOpts().plugins,
+          title: datasets.length ? undefined : {
+            display: true,
+            text: '需 frames[].objects',
+            color: '#9db0c9',
+            font: { size: 11 },
+          },
+        },
+      }),
+    });
+  }
+
+  // 3D object markers
+  const markers = {};
+  if (world?.scene && analysis.objects.available) {
+    for (const id of analysis.objects.ids) {
+      const tr = analysis.objects.objects[id];
+      let color = 0xfbbf24;
+      if (typeof tr.color === 'string' && tr.color.startsWith('#')) {
+        color = Number.parseInt(tr.color.slice(1), 16) || color;
+      }
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(0.014, 16, 12),
+        new THREE.MeshBasicMaterial({ color }),
+      );
+      const grasp = new THREE.Mesh(
+        new THREE.SphereGeometry(0.008, 12, 10),
+        new THREE.MeshBasicMaterial({ color: 0x34d399 }),
+      );
+      mesh.visible = false;
+      grasp.visible = false;
+      world.scene.add(mesh, grasp);
+      markers[id] = { mesh, grasp, traj: tr };
+    }
+  }
+
+  function sync(frameIdx) {
+    for (const id of Object.keys(markers)) {
+      const { mesh, grasp, traj } = markers[id];
+      const p = traj.pos[frameIdx];
+      if (p) {
+        mesh.visible = true;
+        mesh.position.set(p.x, p.y, p.z);
+      } else {
+        mesh.visible = false;
+      }
+      const g = traj.grasp_pos[frameIdx];
+      if (g) {
+        grasp.visible = true;
+        grasp.position.set(g.x, g.y, g.z);
+      } else {
+        grasp.visible = false;
+      }
+    }
+    if (objHint) {
+      const goal = resolveGoalAtFrame(DATA, frameIdx);
+      const c = DATA.frames[frameIdx]?.contact;
+      const parts = [];
+      if (c) {
+        parts.push(c.in_contact ? '接触中' : '无接触');
+        if (Number.isFinite(c.force_n)) parts.push(`F=${c.force_n.toFixed(1)}N`);
+        if (Number.isFinite(c.slip_mm)) parts.push(`slip=${c.slip_mm.toFixed(1)}mm`);
+      }
+      if (goal?.pos) {
+        parts.push(`goal (${goal.pos.x.toFixed(3)}, ${goal.pos.y.toFixed(3)}, ${goal.pos.z.toFixed(3)})`);
+      }
+      const primary = analysis.objects.ids[0];
+      if (primary && dist.available) {
+        const dObj = dist.series[primary].to_object_mm[frameIdx];
+        if (dObj != null) parts.push(`${primary}→TCP ${dObj.toFixed(1)}mm`);
+      }
+      objHint.textContent = parts.join(' · ') || '本帧无物体/接触信息';
+    }
+  }
+
+  return { analysis, sync };
 }
 
 function fillTcpOverview(tcp) {
@@ -2315,6 +2541,9 @@ try {
   setupTcpCharts(DATA, tcp);
   world.setPathArmColors();
 
+  let taskPanelSync = () => {};
+  // task panel wired after pauseJump exists (below)
+
   // C13-ish: TCP threshold attainment (fixed defaults; override via meta.tcp_thresholds)
   const thrEp = meta.tcp_thresholds?.ep_mm ?? 5;
   const thrEr = meta.tcp_thresholds?.eR_deg ?? 5;
@@ -2602,6 +2831,7 @@ try {
     setHeatmapCursor(i, meta.n_frames);
     paintWs(i);
     refreshObsView(i);
+    taskPanelSync(i);
 
     const row = jointContrib[i];
     contribChart.data.datasets[0].data = Array.from(row);
@@ -2619,6 +2849,10 @@ try {
     document.getElementById('btnPlay').classList.remove('active');
     showFrame(i);
   }
+
+  const taskPanel = setupTaskGPanel(DATA, tcp, world, pauseJump);
+  taskPanelSync = taskPanel.sync;
+  taskPanelSync(frameIdx);
 
   const unitCheck = validateUnitsAndActionMode(DATA);
   const provenance = extractProvenance(meta);

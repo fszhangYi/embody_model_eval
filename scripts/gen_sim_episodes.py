@@ -333,6 +333,9 @@ def main() -> int:
             media_root = out.parent / "media"
             rel_prefix = f"./data/{suite}/media"
             patch_episode(out, media_root, rel_prefix)
+            from gen_task_demo import patch_episode as patch_task
+
+            patch_task(out, ep_idx)
 
     print(f"wrote {len(written)} file(s)")
     for p in written:
