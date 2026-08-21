@@ -152,6 +152,8 @@
 
   .hud { position: fixed; z-index: 10; pointer-events: none; }
   .hud > * { pointer-events: auto; }
+  /* Topbar hosts page-nav; must stack above rails / tips / guards */
+  .hud.topbar { z-index: 2147483000; }
 
   .topbar {
     top: 0; left: 0; right: 0;
@@ -172,7 +174,7 @@
   }
   .pill .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
 
-  .page-nav { position: relative; flex-shrink: 0; }
+  .page-nav { position: relative; flex-shrink: 0; z-index: 2147483000; }
   .page-nav-btn {
     cursor: pointer; gap: 6px;
     color: var(--text); text-decoration: none;
@@ -189,7 +191,7 @@
     border-radius: 10px;
     box-shadow: 0 12px 28px rgba(0,0,0,0.4);
     backdrop-filter: blur(10px);
-    z-index: 30;
+    z-index: 2147483000;
   }
   .page-nav-item {
     display: block; padding: 8px 10px; border-radius: 8px;

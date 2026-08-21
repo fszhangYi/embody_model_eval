@@ -8,6 +8,21 @@
   --motion-fast: 160ms;
   --motion-med: 280ms;
   --motion-slow: 520ms;
+  /* Above tips / guards / toasts / side panels (escape low .hud stacking contexts) */
+  --z-page-nav: 2147483000;
+}
+
+/* —— Page switcher: never covered —— */
+.hud.topbar,
+header {
+  z-index: var(--z-page-nav) !important;
+}
+.page-nav {
+  position: relative !important;
+  z-index: var(--z-page-nav) !important;
+}
+.page-nav-menu {
+  z-index: var(--z-page-nav) !important;
 }
 
 /* —— Ambient wash (very soft, matches existing radial bg) —— */
