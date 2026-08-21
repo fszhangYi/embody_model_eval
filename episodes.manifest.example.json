@@ -6,9 +6,9 @@
   },
   "episodes": [
     {
-      "id": "ep0",
-      "label": "simulate · default",
-      "path": "./compare_result.json",
+      "id": "episode_1",
+      "label": "20260819 · episode_1",
+      "path": "./data/20260819/episode_1.json",
       "model": "baseline"
     }
   ],
@@ -16,8 +16,8 @@
     {
       "id": "baseline",
       "label": "Baseline",
-      "episodes": ["ep0"]
+      "episodes": ["episode_1"]
     }
   ],
-  "_comment": "C13/C14: list multiple compare_result.json paths; hub.html loads this manifest."
+  "_comment": "可选手动 manifest。推荐在 hub.html 用 data/<suite>/ 子目录选择器加载全部合法 episode JSON。"
 }

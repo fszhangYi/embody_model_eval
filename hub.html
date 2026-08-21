@@ -56,35 +56,54 @@
   th, td { border-bottom: 1px solid rgba(58,77,102,0.55); padding: 7px 8px; text-align: left; }
   th { color: var(--muted); font-weight: 500; }
   tr:hover td { background: rgba(61,214,198,0.06); }
-  input, button {
+  input, button, select {
     background: #243247; color: var(--text); border: 1px solid #354a66;
     border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 0.8rem;
   }
   button { cursor: pointer; }
   button:hover { border-color: var(--accent); color: var(--accent); }
+  select { min-width: 160px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 8px; }
+  .row:first-of-type { margin-top: 0; }
   .ok { color: #4ade80; } .bad { color: var(--danger); }
   .warn { color: #fbbf24; }
+  details.adv { margin-top: 12px; }
+  details.adv > summary {
+    cursor: pointer; color: var(--muted); font-size: 0.8rem; user-select: none;
+  }
+  details.adv > summary:hover { color: var(--accent); }
 </style>
 </head>
 <body>
 <header>
   <h1>Embody Eval Hub</h1>
-  <span class="muted">C13 多 episode 汇总 · C14 多模型对比 · C15/C16 元数据</span>
+  <span class="muted">C13 多 episode 汇总 · C14 多模型对比 · 数据目录 <code>data/&lt;suite&gt;/</code></span>
   <a href="./index.html">← 单轨迹评测页</a>
 </header>
 <main>
   <div class="card">
-    <div class="muted">加载 manifest（默认 <code>episodes.manifest.example.json</code>），或手动填多个 JSON 路径。</div>
-    <div class="row">
-      <input id="manifestPath" style="flex:1;min-width:220px" value="./episodes.manifest.example.json"/>
-      <button id="btnLoad" type="button">加载</button>
-    </div>
-    <div class="row">
-      <input id="extraPaths" style="flex:1;min-width:220px" placeholder="额外 compare JSON，逗号分隔，如 ./a.json,./b.json"/>
-      <button id="btnAdd" type="button">加入对比</button>
+    <div class="muted">选择 <code>data/</code> 下的子目录（如 20260819），自动加载其中全部合法比对 JSON，并列出多个 episode。</div>
+    <div class="row" style="margin-top:10px">
+      <label class="muted" for="suiteSelect">数据套件</label>
+      <select id="suiteSelect" disabled>
+        <option value="">扫描 data/ …</option>
+      </select>
+      <button id="btnReloadSuites" type="button">刷新列表</button>
+      <button id="btnLoadSuite" type="button">加载</button>
     </div>
     <p class="muted" id="status">尚未加载</p>
+
+    <details class="adv">
+      <summary>高级：手动 manifest / 追加路径</summary>
+      <div class="row">
+        <input id="manifestPath" style="flex:1;min-width:220px" value="./episodes.manifest.example.json"/>
+        <button id="btnLoad" type="button">加载 manifest</button>
+      </div>
+      <div class="row">
+        <input id="extraPaths" style="flex:1;min-width:220px" placeholder="额外 episode JSON，逗号分隔，如 ./data/20260819/episode_1.json"/>
+        <button id="btnAdd" type="button">加入对比</button>
+      </div>
+    </details>
   </div>
 
   <div class="card">
@@ -127,6 +146,9 @@
 <script type="module">
 import { summarizeEpisode, aggregateEpisodes, extractProvenance } from './advanced_cd.js';
 
+const DATA_ROOT = './data';
+const SKIP_JSON = new Set(['index.json', 'catalog.json', 'manifest.json']);
+
 const $ = (id) => document.getElementById(id);
 const rows = []; // { id, label, model, path, summary }
 
@@ -141,6 +163,87 @@ async function fetchJson(path) {
   const res = await fetch(path + (path.includes('?') ? '&' : '?') + '_=' + Date.now());
   if (!res.ok) throw new Error(`${path} → ${res.status}`);
   return res.json();
+}
+
+/** 合法比对 JSON：含 meta + 非空 frames，且帧内有关节数组。 */
+function isValidEpisode(data) {
+  if (!data || typeof data !== 'object') return false;
+  if (!data.meta || typeof data.meta !== 'object') return false;
+  if (!Array.isArray(data.frames) || data.frames.length === 0) return false;
+  const f0 = data.frames[0];
+  const joints = f0?.current ?? f0?.next_gt ?? f0?.next_pred;
+  return Array.isArray(joints) && joints.length > 0;
+}
+
+/**
+ * 解析 Python http.server 目录页中的链接。
+ * @returns {{ name: string, isDir: boolean }[]}
+ */
+function parseDirListing(html) {
+  const out = [];
+  const re = /href=["']([^"']+)["']/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    let href = m[1];
+    try { href = decodeURIComponent(href); } catch (_) { /* keep raw */ }
+    if (!href || href === '../' || href.startsWith('?') || href.startsWith('#') || href.startsWith('/')) continue;
+    if (href.startsWith('http:') || href.startsWith('https:')) continue;
+    const isDir = href.endsWith('/');
+    const name = href.replace(/\/$/, '').split('/').pop();
+    if (!name || name === '.' || name === '..') continue;
+    if (name.startsWith('.')) continue;
+    out.push({ name, isDir });
+  }
+  const seen = new Set();
+  return out.filter((x) => {
+    const k = `${x.isDir ? 'd' : 'f'}:${x.name}`;
+    if (seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
+}
+
+async function listDir(url) {
+  const base = url.endsWith('/') ? url : `${url}/`;
+  const res = await fetch(base + '?_=' + Date.now());
+  if (!res.ok) throw new Error(`无法列出 ${base} → ${res.status}`);
+  const ct = (res.headers.get('content-type') || '').toLowerCase();
+  const text = await res.text();
+  if (ct.includes('json')) {
+    // unexpected JSON directory API — ignore
+    throw new Error(`${base} 返回 JSON，无法作为目录列表`);
+  }
+  return parseDirListing(text);
+}
+
+async function discoverSuites() {
+  try {
+    const entries = await listDir(DATA_ROOT);
+    const suites = entries.filter((e) => e.isDir).map((e) => e.name).sort();
+    if (suites.length) return suites;
+  } catch (_) { /* fall through */ }
+
+  const idx = await fetchJson(`${DATA_ROOT}/index.json`);
+  const suites = (idx.suites || []).map((s) => (typeof s === 'string' ? s : s.id)).filter(Boolean);
+  if (!suites.length) throw new Error('data/ 下没有子目录，且 index.json 为空');
+  return suites;
+}
+
+async function listEpisodeFiles(suiteId) {
+  const dir = `${DATA_ROOT}/${suiteId}`;
+  try {
+    const entries = await listDir(dir);
+    return entries
+      .filter((e) => !e.isDir && e.name.toLowerCase().endsWith('.json'))
+      .map((e) => e.name)
+      .filter((n) => !SKIP_JSON.has(n.toLowerCase()))
+      .sort();
+  } catch (_) {
+    const idx = await fetchJson(`${DATA_ROOT}/index.json`);
+    const suite = (idx.suites || []).find((s) => (typeof s === 'string' ? s : s.id) === suiteId);
+    if (!suite || typeof suite === 'string') return [];
+    return (suite.episodes || []).slice().sort();
+  }
 }
 
 function render() {
@@ -168,9 +271,8 @@ function render() {
       <td>${r.summary.provenance.action_mode || '—'}</td>
       <td><a href="./index.html?data=${encodeURIComponent(r.path)}">评测</a></td>
     </tr>`;
-  }).join('');
+  }).join('') || '<tr><td colspan="10" class="muted">暂无 episode</td></tr>';
 
-  // group by model
   const byModel = new Map();
   for (const r of rows) {
     const m = r.model || 'default';
@@ -188,35 +290,90 @@ function render() {
       <td>${pct(aggM.pass_both_rate)}</td>
       <td class="muted">${prov.ckpt || '—'} / ${prov.policy || '—'}</td>
     </tr>`;
-  }).join('');
+  }).join('') || '<tr><td colspan="6" class="muted">暂无模型</td></tr>';
+}
+
+async function enrichFromSidecar(path, summary) {
+  try {
+    const side = path.replace(/[^/]+\.json$/, 'eval_summary.json');
+    if (side === path) return;
+    const s = await fetchJson(side);
+    if (s?.tcp?.summary) {
+      summary.tcp_ep_mean_mm = s.tcp.summary.ep_mm?.mean ?? summary.tcp_ep_mean_mm;
+      summary.tcp_eR_mean_deg = s.tcp.summary.eR_deg?.mean ?? summary.tcp_eR_mean_deg;
+    }
+  } catch (_) { /* optional */ }
 }
 
 async function ingest(path, { id, label, model } = {}) {
   const data = await fetchJson(path);
-  // Hub stays light: joint-level summary only (no URDF FK / TCP) to save memory.
+  if (!isValidEpisode(data)) throw new Error(`${path} 不是合法比对 JSON（需 meta + frames）`);
   const summary = summarizeEpisode(data, null);
-  // If export sidecar exists, enrich TCP fields
-  try {
-    const side = path.replace(/compare_result\.json$/, 'eval_summary.json');
-    if (side !== path) {
-      const s = await fetchJson(side);
-      if (s?.tcp?.summary) {
-        summary.tcp_ep_mean_mm = s.tcp.summary.ep_mm?.mean ?? null;
-        summary.tcp_eR_mean_deg = s.tcp.summary.eR_deg?.mean ?? null;
-        const thr = 5;
-        // pass rates unknown without series — leave null
-      }
-    }
-  } catch (_) { /* optional */ }
-
-  const epId = id || `ep${rows.length}`;
+  await enrichFromSidecar(path, summary);
+  const base = path.split('/').pop().replace(/\.json$/i, '');
+  const epId = id || base || `ep${rows.length}`;
   rows.push({
     id: epId,
     label: label || data.meta?.title || epId,
-    model: model || data.meta?.policy || 'default',
+    model: model || data.meta?.policy || data.meta?.model || 'default',
     path,
     summary,
   });
+}
+
+async function loadSuite(suiteId) {
+  if (!suiteId) throw new Error('请选择数据套件');
+  rows.length = 0;
+  $('status').textContent = `扫描 ${DATA_ROOT}/${suiteId}/ …`;
+  const files = await listEpisodeFiles(suiteId);
+  const skipped = [];
+  for (const name of files) {
+    const path = `${DATA_ROOT}/${suiteId}/${name}`;
+    try {
+      const data = await fetchJson(path);
+      if (!isValidEpisode(data)) {
+        skipped.push(`${name}（结构不合法）`);
+        continue;
+      }
+      const summary = summarizeEpisode(data, null);
+      await enrichFromSidecar(path, summary);
+      const epId = name.replace(/\.json$/i, '');
+      rows.push({
+        id: epId,
+        label: data.meta?.title || epId,
+        model: data.meta?.policy || data.meta?.model || 'default',
+        path,
+        summary,
+      });
+    } catch (e) {
+      skipped.push(`${name}（${e.message}）`);
+    }
+  }
+  let msg = `套件 ${suiteId} · 已加载 ${rows.length} episode`;
+  if (files.length === 0) msg += ' · 目录下无 .json';
+  if (skipped.length) msg += ` · 跳过 ${skipped.length}：${skipped.join('；')}`;
+  $('status').textContent = msg;
+  render();
+}
+
+async function refreshSuiteSelect(preferred) {
+  const sel = $('suiteSelect');
+  sel.disabled = true;
+  sel.innerHTML = '<option value="">扫描中…</option>';
+  try {
+    const suites = await discoverSuites();
+    sel.innerHTML = suites.map((id) => `<option value="${id}">${id}</option>`).join('')
+      || '<option value="">（无子目录）</option>';
+    sel.disabled = !suites.length;
+    const pick = preferred && suites.includes(preferred)
+      ? preferred
+      : (suites.includes('20260819') ? '20260819' : suites[0]);
+    if (pick) sel.value = pick;
+    return pick || '';
+  } catch (e) {
+    sel.innerHTML = '<option value="">扫描失败</option>';
+    throw e;
+  }
 }
 
 async function loadManifest(path) {
@@ -226,6 +383,7 @@ async function loadManifest(path) {
   const thr = man.thresholds || {};
   for (const ep of man.episodes || []) {
     const data = await fetchJson(ep.path);
+    if (!isValidEpisode(data)) continue;
     const summary = summarizeEpisode(data, null, thr);
     rows.push({
       id: ep.id,
@@ -239,9 +397,32 @@ async function loadManifest(path) {
   render();
 }
 
+$('btnReloadSuites').onclick = () => {
+  refreshSuiteSelect($('suiteSelect').value).then((id) => {
+    $('status').textContent = id ? `已刷新套件列表 · 当前 ${id}` : '已刷新，但无套件';
+  }).catch((e) => {
+    $('status').innerHTML = `<span class="bad">${e.message}</span>`;
+  });
+};
+
+$('btnLoadSuite').onclick = () => {
+  loadSuite($('suiteSelect').value).catch((e) => {
+    $('status').innerHTML = `<span class="bad">${e.message}</span>`;
+  });
+};
+
+$('suiteSelect').addEventListener('change', () => {
+  const id = $('suiteSelect').value;
+  if (!id) return;
+  loadSuite(id).catch((e) => {
+    $('status').innerHTML = `<span class="bad">${e.message}</span>`;
+  });
+});
+
 $('btnLoad').onclick = () => loadManifest($('manifestPath').value.trim()).catch((e) => {
   $('status').innerHTML = `<span class="bad">${e.message}</span>`;
 });
+
 $('btnAdd').onclick = async () => {
   const raw = $('extraPaths').value.trim();
   if (!raw) return;
@@ -256,9 +437,21 @@ $('btnAdd').onclick = async () => {
   }
 };
 
-loadManifest($('manifestPath').value.trim()).catch((e) => {
-  $('status').innerHTML = `<span class="warn">默认 manifest 未加载：${e.message}</span>`;
-});
+(async () => {
+  try {
+    const qs = new URLSearchParams(location.search);
+    const preferred = qs.get('suite') || '';
+    const id = await refreshSuiteSelect(preferred);
+    if (id) await loadSuite(id);
+    else {
+      $('status').textContent = 'data/ 下暂无套件子目录';
+      render();
+    }
+  } catch (e) {
+    $('status').innerHTML = `<span class="warn">初始化失败：${e.message}</span>`;
+    render();
+  }
+})();
 </script>
 </body>
 </html>

@@ -1,0 +1,24 @@
+{
+  "root": "./data",
+  "suites": [
+    {
+      "id": "20260405",
+      "episodes": [
+        "episode_1.json",
+        "episode_2.json",
+        "episode_3.json"
+      ]
+    },
+    {
+      "id": "20260819",
+      "episodes": [
+        "episode_1.json",
+        "episode_2.json",
+        "episode_3.json",
+        "episode_4.json",
+        "episode_5.json"
+      ]
+    }
+  ],
+  "_comment": "Optional cache for Hub when HTTP directory listing is unavailable. Regenerate: python3 scripts/refresh_data_index.py"
+}

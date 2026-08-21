@@ -24,10 +24,43 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _looks_like_episode(path: Path) -> bool:
+    try:
+        obj = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return False
+    if not isinstance(obj, dict):
+        return False
+    meta, frames = obj.get("meta"), obj.get("frames")
+    if not isinstance(meta, dict) or not isinstance(frames, list) or not frames:
+        return False
+    f0 = frames[0] if isinstance(frames[0], dict) else {}
+    joints = f0.get("current") or f0.get("next_gt") or f0.get("next_pred")
+    return isinstance(joints, list) and len(joints) > 0
+
+
 def find_inputs(root: Path) -> list[Path]:
     if root.is_file():
         return [root]
-    return sorted(root.rglob("compare_result.json"))
+    skip = {
+        "index.json",
+        "catalog.json",
+        "manifest.json",
+        "thresholds.example.json",
+        "episodes.manifest.example.json",
+        "package.json",
+        "package-lock.json",
+    }
+    out: list[Path] = []
+    for path in sorted(root.rglob("*.json")):
+        if path.name.lower() in skip:
+            continue
+        # Ignore vendored / unrelated JSON trees
+        if "vendor" in path.parts or "node_modules" in path.parts:
+            continue
+        if _looks_like_episode(path):
+            out.append(path)
+    return out
 
 
 def load_thresholds(path: Path | None) -> dict[str, Any]:
@@ -126,7 +159,7 @@ def main() -> int:
     thresholds = load_thresholds(args.thresholds)
     paths = find_inputs(args.input)
     if not paths:
-        print("no compare_result.json found", file=sys.stderr)
+        print("no valid episode JSON found", file=sys.stderr)
         return 1
 
     rows = [score_one(p, thresholds) for p in paths]

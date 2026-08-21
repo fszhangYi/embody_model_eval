@@ -766,7 +766,7 @@ const TERM_GLOSSARY = {
   },
   hub: {
     title: 'Hub · 多 episode',
-    body: '跨多条轨迹 / 多模型的汇总对比页（C13/C14）。可加载 manifest，看达标率与模型均值。',
+    body: '跨多条轨迹 / 多模型的汇总对比页。在 data/ 下按套件分子目录，Hub 选框切换套件并加载其中全部合法 episode JSON。',
   },
   play: {
     title: '播放控制',
@@ -1062,7 +1062,7 @@ setupTermTips();
 
 async function loadData() {
   const qs = new URLSearchParams(location.search);
-  const dataPath = qs.get('data') || './compare_result.json';
+  const dataPath = qs.get('data') || './data/20260819/episode_1.json';
   const res = await fetch(dataPath + (dataPath.includes('?') ? '&' : '?') + '_=' + Date.now());
   if (!res.ok) throw new Error(`无法加载 ${dataPath}`);
   const json = await res.json();

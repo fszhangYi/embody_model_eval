@@ -26,15 +26,20 @@ python3 -V   # 建议 >= 3.10，推荐 3.12
 ```
 embody_model_eval/
 ├── index.html              # 评测主页面
-├── hub.html
+├── hub.html                # 多 episode 汇总（按 data/<suite> 选择）
 ├── tcp_metrics.js          # TCP / 任务误差指标
 ├── export_report.js        # HTML/JSON 报告与门禁
 ├── favicon.svg / .ico / .png
-├── compare_result.json     # 评测对比数据
+├── data/                   # 比对数据（按套件分子目录）
+│   ├── index.json          # 启动时由 serve.sh 实时刷新
+│   ├── 20260819/episode_*.json
+│   └── 20260405/episode_*.json
 ├── vendor/                 # 离线前端依赖（Three / Chart.js / urdf-loader）
 ├── scripts/
 │   ├── batch_score.py      # 批量跑分 + 门禁
-│   ├── bag_to_compare.py   # 日志 → compare_result.json
+│   ├── bag_to_compare.py   # 日志 → episode JSON
+│   ├── gen_sim_episodes.py # 生成多条模拟 episode
+│   ├── refresh_data_index.py
 │   └── thresholds.example.json
 ├── serve.sh
 ├── requirements.txt
@@ -64,7 +69,25 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 
 ## 评测数据
 
-`compare_result.json`：
+比对 JSON 放在 **`data/<套件名>/`** 下，例如：
+
+- `data/20260819/episode_1.json` …
+- `data/20260405/episode_1.json` …
+
+每个文件需含 `meta` + 非空 `frames[]`（帧内 `current` / `next_gt` / `next_pred` 关节角）。
+
+- **单轨迹页**默认加载 `./data/20260819/episode_1.json`；可用 `?data=./data/<suite>/xxx.json` 指定。
+- **Hub**（`hub.html`）选框列出 `data/` 子目录；选中后加载该目录下全部合法 JSON，生成多条 episode。
+- **`./serve.sh` 启动前**会执行 `scripts/refresh_data_index.py`，实时重写 `data/index.json`。
+- 批量生成模拟数据：
+
+```bash
+python3 scripts/gen_sim_episodes.py --preset
+# 或指定套件：
+python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --overwrite
+```
+
+字段说明：
 
 - `meta`：帧数、fps、mean/max L2、逐关节 MAE、来源
 - `series`：整段曲线（Chart.js）
@@ -75,10 +98,10 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 ```bash
 python /root/autodl-tmp/act_robot/scripts/compare_pose_offline.py \
   --mode simulate --n-frames 120 \
-  --out-dir /root/autodl-tmp/embody_model_eval
+  --out-dir /root/autodl-tmp/embody_model_eval/data/20260819
 ```
 
-会覆盖本目录的 `compare_result.json`，并同步当前页面模板。
+若脚本仍输出 `compare_result.json`，请改名为 `episode_N.json` 放入对应套件目录。
 
 ## 离线说明
 
@@ -107,12 +130,12 @@ python3 scripts/batch_score.py . \
   --thresholds scripts/thresholds.example.json \
   --out-dir /tmp/embody_batch --fail-on-gate
 
-# E24：JSONL / CSV 关节日志 → compare_result.json（再 ./serve.sh 回放）
-python3 scripts/bag_to_compare.py run.jsonl -o compare_result.json \
+# E24：JSONL / CSV 关节日志 → episode JSON（再 ./serve.sh 回放）
+python3 scripts/bag_to_compare.py run.jsonl -o data/test1/episode_2.json \
   --fps 30 --action-mode absolute --title "bag replay"
 ```
 
-TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），与 `compare_result.json` 放在一起后再跑 `batch_score.py`。
+TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），与 episode JSON 放在一起后再跑 `batch_score.py`。
 
 ## 评测能力提升清单（A–E）
 
@@ -144,7 +167,7 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 
 | # | 项 | 状态 |
 |---|----|------|
-| C13 | 多 episode / 多任务汇总页；阈值达标率 | ✅ `hub.html` + manifest；单页达标率亦有 |
+| C13 | 多 episode / 多任务汇总页；阈值达标率 | ✅ `hub.html` 按 `data/<suite>` 加载；单页达标率亦有 |
 | C14 | 多模型 / 多 checkpoint 同页对比 | ✅ Hub 按 model 聚合对比表 |
 | C15 | `action_mode` 明示 + 单位校验 | ✅ 启发式 deg/rad 与 mode 告警 |
 | C16 | dataset / 策略 / ckpt / obs 等 meta 可导出 | ✅ 页面 provenance + 导出 JSON 字段 |
@@ -196,9 +219,9 @@ const URDF_PRED = './my_arm_colored/xxx_pred.urdf';
 | 位置 | 改什么 | 为何 |
 |------|--------|------|
 | `index.html` → `JOINTS` | 关节名数组，顺序与控制量一致 | `setPose` 按此名写 `robot.joints[name]` |
-| `compare_result.json` → `meta.joint_names` | 与 `JOINTS` **同名、同序** | 右侧图表 / 数值面板依赖该字段 |
-| `compare_result.json` → `frames[].current|next_gt|next_pred` | 每帧关节角数组长度与顺序 = `JOINTS` | 单位默认按 **度**（页面内 `* DEG2RAD`） |
-| `compare_result.json` → `meta.per_joint_mae` / `series` | 键名或曲线通道与关节一致 | 概览 MAE、关节轨迹图 |
+| 评测 JSON → `meta.joint_names` | 与 `JOINTS` **同名、同序** | 右侧图表 / 数值面板依赖该字段 |
+| 评测 JSON → `frames[].current|next_gt|next_pred` | 每帧关节角数组长度与顺序 = `JOINTS` | 单位默认按 **度**（页面内 `* DEG2RAD`） |
+| 评测 JSON → `meta.per_joint_mae` / `series` | 键名或曲线通道与关节一致 | 概览 MAE、关节轨迹图 |
 | `index.html` → `getTcpPose` / `TCP_OFFSET_GRIPPER` | TCP 所在 **link 名** + 指尖相对该 link 的偏移 | 默认 link=`gripper`，偏移 `(0, -0.1062, 0)`（米，gripper 系） |
 | `index.html` → `loadRobot` 里 `robot.rotation.x` | 坐标系朝向（当前 `-π/2` 适配 SO-100） | 换臂后若模型躺倒/倒置，调此旋转或在 URDF 里改 root |
 | 生成脚本（可选） | `act_robot/scripts/compare_pose_offline.py` 等 | 重新导出 JSON 时关节定义要与新臂一致 |

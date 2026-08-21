@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convert a simple robot log / bag export into compare_result.json (E24).
+"""Convert a simple robot log / bag export into episode compare JSON (E24).
 
 Supported inputs:
   1) JSONL — one object per line with joints:
@@ -11,7 +11,7 @@ This does not parse ROS bag binaries; export joints to JSONL/CSV first
 (rosbag → csv, or your teleop logger). Output schema matches the viewer.
 
 Example:
-  python3 scripts/bag_to_compare.py run.jsonl -o compare_result.json \\
+  python3 scripts/bag_to_compare.py run.jsonl -o data/test1/episode_2.json \\
     --joint-names shoulder_pan,shoulder_lift,elbow_flex,wrist_flex,wrist_roll,gripper \\
     --fps 30 --action-mode absolute --title "bag replay"
 """
@@ -187,7 +187,7 @@ def path_stem(p: Path) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("input", type=Path, help="JSONL or CSV joint log")
-    ap.add_argument("-o", "--output", type=Path, default=Path("compare_result.json"))
+    ap.add_argument("-o", "--output", type=Path, default=Path("data/test1/episode_1.json"))
     ap.add_argument("--fps", type=float, default=30.0)
     ap.add_argument("--action-mode", default="absolute")
     ap.add_argument("--joint-names", default=None, help="comma-separated")
