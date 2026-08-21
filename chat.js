@@ -13,6 +13,7 @@ const state = {
   selected: new Set(),
   config: null,
   busy: false,
+  abort: null,
 };
 
 async function api(path, opts = {}) {
@@ -23,11 +24,36 @@ async function api(path, opts = {}) {
   let data = null;
   try {
     data = await res.json();
-  } catch {
+  } catch (err) {
+    if (opts.signal?.aborted || (err && err.name === 'AbortError')) throw err;
     data = { ok: false, error: `HTTP ${res.status}` };
   }
   if (!res.ok && data && data.ok === undefined) data.ok = false;
   return data;
+}
+
+function setSendBusy(busy) {
+  state.busy = busy;
+  const btn = $('#btnSend');
+  if (busy) {
+    btn.textContent = '取消';
+    btn.classList.remove('btn-primary');
+    btn.classList.add('btn-cancel');
+    btn.disabled = false;
+    btn.title = '取消等待';
+  } else {
+    btn.textContent = '发送';
+    btn.classList.add('btn-primary');
+    btn.classList.remove('btn-cancel');
+    btn.disabled = false;
+    btn.title = '';
+    state.abort = null;
+  }
+}
+
+function cancelChat() {
+  if (!state.busy || !state.abort) return;
+  state.abort.abort();
 }
 
 function toast(msg, kind = 'info') {
@@ -42,7 +68,7 @@ function toast(msg, kind = 'info') {
 function renderSkillList() {
   const box = $('#managedSkills');
   if (!state.managed.length) {
-    box.innerHTML = '<p class="muted empty">托管目录尚无 skill。右侧从本机导入，或把含 SKILL.md 的目录放到 <code>agent_skills/</code>。</p>';
+    box.innerHTML = '<p class="muted empty">托管目录尚无 skill，可从下方导入。</p>';
     return;
   }
   box.innerHTML = state.managed.map((s) => {
@@ -90,18 +116,12 @@ function syncSelectedHint() {
 
 function renderSources() {
   const box = $('#sourceSkills');
-  const blocks = [];
+  const rows = [];
   for (const [key, info] of Object.entries(state.sources || {})) {
-    const label = key === 'user' ? '用户 skills (~/.cursor/skills)' : '内置 skills-cursor';
     const skills = info.skills || [];
-    blocks.push(`<div class="source-block"><h3>${label}</h3>`);
-    if (!skills.length) {
-      blocks.push('<p class="muted empty">无可用 skill</p></div>');
-      continue;
-    }
     for (const s of skills) {
       const already = state.managed.some((m) => m.id === s.id);
-      blocks.push(`
+      rows.push(`
         <div class="source-row">
           <div>
             <div class="skill-name">${s.name || s.id}</div>
@@ -112,9 +132,8 @@ function renderSources() {
           </button>
         </div>`);
     }
-    blocks.push('</div>');
   }
-  box.innerHTML = blocks.join('') || '<p class="muted">未能读取本机 skill 源</p>';
+  box.innerHTML = rows.join('') || '<p class="muted empty">暂无可导入 skill</p>';
   box.querySelectorAll('button[data-import]').forEach((btn) => {
     btn.addEventListener('click', async () => {
       const [source, id] = btn.dataset.import.split(':');
@@ -226,8 +245,9 @@ async function sendChat() {
   const key = $('#cfgApiKey').value.trim();
   if (key) configOverride.apiKey = key;
 
-  state.busy = true;
-  $('#btnSend').disabled = true;
+  const abort = new AbortController();
+  state.abort = abort;
+  setSendBusy(true);
   appendBubble('user', message, [...state.selected].join(', ') || '无 skill');
   $('#chatInput').value = '';
   appendBubble('system', '发送中…');
@@ -235,13 +255,13 @@ async function sendChat() {
   try {
     const out = await api('/api/chat', {
       method: 'POST',
+      signal: abort.signal,
       body: JSON.stringify({
         message,
         skillIds: [...state.selected],
         config: configOverride,
       }),
     });
-    // remove trailing "发送中"
     const log = $('#chatLog');
     const last = log.lastElementChild;
     if (last && last.classList.contains('bubble-system')) last.remove();
@@ -259,11 +279,15 @@ async function sendChat() {
     const log = $('#chatLog');
     const last = log.lastElementChild;
     if (last && last.classList.contains('bubble-system')) last.remove();
-    appendBubble('system', String(err));
-    toast('网络或服务错误', 'err');
+    if (err?.name === 'AbortError' || abort.signal.aborted) {
+      appendBubble('system', '已取消');
+      toast('已取消等待', 'info');
+    } else {
+      appendBubble('system', String(err));
+      toast('网络或服务错误', 'err');
+    }
   } finally {
-    state.busy = false;
-    $('#btnSend').disabled = false;
+    setSendBusy(false);
   }
 }
 
@@ -277,11 +301,14 @@ $('#btnRefresh').addEventListener('click', async () => {
     toast(String(e.message || e), 'err');
   }
 });
-$('#btnSend').addEventListener('click', () => sendChat());
+$('#btnSend').addEventListener('click', () => {
+  if (state.busy) cancelChat();
+  else sendChat();
+});
 $('#chatInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
-    sendChat();
+    if (!state.busy) sendChat();
   }
 });
 

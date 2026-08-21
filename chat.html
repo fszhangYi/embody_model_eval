@@ -146,6 +146,16 @@
   .btn-primary {
     background: #1e3d3a; border-color: var(--accent); color: var(--accent);
   }
+  .btn-cancel {
+    background: rgba(248, 113, 113, 0.12);
+    border-color: rgba(248, 113, 113, 0.55);
+    color: var(--danger);
+    min-width: 4.5rem;
+  }
+  .btn-cancel:hover {
+    border-color: var(--danger);
+    color: #fecaca;
+  }
 
   .skill-card {
     display: grid;
@@ -273,7 +283,6 @@
     <p class="muted" id="selectedHint">未选择 skill</p>
     <div id="managedSkills"></div>
     <h3>从本机导入</h3>
-    <p class="muted">读取 <code>~/.cursor/skills</code> 与 <code>skills-cursor</code>，复制到仓库 <code>agent_skills/</code>。</p>
     <div id="sourceSkills"></div>
   </aside>
 
