@@ -70,6 +70,35 @@
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     color: var(--muted); background: rgba(11,16,24,0.72); z-index: 2; pointer-events: none;
   }
+  #arm3d .loading-card {
+    width: min(360px, 82vw);
+    padding: 18px 20px 16px;
+    border-radius: 14px;
+    background: rgba(18, 26, 38, 0.92);
+    border: 1px solid rgba(58, 77, 102, 0.7);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+  }
+  #arm3d .loading-text {
+    font-size: 0.88rem; color: var(--text); margin-bottom: 12px; line-height: 1.4;
+  }
+  #arm3d .loading-bar {
+    height: 8px; border-radius: 999px;
+    background: rgba(36, 50, 71, 0.95);
+    border: 1px solid rgba(58, 77, 102, 0.55);
+    overflow: hidden;
+  }
+  #arm3d .loading-bar-fill {
+    height: 100%; width: 0%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #2a9d8f, var(--accent));
+    transition: width 0.18s ease;
+  }
+  #arm3d .loading-meta {
+    display: flex; justify-content: space-between; gap: 10px;
+    margin-top: 8px; font-size: 0.72rem; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
 
   .hud { position: fixed; z-index: 10; pointer-events: none; }
   .hud > * { pointer-events: auto; }
@@ -412,7 +441,20 @@
 </head>
 <body>
 
-<div id="arm3d"><div class="loading" id="loadHint">加载 3× SO-100 URDF…</div></div>
+<div id="arm3d">
+  <div class="loading" id="loadHint">
+    <div class="loading-card">
+      <div class="loading-text" id="loadText">准备加载 3× SO-100 URDF…</div>
+      <div class="loading-bar" aria-hidden="true">
+        <div class="loading-bar-fill" id="loadBarFill"></div>
+      </div>
+      <div class="loading-meta">
+        <span id="loadDetail">等待资源…</span>
+        <span id="loadPct">0%</span>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="hud topbar">
   <h1 id="title">Embody 模型评测</h1>
@@ -633,7 +675,7 @@
     <details class="drawer">
       <summary><span class="tip" data-tip="help" tabindex="0">说明</span></summary>
       <div class="body">
-        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。带虚下划线的名词可悬停查看左下角解释。</p>
+        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹（同色浅→深）与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。带虚下划线的名词可悬停查看左下角解释。</p>
       </div>
     </details>
   </div>
@@ -790,7 +832,7 @@ const TERM_GLOSSARY = {
   },
   full_path: {
     title: '整段轨迹',
-    body: '绘制整条 TCP 路径；颜色按各点 e_p 映射，便于一眼看到误差在空间中的分布。',
+    body: '绘制整条 TCP 路径；颜色与对应机械臂一致（灰/红/蓝），沿时间从浅到深，便于区分起止与走向。',
   },
   err_arrow: {
     title: '误差矢量',
@@ -1116,7 +1158,19 @@ function getTcp(robot, out = new THREE.Vector3()) {
   return getTcpPose(robot, out).pos;
 }
 
-function loadRobot(urdfUrl) {
+function setLoadProgress(ratio, text, detail) {
+  const pct = Math.max(0, Math.min(1, Number.isFinite(ratio) ? ratio : 0));
+  const fill = document.getElementById('loadBarFill');
+  const pctEl = document.getElementById('loadPct');
+  const textEl = document.getElementById('loadText');
+  const detailEl = document.getElementById('loadDetail');
+  if (fill) fill.style.width = `${(pct * 100).toFixed(1)}%`;
+  if (pctEl) pctEl.textContent = `${Math.round(pct * 100)}%`;
+  if (text != null && textEl) textEl.textContent = text;
+  if (detail != null && detailEl) detailEl.textContent = detail;
+}
+
+function loadRobot(urdfUrl, { onProgress, label } = {}) {
   return new Promise((resolve, reject) => {
     const manager = new THREE.LoadingManager();
     let robot = null;
@@ -1125,7 +1179,12 @@ function loadRobot(urdfUrl) {
       if (settled || !robot) return;
       settled = true;
       softMaterial(robot);
+      onProgress?.(1, label || urdfUrl);
       resolve(robot);
+    };
+    manager.onProgress = (_url, loaded, total) => {
+      const t = total > 0 ? loaded / total : 0;
+      onProgress?.(Math.min(0.99, t), label || _url);
     };
     manager.onLoad = finish;
     manager.onError = (url) => {
@@ -1222,25 +1281,27 @@ function syncTcpAxes(axes, robot) {
   axes.quaternion.copy(quat);
 }
 
-function heatColor(t, out = new THREE.Color()) {
-  // 0 → teal, 1 → red
+/** 轨迹着色：沿时间从浅 → 深，色相与对应机械臂一致（非跨色相热力）。 */
+function shadeArmColor(baseHex, t, out = new THREE.Color()) {
   const u = Math.max(0, Math.min(1, t));
-  out.setRGB(0.15 + 0.85 * u, 0.75 * (1 - u), 0.72 * (1 - u) + 0.15 * u);
-  return out;
+  const base = new THREE.Color(baseHex);
+  const light = base.clone().lerp(new THREE.Color(0xffffff), 0.62);
+  const dark = base.clone().lerp(new THREE.Color(0x000000), 0.28);
+  return out.copy(light).lerp(dark, u);
 }
 
-function makeTimedPathLine(points, epMm, epMax) {
+function makeTimedPathLine(points, baseHex) {
   const n = points.length;
   const positions = new Float32Array(n * 3);
   const colors = new Float32Array(n * 3);
   const c = new THREE.Color();
-  const denom = Math.max(1e-6, epMax || 1);
   for (let i = 0; i < n; i++) {
     const p = points[i];
     positions[i * 3] = p.x;
     positions[i * 3 + 1] = p.y;
     positions[i * 3 + 2] = p.z;
-    heatColor((epMm?.[i] ?? 0) / denom, c);
+    const t = n <= 1 ? 1 : i / (n - 1);
+    shadeArmColor(baseHex, t, c);
     colors[i * 3] = c.r;
     colors[i * 3 + 1] = c.g;
     colors[i * 3 + 2] = c.b;
@@ -1257,7 +1318,21 @@ function makeTimedPathLine(points, epMm, epMax) {
   const line = new THREE.Line(geo, mat);
   line.frustumCulled = false;
   line.renderOrder = 8;
+  line.userData.baseHex = baseHex;
   return line;
+}
+
+function paintPathArmColors(line, points) {
+  const baseHex = line.userData.baseHex ?? 0xffffff;
+  const colors = line.geometry.getAttribute('color');
+  const n = points.length;
+  const c = new THREE.Color();
+  for (let i = 0; i < n; i++) {
+    const t = n <= 1 ? 1 : i / (n - 1);
+    shadeArmColor(baseHex, t, c);
+    colors.setXYZ(i, c.r, c.g, c.b);
+  }
+  colors.needsUpdate = true;
 }
 
 function makeErrArrow() {
@@ -1361,12 +1436,37 @@ async function initScene(container, frames) {
   fill.position.set(-1.5, 1.0, -1.0); scene.add(fill);
   scene.add(new THREE.GridHelper(1.6, 16, 0x3a4d66, 0x243247));
 
+  setLoadProgress(0.02, '加载 3× SO-100 URDF…', '解析模型与网格');
+  const robotProgress = [0, 0, 0];
+  const robotLabels = ['灰 cur', '红 GT', '蓝 pred'];
+  const bumpRobots = () => {
+    const avg = (robotProgress[0] + robotProgress[1] + robotProgress[2]) / 3;
+    // URDF 阶段占总体约 0~75%
+    const parts = robotLabels
+      .map((name, i) => `${name} ${Math.round(robotProgress[i] * 100)}%`)
+      .join(' · ');
+    setLoadProgress(0.02 + avg * 0.73, '加载机械臂模型…', parts);
+  };
+
   const [armCur, armGT, armPred] = await Promise.all([
-    loadRobot(URDF_CUR), loadRobot(URDF_GT), loadRobot(URDF_PRED),
+    loadRobot(URDF_CUR, {
+      label: robotLabels[0],
+      onProgress: (p) => { robotProgress[0] = p; bumpRobots(); },
+    }),
+    loadRobot(URDF_GT, {
+      label: robotLabels[1],
+      onProgress: (p) => { robotProgress[1] = p; bumpRobots(); },
+    }),
+    loadRobot(URDF_PRED, {
+      label: robotLabels[2],
+      onProgress: (p) => { robotProgress[2] = p; bumpRobots(); },
+    }),
   ]);
   scene.add(armCur, armGT, armPred);
 
+  setLoadProgress(0.78, '计算 TCP 轨迹…', '正运动学采样');
   const paths = computeTcpPaths(armGT, frames);
+  setLoadProgress(0.90, '构建场景对象…', '轨迹 / 散点 / TCP 轴');
   const scatterCur = makeScatter(COLOR_CUR);
   const scatterGT = makeScatter(COLOR_GT);
   const scatterPred = makeScatter(COLOR_PRED);
@@ -1377,14 +1477,13 @@ async function initScene(container, frames) {
   const tcpPred = makeTcpAxes();
   scene.add(tcpCur, tcpGT, tcpPred);
 
-  // Placeholder ep coloring; caller can rebuild via setPathEpColors
-  const zeroEp = paths.gt.map(() => 0);
-  const pathLineGT = makeTimedPathLine(paths.gt, zeroEp, 1);
-  const pathLinePred = makeTimedPathLine(paths.pred, zeroEp, 1);
-  // Distinct base tints: GT slightly cooler via material — vertex colors set later
-  pathLineGT.material.opacity = 0.75;
+  const pathLineCur = makeTimedPathLine(paths.cur, COLOR_CUR);
+  const pathLineGT = makeTimedPathLine(paths.gt, COLOR_GT);
+  const pathLinePred = makeTimedPathLine(paths.pred, COLOR_PRED);
+  pathLineCur.material.opacity = 0.78;
+  pathLineGT.material.opacity = 0.88;
   pathLinePred.material.opacity = 0.95;
-  scene.add(pathLineGT, pathLinePred);
+  scene.add(pathLineCur, pathLineGT, pathLinePred);
 
   const errArrow = makeErrArrow();
   scene.add(errArrow);
@@ -1392,17 +1491,10 @@ async function initScene(container, frames) {
   const followOffset = new THREE.Vector3(0.45, 0.28, 0.55);
   let camMode = 'free'; // free | follow
 
-  function setPathEpColors(epMm) {
-    const epMax = Math.max(...epMm, 1e-6);
-    const c = new THREE.Color();
-    for (const [line, pts] of [[pathLineGT, paths.gt], [pathLinePred, paths.pred]]) {
-      const colors = line.geometry.getAttribute('color');
-      for (let i = 0; i < pts.length; i++) {
-        heatColor(epMm[i] / epMax, c);
-        colors.setXYZ(i, c.r, c.g, c.b);
-      }
-      colors.needsUpdate = true;
-    }
+  function setPathArmColors() {
+    paintPathArmColors(pathLineCur, paths.cur);
+    paintPathArmColors(pathLineGT, paths.gt);
+    paintPathArmColors(pathLinePred, paths.pred);
   }
 
   function applyCameraPreset(mode) {
@@ -1435,12 +1527,13 @@ async function initScene(container, frames) {
   }
   window.addEventListener('resize', resize);
 
+  setLoadProgress(1, '加载完成', '进入评测视图');
   return {
     armCur, armGT, armPred,
     scatterCur, scatterGT, scatterPred,
     tcpCur, tcpGT, tcpPred,
-    pathLineGT, pathLinePred, errArrow,
-    setPathEpColors, applyCameraPreset, updateFollowCam,
+    pathLineCur, pathLineGT, pathLinePred, errArrow,
+    setPathArmColors, applyCameraPreset, updateFollowCam,
     getCamMode: () => camMode,
     setCamMode: (m) => { camMode = m; },
     paths,
@@ -2046,12 +2139,14 @@ function pickMimeType() {
 }
 
 try {
+  setLoadProgress(0.01, '加载评测数据…', '读取 episode JSON');
   const DATA = await loadData();
   const meta = DATA.meta;
   const names = meta.joint_names;
 
   document.getElementById('subtitle').textContent =
     `${meta.source} · ${meta.n_frames}帧 · ${meta.generated_at}`;
+  setLoadProgress(0.08, '初始化界面…', `${meta.n_frames} 帧 · 准备 3D 场景`);
 
   const stats = document.getElementById('stats');
   for (const [label, value, tipKey] of [
@@ -2064,6 +2159,7 @@ try {
   }
 
   setupCharts(DATA);
+  setLoadProgress(0.12, '加载机械臂模型…', '开始下载 URDF / STL');
 
   const world = await initScene(document.getElementById('arm3d'), DATA.frames);
   document.getElementById('loadHint')?.remove();
@@ -2081,7 +2177,7 @@ try {
   });
   fillTcpOverview(tcp);
   setupTcpCharts(DATA, tcp);
-  world.setPathEpColors(tcp.series.ep_mm);
+  world.setPathArmColors();
 
   // C13-ish: TCP threshold attainment (fixed defaults; override via meta.tcp_thresholds)
   const thrEp = meta.tcp_thresholds?.ep_mm ?? 5;
@@ -2224,8 +2320,9 @@ try {
     world.armPred.visible = visibility.pred;
     world.scatterPred.visible = visibility.pred;
     world.tcpPred.visible = visibility.pred;
-    world.pathLineGT.visible = visibility.paths;
-    world.pathLinePred.visible = visibility.paths;
+    world.pathLineCur.visible = visibility.paths && visibility.cur;
+    world.pathLineGT.visible = visibility.paths && visibility.gt;
+    world.pathLinePred.visible = visibility.paths && visibility.pred;
     world.errArrow.visible = visibility.errArrow;
   }
 
@@ -2588,8 +2685,9 @@ try {
   requestAnimationFrame(loop);
 } catch (err) {
   document.getElementById('subtitle').textContent = '加载失败: ' + err.message;
-  const hint = document.getElementById('loadHint');
-  if (hint) hint.textContent = '加载失败: ' + err.message;
+  setLoadProgress(1, '加载失败', err.message);
+  const fill = document.getElementById('loadBarFill');
+  if (fill) fill.style.background = 'linear-gradient(90deg, #7f1d1d, #f87171)';
   console.error(err);
 }
 </script>
