@@ -34,32 +34,34 @@
     "ec616": {
       "id": "ec616",
       "label": "EC616",
-      "description": "EC616 六轴工业臂（URDF + STL）",
+      "description": "EC616 六轴工业臂 + 平行夹爪末端",
       "joint_names": [
         "Joint1",
         "Joint2",
         "Joint3",
         "Joint4",
         "Joint5",
-        "Joint6"
+        "Joint6",
+        "gripper_1_joint",
+        "gripper_2_joint"
       ],
       "urdf": {
-        "preview": "./ec616/ec616.urdf",
-        "cur": "./ec616/ec616.urdf",
-        "gt": "./ec616/ec616.urdf",
-        "pred": "./ec616/ec616.urdf"
+        "preview": "./ec616/ec616.urdf?v=13",
+        "cur": "./ec616/ec616.urdf?v=13",
+        "gt": "./ec616/ec616.urdf?v=13",
+        "pred": "./ec616/ec616.urdf?v=13"
       },
       "root_rotation_euler_xyz_deg": [-90, 0, 0],
       "tcp": {
-        "link": "Link6",
-        "offset": [0, 0, 0]
+        "link": "gripper_centor_link",
+        "offset": [0, 0, 0.03]
       },
       "colors": {
         "cur": "#9ca3af",
         "gt": "#ef4444",
         "pred": "#3b82f6"
       },
-      "home_q_deg": [0, -45, 60, 0, 30, 0]
+      "home_q_deg": [0, -45, 60, 0, 30, 0, 20, 20]
     }
   },
   "_comment": "声明本仓库当前可用的机械臂型号。episode JSON 须在 meta.robot 填写此处 id；页面加载时按该字段选用 URDF / 关节名 / TCP。preview 供机型 3D 浏览页使用。"
