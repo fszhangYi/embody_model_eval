@@ -17,11 +17,19 @@ export const PAGES = [
     short: 'Hub',
     desc: '多 episode / 多模型对比',
   },
+  {
+    id: 'pipeline',
+    href: './pipeline.html',
+    label: '模型数据流',
+    short: '数据流',
+    desc: 'ComfyUI 风格：训练 / 推理流向演示',
+  },
 ];
 
 export function resolveCurrentPageId(pathname = location.pathname) {
   const base = pathname.split('/').pop() || '';
   if (/hub\.html$/i.test(base)) return 'hub';
+  if (/pipeline\.html$/i.test(base)) return 'pipeline';
   if (/index\.html$/i.test(base) || base === '' || base === '/') return 'eval';
   const hit = PAGES.find((p) => base && p.href.endsWith(base));
   return hit?.id || 'eval';

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Embody · 模型数据流画布</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml"/>
+<style>
+  :root {
+    --bg: #0b1018; --panel: #121a26; --border: #3a4d66;
+    --text: #e7ecf3; --muted: #8b9bb4; --accent: #3dd6c6;
+    --header-h: 56px;
+    --scrollbar-thumb: rgba(61, 214, 198, 0.45);
+    --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
+    --scrollbar-size: 4px;
+  }
+  * { box-sizing: border-box; }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  *::-webkit-scrollbar { width: var(--scrollbar-size); height: var(--scrollbar-size); }
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb); border-radius: 999px;
+  }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+
+  header {
+    position: relative; z-index: 5;
+    display: grid;
+    grid-template-columns: minmax(140px, 260px) minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 14px;
+    height: var(--header-h);
+    padding: 0 16px;
+    background: linear-gradient(180deg, rgba(11,16,24,0.96), rgba(11,16,24,0.82));
+    border-bottom: 1px solid rgba(58,77,102,0.55);
+    overflow: hidden;
+  }
+  .header-brand {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .header-blurb {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .muted { color: var(--muted); font-size: 0.8rem; }
+
+  .pill {
+    display: inline-flex; gap: 8px; align-items: center;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: rgba(26,35,50,0.7);
+    font-size: 0.72rem; color: var(--muted); flex-shrink: 0;
+  }
+  .page-nav { position: relative; flex-shrink: 0; }
+  .page-nav-btn {
+    cursor: pointer; gap: 6px; color: var(--text); text-decoration: none;
+    font: inherit; font-size: 0.72rem; background: rgba(26,35,50,0.7);
+  }
+  .page-nav-btn:hover, .page-nav.open .page-nav-btn {
+    border-color: var(--accent); color: var(--accent);
+  }
+  .page-nav-caret { opacity: 0.7; font-size: 0.65rem; }
+  .page-nav-menu {
+    position: absolute; top: calc(100% + 6px); right: 0;
+    min-width: 220px; padding: 6px;
+    background: rgba(18, 26, 38, 0.96);
+    border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.4); z-index: 30;
+  }
+  .page-nav-item {
+    display: block; padding: 8px 10px; border-radius: 8px;
+    text-decoration: none; color: var(--text);
+  }
+  .page-nav-item:hover { background: rgba(61,214,198,0.1); }
+  .page-nav-item.active {
+    background: rgba(61,214,198,0.14);
+    outline: 1px solid rgba(61,214,198,0.35);
+  }
+  .page-nav-item-title { display: block; font-size: 0.8rem; font-weight: 560; }
+  .page-nav-item-desc { display: block; margin-top: 2px; font-size: 0.68rem; color: var(--muted); }
+
+  .toolbar {
+    display: flex; gap: 8px; flex-wrap: nowrap; align-items: center;
+    min-width: 0;
+    justify-self: start;
+  }
+  .toolbar label.muted {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+  select.pipeline-select {
+    background: #243247; color: var(--text); border: 1px solid #354a66;
+    border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 0.8rem;
+    width: 168px; flex-shrink: 0;
+  }
+  select.pipeline-select:focus {
+    outline: none; border-color: var(--accent);
+  }
+  button, .seg button {
+    background: #243247; color: var(--text); border: 1px solid #354a66;
+    border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 0.8rem; cursor: pointer;
+    flex-shrink: 0;
+  }
+  #btnAnim { min-width: 5.75rem; }
+  #btnFit { min-width: 4.5rem; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.active {
+    background: #1e3d3a; border-color: var(--accent); color: var(--accent);
+  }
+  .seg {
+    display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
+    flex-shrink: 0;
+  }
+  .seg button {
+    border: 0; border-radius: 0; border-right: 1px solid var(--border);
+    min-width: 3.25rem;
+  }
+  .seg button:last-child { border-right: 0; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 1fr min(320px, 34vw);
+    height: calc(100% - var(--header-h));
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: 1fr 220px; }
+    header {
+      grid-template-columns: minmax(100px, 1fr) auto;
+      grid-template-rows: var(--header-h);
+    }
+    .header-brand { display: none; }
+  }
+
+  .stage-wrap {
+    position: relative; min-width: 0; min-height: 0;
+    background:
+      radial-gradient(900px 420px at 12% -8%, rgba(26,39,64,0.55), transparent 55%),
+      #0b1018;
+  }
+  #flowStage {
+    position: absolute; inset: 0; overflow: hidden; cursor: grab;
+  }
+  #flowStage:active { cursor: grabbing; }
+  #flowCanvas {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  .flow-node {
+    position: absolute; left: 0; top: 0;
+    width: 210px;
+    background: rgba(18, 26, 38, 0.96);
+    border: 1px solid rgba(58,77,102,0.85);
+    border-radius: 10px;
+    box-shadow: 0 10px 28px rgba(0,0,0,0.35);
+    overflow: hidden;
+    user-select: none;
+    z-index: 2;
+  }
+  .flow-node.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(61,214,198,0.35), 0 12px 32px rgba(0,0,0,0.45);
+  }
+  .flow-node-title {
+    padding: 8px 10px 6px;
+    font-size: 0.82rem; font-weight: 600;
+    border-left: 3px solid var(--kind);
+    background: rgba(12, 18, 28, 0.65);
+    border-bottom: 1px solid rgba(58,77,102,0.55);
+  }
+  .flow-node-kind {
+    position: absolute; top: 8px; right: 8px;
+    font-size: 0.62rem; color: var(--kind); text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .flow-ports {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 4px;
+    padding: 8px 8px 6px;
+  }
+  .flow-port {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 0.68rem; color: var(--muted); min-height: 18px;
+  }
+  .flow-port.out { justify-content: flex-end; }
+  .flow-port .dot {
+    width: 9px; height: 9px; border-radius: 50%;
+    background: var(--kind);
+    border: 1px solid rgba(231,236,243,0.55);
+    flex: 0 0 auto;
+  }
+  .flow-node-file {
+    padding: 0 10px 8px;
+    font-size: 0.62rem; color: #7f8fa8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  .side {
+    border-left: 1px solid rgba(58,77,102,0.55);
+    background: rgba(12,18,28,0.96);
+    padding: 14px 16px; overflow: auto;
+  }
+  .side h2 { margin: 0 0 6px; font-size: 1rem; }
+  .side h3 { margin: 0 0 8px; font-size: 0.95rem; }
+  .side p { margin: 0 0 10px; font-size: 0.8rem; line-height: 1.5; color: #c5d0e0; }
+  .side .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.72rem; color: var(--accent);
+  }
+  .detail-kicker {
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;
+  }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px;
+  }
+  .legend span {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 0.7rem; color: var(--muted);
+  }
+  .legend i {
+    width: 10px; height: 10px; border-radius: 3px; display: inline-block;
+  }
+  .hint-list { margin: 10px 0 0; padding-left: 18px; color: var(--muted); font-size: 0.75rem; line-height: 1.55; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-brand">
+    <h1 id="graphTitle" title="训练数据流">训练数据流</h1>
+    <p class="header-blurb" id="graphBlurb" title="冻结 SAM2 离线抽特征 → 只训 ACT 头">冻结 SAM2 离线抽特征 → 只训 ACT 头</p>
+  </div>
+  <div class="toolbar">
+    <label class="muted" for="pipelineSelect">模型</label>
+    <select id="pipelineSelect" class="pipeline-select" aria-label="选择模型管线"></select>
+    <div class="seg" role="group" aria-label="阶段">
+      <button type="button" id="btnTrain" class="active">训练</button>
+      <button type="button" id="btnInfer">推理</button>
+    </div>
+    <button type="button" id="btnAnim">流动演示</button>
+    <button type="button" id="btnFit">适配视图</button>
+  </div>
+  <div id="pageNavRoot"></div>
+</header>
+
+<div class="layout">
+  <div class="stage-wrap">
+    <div id="flowStage">
+      <canvas id="flowCanvas"></canvas>
+    </div>
+  </div>
+  <aside class="side">
+    <h2>节点说明</h2>
+    <div id="nodeDetail">
+      <p class="muted">点击节点查看说明；拖动画布空白处平移，滚轮缩放。</p>
+    </div>
+    <div class="legend">
+      <span><i style="background:#3b82f6"></i>data</span>
+      <span><i style="background:#a855f7"></i>vision</span>
+      <span><i style="background:#f59e0b"></i>model</span>
+      <span><i style="background:#ef4444"></i>loss</span>
+      <span><i style="background:#22c55e"></i>robot</span>
+      <span><i style="background:#14b8a6"></i>cache</span>
+      <span><i style="background:#64748b"></i>ctrl</span>
+    </div>
+    <ul class="hint-list">
+      <li>下拉切换 <strong>SAM2Grasp</strong> 与 <strong>纯 ACT (CVAE)</strong>；再选训练 / 推理。</li>
+      <li>连线表示张量 / 控制流，结构对齐 <code>act_robot</code> 源码路径。</li>
+      <li>SAM2Grasp：冻 SAM2 + 轻量 ACT 头；纯 ACT：ResNet 骨干端到端 + CVAE。</li>
+    </ul>
+  </aside>
+</div>
+
+<script type="module">
+import { mountPageNav } from './nav_pages.js';
+import { FlowCanvas, PIPELINES, graphKey } from './pipeline_flow.js';
+
+mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'pipeline' });
+
+const flow = new FlowCanvas({
+  stage: document.getElementById('flowStage'),
+  canvas: document.getElementById('flowCanvas'),
+  detailEl: document.getElementById('nodeDetail'),
+  titleEl: document.getElementById('graphTitle'),
+  blurbEl: document.getElementById('graphBlurb'),
+});
+
+const pipelineSelect = document.getElementById('pipelineSelect');
+const btnTrain = document.getElementById('btnTrain');
+const btnInfer = document.getElementById('btnInfer');
+const btnAnim = document.getElementById('btnAnim');
+
+pipelineSelect.innerHTML = PIPELINES.map((p) =>
+  `<option value="${p.id}" title="${p.desc}">${p.label}</option>`
+).join('');
+
+let mode = 'train';
+
+function refresh() {
+  const pipelineId = pipelineSelect.value || 'sam2grasp';
+  const meta = PIPELINES.find((p) => p.id === pipelineId);
+  btnTrain.classList.toggle('active', mode === 'train');
+  btnInfer.classList.toggle('active', mode === 'infer');
+  flow.setGraph(graphKey(pipelineId, mode));
+  if (meta && flow.blurbEl) {
+    // keep graph blurb; append family hint in title already from graph
+  }
+  flow.fitView();
+  flow.stopAnim();
+  btnAnim.textContent = '流动演示';
+  btnAnim.classList.remove('active');
+}
+
+pipelineSelect.addEventListener('change', refresh);
+btnTrain.addEventListener('click', () => { mode = 'train'; refresh(); });
+btnInfer.addEventListener('click', () => { mode = 'infer'; refresh(); });
+document.getElementById('btnFit').addEventListener('click', () => flow.fitView());
+btnAnim.addEventListener('click', () => {
+  if (flow.animating) {
+    flow.stopAnim();
+    btnAnim.textContent = '流动演示';
+    btnAnim.classList.remove('active');
+  } else {
+    flow.startAnim();
+    btnAnim.textContent = '停止流动';
+    btnAnim.classList.add('active');
+  }
+});
+
+refresh();
+</script>
+</body>
+</html>

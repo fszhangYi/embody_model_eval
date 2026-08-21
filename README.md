@@ -7,6 +7,7 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 - 左侧：播放 / 显隐 / 观测相机同步 (F) / 画布录制（WebM）
 - 右侧：概览、误差、关节轨迹、任务/接触 (G)、数值（可折叠）
 - Hub：多 episode 汇总，含 obs / 任务列与机型防呆；顶栏「页面」菜单可扩展更多 tab
+- 数据流：`pipeline.html` ComfyUI 风格画布，演示 ACT/SAM2 训练与推理张量流向
 
 浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库静态托管即可。
 
@@ -28,6 +29,8 @@ python3 -V   # 建议 >= 3.10，推荐 3.12
 embody_model_eval/
 ├── index.html              # 评测主页面（按 meta.robot 加载机型）
 ├── hub.html                # 多 episode 汇总（按 data/<suite> 选择）
+├── pipeline.html           # 模型训练/推理数据流画布（演示）
+├── pipeline_flow.js        # 节点图引擎与 ACT/SAM2 流向定义
 ├── nav_pages.js            # 顶栏「页面」菜单（后续 tab 在此登记）
 ├── robots.json             # 当前可用机械臂型号注册表
 ├── robots_registry.js      # 机型解析辅助
@@ -154,7 +157,8 @@ python /root/autodl-tmp/act_robot/scripts/compare_pose_offline.py \
 - **显隐**：灰 / 红 / 蓝对应 current / GT / predict
 - **速度**：默认约 `0.2×`（相对数据 fps）
 - **快捷键（评测页）**：空格 播放/暂停 · ←/→ 切帧 · Home 重置 · R 开始录制 · T 停止 · S 保存
-- **页面入口**：顶栏「页面」下拉（`nav_pages.js`）；新增 tab 时在该文件登记即可
+- **页面入口**：顶栏「页面」下拉（`nav_pages.js`）；含评测 / Hub / **模型数据流**
+- **数据流画布**：`pipeline.html` — 下拉选 SAM2Grasp / 纯 ACT(CVAE)，再切训练·推理；可拖拽与流动演示
 - **录制**：仅 Three.js 画布 → WebM；侧栏不进入录像
 - **导出**：左侧「导出 / 门禁」可下载 HTML 报告或 `eval_summary.json`（供批量门禁）
 - **观测 (F)**：左侧「观测相机 (F)」与帧滑条/播放同步；Hub Episode 表有 `obs` 列
