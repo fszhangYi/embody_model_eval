@@ -1,0 +1,301 @@
+/**
+ * Shared UI motion — Embody dark teal theme.
+ * Subtle premium motion; respects prefers-reduced-motion.
+ */
+:root {
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --motion-fast: 160ms;
+  --motion-med: 280ms;
+  --motion-slow: 520ms;
+}
+
+/* —— Ambient wash (very soft, matches existing radial bg) —— */
+body {
+  isolation: isolate;
+}
+body::before {
+  content: "";
+  position: fixed;
+  inset: -18%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 36% at 18% 8%, rgba(61, 214, 198, 0.07), transparent 62%),
+    radial-gradient(38% 32% at 86% 12%, rgba(59, 130, 246, 0.05), transparent 60%),
+    radial-gradient(50% 40% at 50% 100%, rgba(26, 39, 64, 0.35), transparent 70%);
+  animation: ambience-drift 36s var(--motion-ease-soft) infinite alternate;
+  will-change: transform, opacity;
+}
+
+@keyframes ambience-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); opacity: 0.85; }
+  100% { transform: translate3d(-2.5%, 1.5%, 0) scale(1.04); opacity: 1; }
+}
+
+/* —— Enter —— */
+@keyframes ui-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ui-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes ui-menu-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ui-toast-in {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+header,
+.hud.topbar {
+  animation: ui-rise var(--motion-slow) var(--motion-ease) both;
+}
+
+header h1,
+.hud.topbar h1,
+.topbar h1 {
+  position: relative;
+}
+header h1::after,
+.hud.topbar h1::after,
+.topbar h1::after {
+  content: "";
+  display: block;
+  width: min(72px, 40%);
+  height: 1px;
+  margin-top: 5px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, rgba(61, 214, 198, 0.85), rgba(61, 214, 198, 0));
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: ui-accent-line var(--motion-slow) var(--motion-ease) 0.35s both;
+}
+/* Compact HUD topbar: underline overlays instead of growing the row */
+.hud.topbar h1::after,
+.topbar h1::after {
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  margin-top: 0;
+  width: 40px;
+}
+@keyframes ui-accent-line {
+  from { transform: scaleX(0); opacity: 0; }
+  to   { transform: scaleX(1); opacity: 1; }
+}
+
+main,
+.layout,
+.panel,
+.card,
+.side,
+#nodeSide {
+  animation: ui-rise var(--motion-slow) var(--motion-ease) both;
+}
+main { animation-delay: 40ms; }
+.layout > .panel:nth-child(1) { animation-delay: 60ms; }
+.layout > .panel:nth-child(2),
+.layout > .chat-main { animation-delay: 110ms; }
+.layout > .panel:nth-child(3) { animation-delay: 160ms; }
+.card:nth-of-type(1) { animation-delay: 50ms; }
+.card:nth-of-type(2) { animation-delay: 90ms; }
+.card:nth-of-type(3) { animation-delay: 130ms; }
+.card:nth-of-type(4) { animation-delay: 170ms; }
+
+/* —— Interactive polish —— */
+button,
+.btn-sm,
+.pill,
+.page-nav-btn,
+.rail-tab,
+.view-tools button,
+.skill-card,
+.source-row,
+.page-nav-item {
+  transition:
+    color var(--motion-fast) var(--motion-ease-soft),
+    border-color var(--motion-fast) var(--motion-ease-soft),
+    background-color var(--motion-fast) var(--motion-ease-soft),
+    box-shadow var(--motion-med) var(--motion-ease),
+    transform var(--motion-fast) var(--motion-ease),
+    opacity var(--motion-fast) var(--motion-ease-soft);
+}
+
+button:hover:not(:disabled),
+.btn-sm:hover:not(:disabled),
+.page-nav-btn:hover,
+.rail-tab:hover,
+.view-tools button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22), 0 0 0 1px rgba(61, 214, 198, 0.12);
+}
+
+button:active:not(:disabled),
+.btn-sm:active:not(:disabled),
+.page-nav-btn:active,
+.view-tools button:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: none;
+}
+
+.btn-primary:hover:not(:disabled),
+button.btn-primary:hover:not(:disabled) {
+  box-shadow: 0 6px 18px rgba(61, 214, 198, 0.18), 0 0 0 1px rgba(61, 214, 198, 0.28);
+}
+
+.card,
+.panel,
+.skill-card {
+  transition:
+    border-color var(--motion-med) var(--motion-ease-soft),
+    box-shadow var(--motion-med) var(--motion-ease),
+    transform var(--motion-med) var(--motion-ease),
+    background-color var(--motion-med) var(--motion-ease-soft);
+}
+
+.card:hover,
+.skill-card:hover {
+  border-color: rgba(61, 214, 198, 0.45);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(61, 214, 198, 0.1);
+}
+
+.stat {
+  transition: border-color var(--motion-fast), background-color var(--motion-fast), transform var(--motion-fast);
+}
+.stat:hover {
+  transform: translateY(-1px);
+  background: rgba(61, 214, 198, 0.08);
+}
+
+tr {
+  transition: background-color var(--motion-fast) var(--motion-ease-soft);
+}
+
+/* —— Page nav —— */
+.page-nav-caret {
+  display: inline-block;
+  transition: transform var(--motion-med) var(--motion-ease);
+}
+.page-nav.open .page-nav-caret {
+  transform: rotate(180deg);
+}
+.page-nav-menu:not([hidden]) {
+  transform-origin: top right;
+  animation: ui-menu-in var(--motion-med) var(--motion-ease) both;
+}
+.page-nav-item {
+  transition: background-color var(--motion-fast), transform var(--motion-fast);
+}
+.page-nav-item:hover {
+  transform: translateX(2px);
+}
+
+/* —— Chat —— */
+.bubble {
+  animation: ui-rise var(--motion-med) var(--motion-ease) both;
+}
+#toast:not([hidden]) {
+  animation: ui-toast-in var(--motion-med) var(--motion-ease) both;
+}
+.source-row {
+  transition: background-color var(--motion-fast), border-color var(--motion-fast);
+}
+.source-row:hover {
+  background: rgba(61, 214, 198, 0.06);
+}
+
+/* —— Inputs —— */
+input,
+textarea,
+select {
+  transition:
+    border-color var(--motion-fast) var(--motion-ease-soft),
+    box-shadow var(--motion-med) var(--motion-ease),
+    background-color var(--motion-fast);
+}
+input:focus,
+textarea:focus,
+select:focus {
+  box-shadow: 0 0 0 3px rgba(61, 214, 198, 0.14);
+}
+
+/* —— Status pulse (API connected) —— */
+.header-status[data-ok="1"] {
+  position: relative;
+}
+.header-status[data-ok="1"]::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 0 rgba(61, 214, 198, 0.55);
+  animation: status-ping 2.4s var(--motion-ease-soft) infinite;
+  vertical-align: 1px;
+}
+@keyframes status-ping {
+  0%   { box-shadow: 0 0 0 0 rgba(61, 214, 198, 0.45); }
+  70%  { box-shadow: 0 0 0 8px rgba(61, 214, 198, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(61, 214, 198, 0); }
+}
+
+/* —— Progress bars —— */
+.progress > span,
+#loadBarFill,
+.load-bar > span {
+  transition: width var(--motion-med) var(--motion-ease);
+}
+
+/* —— Avoid fighting 3D / canvas surfaces —— */
+canvas,
+#viewer,
+#stage,
+#canvasHost,
+.flow-root,
+.pipeline-canvas,
+#arm3d {
+  animation: none !important;
+}
+/* Toolbar keeps its own centering transform */
+.view-tools {
+  animation: none !important;
+}
+
+/* HUD rails: soft enter only (panels keep their own slide) */
+.hud.drawer-rail {
+  animation: ui-fade var(--motion-slow) var(--motion-ease) both;
+  animation-delay: 80ms;
+}
+
+#arm3d .loading-card {
+  animation: ui-rise var(--motion-slow) var(--motion-ease) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  body::before {
+    animation: none !important;
+    opacity: 0.5;
+  }
+  header h1::after,
+  .hud.topbar h1::after,
+  .topbar h1::after {
+    animation: none !important;
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
