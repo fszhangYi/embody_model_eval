@@ -31,6 +31,13 @@ export const PAGES = [
     short: 'Chat',
     desc: '选 skill、配 Agent 链接、发送诉求看回执',
   },
+  {
+    id: 'robots',
+    href: './robots.html',
+    label: '机械臂 3D',
+    short: '机型',
+    desc: '下拉选择机型，Three.js 浏览 URDF',
+  },
 ];
 
 export function resolveCurrentPageId(pathname = location.pathname) {
@@ -38,6 +45,7 @@ export function resolveCurrentPageId(pathname = location.pathname) {
   if (/hub\.html$/i.test(base)) return 'hub';
   if (/pipeline\.html$/i.test(base)) return 'pipeline';
   if (/chat\.html$/i.test(base)) return 'chat';
+  if (/robots\.html$/i.test(base)) return 'robots';
   if (/index\.html$/i.test(base) || base === '' || base === '/') return 'eval';
   const hit = PAGES.find((p) => base && p.href.endsWith(base));
   return hit?.id || 'eval';

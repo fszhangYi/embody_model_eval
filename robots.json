@@ -4,7 +4,7 @@
     "so100": {
       "id": "so100",
       "label": "SO-100",
-      "description": "SO-ARM100 六轴桌面臂（当前默认可视化机型）",
+      "description": "SO-ARM100 六轴桌面臂（默认可视化机型）",
       "joint_names": [
         "shoulder_pan",
         "shoulder_lift",
@@ -14,6 +14,7 @@
         "gripper"
       ],
       "urdf": {
+        "preview": "./so100_colored/so100_cur.urdf",
         "cur": "./so100_colored/so100_cur.urdf",
         "gt": "./so100_colored/so100_gt.urdf",
         "pred": "./so100_colored/so100_pred.urdf"
@@ -27,8 +28,39 @@
         "cur": "#9ca3af",
         "gt": "#ef4444",
         "pred": "#3b82f6"
-      }
+      },
+      "home_q_deg": [0, -90, 90, 0, 0, 0]
+    },
+    "ec616": {
+      "id": "ec616",
+      "label": "EC616",
+      "description": "EC616 六轴工业臂（URDF + STL）",
+      "joint_names": [
+        "Joint1",
+        "Joint2",
+        "Joint3",
+        "Joint4",
+        "Joint5",
+        "Joint6"
+      ],
+      "urdf": {
+        "preview": "./ec616/ec616.urdf",
+        "cur": "./ec616/ec616.urdf",
+        "gt": "./ec616/ec616.urdf",
+        "pred": "./ec616/ec616.urdf"
+      },
+      "root_rotation_euler_xyz_deg": [-90, 0, 0],
+      "tcp": {
+        "link": "Link6",
+        "offset": [0, 0, 0]
+      },
+      "colors": {
+        "cur": "#9ca3af",
+        "gt": "#ef4444",
+        "pred": "#3b82f6"
+      },
+      "home_q_deg": [0, -45, 60, 0, 30, 0]
     }
   },
-  "_comment": "声明本仓库当前可用的机械臂型号。episode JSON 须在 meta.robot 填写此处 id；页面加载时按该字段选用 URDF / 关节名 / TCP。"
+  "_comment": "声明本仓库当前可用的机械臂型号。episode JSON 须在 meta.robot 填写此处 id；页面加载时按该字段选用 URDF / 关节名 / TCP。preview 供机型 3D 浏览页使用。"
 }

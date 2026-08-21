@@ -64,18 +64,27 @@ export function normalizeRobotProfile(profile, fallbackId) {
     gt: profile.colors?.gt || '#ef4444',
     pred: profile.colors?.pred || '#3b82f6',
   };
+  const home = Array.isArray(profile.home_q_deg)
+    ? profile.home_q_deg.map(Number)
+    : joint_names.map(() => 0);
   return {
     id,
     label: profile.label || id,
     description: profile.description || '',
     joint_names,
-    urdf: { cur: urdf.cur, gt: urdf.gt, pred: urdf.pred },
+    urdf: {
+      preview: urdf.preview || urdf.cur,
+      cur: urdf.cur,
+      gt: urdf.gt,
+      pred: urdf.pred,
+    },
     root_rotation_euler_xyz_deg: root,
     tcp: {
       link: tcp.link || 'gripper',
       offset,
     },
     colors,
+    home_q_deg: home,
   };
 }
 

@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>机械臂 3D · Embody Eval</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+<style>
+  :root {
+    --bg: #0b1018;
+    --panel: rgba(12, 18, 28, 0.96);
+    --border: rgba(58, 77, 102, 0.55);
+    --text: #e7ecf3;
+    --muted: #8b9bb4;
+    --accent: #3dd6c6;
+    --accent-dim: rgba(61, 214, 198, 0.14);
+    --danger: #f87171;
+    --header-h: 56px;
+    --font: "IBM Plex Sans", "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --scrollbar-thumb: rgba(61, 214, 198, 0.45);
+    --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
+    --scrollbar-size: 4px;
+  }
+  * { box-sizing: border-box; }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+  *::-webkit-scrollbar-corner { background: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--text);
+    background:
+      radial-gradient(900px 420px at 8% -10%, rgba(26, 39, 64, 0.55), transparent 55%),
+      radial-gradient(700px 380px at 92% 0%, rgba(20, 48, 52, 0.35), transparent 50%),
+      var(--bg);
+  }
+  header {
+    position: relative; z-index: 40;
+    display: grid;
+    grid-template-columns: minmax(160px, 280px) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    height: var(--header-h);
+    padding: 0 16px;
+    background: linear-gradient(180deg, rgba(11,16,24,0.96), rgba(11,16,24,0.82));
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+  .header-blurb { margin: 2px 0 0; color: var(--muted); font-size: 0.75rem; }
+  .toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    justify-self: start;
+  }
+  .toolbar label { font-size: 0.75rem; color: var(--muted); }
+  .robot-select {
+    min-width: 160px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(26, 35, 50, 0.85);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.82rem;
+  }
+  .robot-select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+  .pill {
+    display: inline-flex; gap: 8px; align-items: center;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: rgba(26,35,50,0.7);
+    font-size: 0.72rem; color: var(--muted);
+  }
+  .page-nav { position: relative; z-index: 50; }
+  .page-nav-btn {
+    cursor: pointer; gap: 6px; color: var(--text); text-decoration: none;
+    font: inherit; font-size: 0.72rem; background: rgba(26,35,50,0.7);
+  }
+  .page-nav-btn:hover, .page-nav.open .page-nav-btn {
+    border-color: var(--accent); color: var(--accent);
+  }
+  .page-nav-caret { opacity: 0.7; font-size: 0.65rem; }
+  .page-nav-menu {
+    position: absolute; top: calc(100% + 6px); right: 0;
+    min-width: 220px; padding: 6px;
+    background: rgba(18, 26, 38, 0.98);
+    border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.45); z-index: 60;
+  }
+  .page-nav-item {
+    display: block; padding: 8px 10px; border-radius: 8px;
+    text-decoration: none; color: var(--text);
+  }
+  .page-nav-item:hover { background: var(--accent-dim); }
+  .page-nav-item.active {
+    background: var(--accent-dim); color: var(--accent);
+  }
+  .page-nav-item-title { display: block; font-size: 0.8rem; }
+  .page-nav-item-desc { display: block; font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
+    height: calc(100% - var(--header-h));
+  }
+  .side {
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    padding: 14px 14px 18px;
+    overflow: auto;
+  }
+  .side h2 {
+    margin: 0 0 6px; font-size: 0.92rem; font-weight: 600;
+  }
+  .side .desc {
+    margin: 0 0 14px; font-size: 0.78rem; color: var(--muted); line-height: 1.45;
+  }
+  .meta-grid {
+    display: grid; gap: 8px; margin-bottom: 14px;
+  }
+  .meta-item {
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(18, 26, 38, 0.55);
+  }
+  .meta-item .k { font-size: 0.68rem; color: var(--muted); }
+  .meta-item .v {
+    margin-top: 2px; font-size: 0.8rem;
+    font-family: var(--mono); word-break: break-all;
+  }
+  .joint-list { display: grid; gap: 10px; }
+  .joint-row label {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 0.72rem; color: var(--muted); margin-bottom: 4px;
+  }
+  .joint-row strong {
+    font-family: var(--mono); font-size: 0.72rem; color: var(--accent); font-weight: 560;
+  }
+  .joint-row input[type="range"] {
+    width: 100%; accent-color: var(--accent);
+  }
+  .btn-row { display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap; }
+  button {
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: rgba(26, 35, 50, 0.85);
+    color: var(--text);
+    font: inherit;
+    font-size: 0.78rem;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+
+  #viewer {
+    position: relative;
+    min-height: 0;
+    background: radial-gradient(720px 420px at 50% 20%, #152033, #0b1018 70%);
+  }
+  #viewer canvas { display: block; width: 100% !important; height: 100% !important; }
+  #viewer .loading {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: var(--muted); background: rgba(11,16,24,0.72); z-index: 2; pointer-events: none;
+  }
+  #viewer .loading[hidden] { display: none; }
+  #viewer .loading-card {
+    width: min(360px, 82vw);
+    padding: 18px 20px 16px;
+    border-radius: 14px;
+    background: rgba(18, 26, 38, 0.92);
+    border: 1px solid rgba(58, 77, 102, 0.7);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.4);
+  }
+  #viewer .loading-text {
+    font-size: 0.88rem; color: var(--text); margin-bottom: 12px; line-height: 1.4;
+  }
+  #viewer .loading-bar {
+    height: 8px; border-radius: 999px;
+    background: rgba(36, 50, 71, 0.95);
+    border: 1px solid rgba(58, 77, 102, 0.55);
+    overflow: hidden;
+  }
+  #viewer .loading-bar-fill {
+    height: 100%; width: 0%;
+    background: linear-gradient(90deg, #2a9d8f, var(--accent));
+    border-radius: inherit;
+    transition: width 0.15s ease-out;
+  }
+  #viewer .loading-meta {
+    margin-top: 8px; font-size: 0.72rem; color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+  #viewer .hud-hint {
+    position: absolute; left: 14px; bottom: 14px; z-index: 3;
+    font-size: 0.72rem; color: var(--muted);
+    pointer-events: none;
+  }
+  #statusErr {
+    color: var(--danger); font-size: 0.78rem; margin-top: 10px; line-height: 1.4;
+  }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; grid-template-rows: auto minmax(360px, 1fr); }
+    .side { border-right: none; border-bottom: 1px solid var(--border); max-height: 42vh; }
+    header {
+      grid-template-columns: 1fr auto;
+      height: auto; padding: 10px 14px; gap: 8px;
+    }
+    .toolbar { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>机械臂 3D</h1>
+    <p class="header-blurb">从 robots.json 选择机型，浏览 URDF 与关节</p>
+  </div>
+  <div class="toolbar">
+    <label for="robotSelect">机型</label>
+    <select id="robotSelect" class="robot-select" aria-label="选择机械臂型号"></select>
+    <span class="pill" id="robotCount">—</span>
+  </div>
+  <div id="pageNavRoot"></div>
+</header>
+
+<div class="layout">
+  <aside class="side" aria-label="机型信息">
+    <h2 id="robotTitle">—</h2>
+    <p class="desc" id="robotDesc">加载 robots.json…</p>
+    <div class="meta-grid" id="metaGrid"></div>
+    <h2 style="margin-top:4px">关节</h2>
+    <div class="joint-list" id="jointList"></div>
+    <div class="btn-row">
+      <button type="button" id="btnHome">回 home</button>
+      <button type="button" id="btnZero">回零</button>
+      <button type="button" id="btnFit">适配相机</button>
+    </div>
+    <p id="statusErr" hidden></p>
+  </aside>
+  <div id="viewer" aria-label="3D 视图">
+    <div class="loading" id="loading">
+      <div class="loading-card">
+        <div class="loading-text" id="loadText">准备加载…</div>
+        <div class="loading-bar"><div class="loading-bar-fill" id="loadBar"></div></div>
+        <div class="loading-meta" id="loadMeta"></div>
+      </div>
+    </div>
+    <div class="hud-hint">拖拽旋转 · 滚轮缩放 · 右键平移</div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/build/three.module.js",
+    "three/addons/": "./vendor/three/examples/jsm/",
+    "three/examples/jsm/": "./vendor/three/examples/jsm/",
+    "urdf-loader": "./vendor/urdf-loader/src/URDFLoader.js"
+  }
+}
+</script>
+<script type="module" src="./robots_view.js?v=2"></script>
+</body>
+</html>
