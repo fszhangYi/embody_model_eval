@@ -4,12 +4,13 @@
 Endpoints:
   GET    /api/health
   GET    /api/skills
+  GET    /api/skills/<id>
   GET    /api/skills/sources
   POST   /api/skills/import
   DELETE /api/skills/<id>
   GET    /api/agent/config
   PUT    /api/agent/config
-  POST   /api/chat
+  POST   /api/chat   (body: message, skillIds?, history?, config?)
 """
 
 from __future__ import annotations
@@ -39,6 +40,8 @@ SOURCE_ROOTS = {
     "user": Path.home() / ".cursor" / "skills",
     "builtin": Path.home() / ".cursor" / "skills-cursor",
 }
+CURSOR_HOME = Path.home() / ".cursor"
+CURSOR_SCAN_SKIP = {".run", "chats", "projects", "ai-tracking", "sandbox-policies"}
 
 
 def _json_bytes(obj: Any, status: int = 200) -> tuple[int, bytes, str]:
@@ -111,6 +114,50 @@ def list_skills_in(root: Path) -> list[dict[str, Any]]:
     return out
 
 
+def scan_cursor_home_skills() -> list[dict[str, Any]]:
+    """Recursively find SKILL.md under ~/.cursor (skills / skills-cursor / …)."""
+    out: list[dict[str, Any]] = []
+    if not CURSOR_HOME.is_dir():
+        return out
+    seen: set[str] = set()
+    for skill_md in sorted(CURSOR_HOME.rglob("SKILL.md")):
+        folder = skill_md.parent
+        try:
+            rel = folder.relative_to(CURSOR_HOME)
+        except ValueError:
+            continue
+        parts = rel.parts
+        if not parts:
+            continue
+        if parts[0] in CURSOR_SCAN_SKIP or any(p.startswith(".") for p in parts):
+            continue
+        if not SKILL_NAME_RE.match(folder.name):
+            continue
+        key = str(folder.resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            text = skill_md.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        meta, _ = _parse_frontmatter(text)
+        group = parts[0]
+        out.append(
+            {
+                "id": folder.name,
+                "name": meta.get("name") or folder.name,
+                "description": meta.get("description") or "",
+                "path": str(folder),
+                "rel": str(rel).replace("\\", "/"),
+                "group": group,
+                "bytes": skill_md.stat().st_size,
+            }
+        )
+    out.sort(key=lambda s: (s.get("group") or "", s.get("id") or ""))
+    return out
+
+
 def load_skill_bundle(skill_id: str) -> dict[str, Any] | None:
     if not SKILL_NAME_RE.match(skill_id):
         return None
@@ -174,7 +221,28 @@ def public_config(cfg: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def build_messages(user_message: str, skills: list[dict[str, Any]], system_prompt: str) -> list[dict[str, str]]:
+def normalize_history(raw: Any) -> list[dict[str, str]]:
+    """Prior user/assistant turns only (no system). Caps length for safety."""
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip()
+        content = str(item.get("content") or "").strip()
+        if role not in ("user", "assistant") or not content:
+            continue
+        out.append({"role": role, "content": content})
+    return out[-40:]
+
+
+def build_messages(
+    user_message: str,
+    skills: list[dict[str, Any]],
+    system_prompt: str,
+    history: list[dict[str, str]] | None = None,
+) -> list[dict[str, str]]:
     parts = [system_prompt.strip() or "You are a helpful assistant."]
     if skills:
         parts.append("\n\n# Active Agent Skills\n")
@@ -186,10 +254,11 @@ def build_messages(user_message: str, skills: list[dict[str, Any]], system_promp
             parts.append("\n```skill\n")
             parts.append(s["content"])
             parts.append("\n```\n")
-    return [
-        {"role": "system", "content": "".join(parts)},
-        {"role": "user", "content": user_message},
-    ]
+    messages: list[dict[str, str]] = [{"role": "system", "content": "".join(parts)}]
+    for turn in history or []:
+        messages.append({"role": turn["role"], "content": turn["content"]})
+    messages.append({"role": "user", "content": user_message})
+    return messages
 
 
 def http_json(url: str, payload: dict[str, Any], api_key: str, timeout: float = 120.0) -> dict[str, Any]:
@@ -245,7 +314,12 @@ def extract_openai_text(data: Any) -> str:
     return json.dumps(data, ensure_ascii=False, indent=2)
 
 
-def try_cursor_sdk(message: str, skills: list[dict[str, Any]], cfg: dict[str, Any]) -> dict[str, Any]:
+def try_cursor_sdk(
+    message: str,
+    skills: list[dict[str, Any]],
+    cfg: dict[str, Any],
+    history: list[dict[str, str]] | None = None,
+) -> dict[str, Any]:
     """Optional path: local Cursor SDK with staged project skills."""
     try:
         from cursor_sdk import Agent, AgentOptions, LocalAgentOptions  # type: ignore
@@ -265,6 +339,14 @@ def try_cursor_sdk(message: str, skills: list[dict[str, Any]], cfg: dict[str, An
 
     api_key = cfg.get("apiKey") or os.environ.get("CURSOR_API_KEY") or ""
     model = cfg.get("model") or "composer-2.5"
+    sdk_message = message
+    if history:
+        transcript = "\n".join(f"{h['role']}: {h['content']}" for h in history)
+        sdk_message = (
+            "Previous conversation (for context):\n"
+            f"{transcript}\n\n"
+            f"Current user message:\n{message}"
+        )
     try:
         with Agent.create(
             AgentOptions(
@@ -276,7 +358,7 @@ def try_cursor_sdk(message: str, skills: list[dict[str, Any]], cfg: dict[str, An
                 ),
             )
         ) as agent:
-            run = agent.send(message)
+            run = agent.send(sdk_message)
             result = run.wait()
             text = getattr(result, "result", None) or getattr(result, "text", None)
             if text is None and hasattr(run, "text"):
@@ -304,6 +386,8 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(skill_ids, list):
         return {"ok": False, "error": "skillIds must be a list"}
 
+    history = normalize_history(payload.get("history"))
+
     skills: list[dict[str, Any]] = []
     missing: list[str] = []
     for sid in skill_ids:
@@ -326,7 +410,7 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
                     continue
                 cfg[k] = override[k]
 
-    messages = build_messages(message, skills, cfg.get("systemPrompt") or "")
+    messages = build_messages(message, skills, cfg.get("systemPrompt") or "", history)
     mode = (cfg.get("mode") or "dry_run").strip()
 
     meta = {
@@ -334,23 +418,29 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
         "model": cfg.get("model"),
         "skillIds": [s["id"] for s in skills],
         "skillCount": len(skills),
+        "historyTurns": len(history),
     }
 
     if mode == "dry_run":
         receipt = {
             "note": "dry_run：未调用外部 Agent，仅返回打包后的诉求与 skill。",
             "messages": messages,
+            "history": history,
         }
+        hist_note = f"历史轮次: {len(history)}\n" if history else ""
         return {
             "ok": True,
             "reply": (
                 "【Dry-run 回执】\n"
                 f"模式: dry_run\n模型: {cfg.get('model')}\n"
-                f"已选 skill: {', '.join(s['id'] for s in skills) or '(无)'}\n\n"
+                f"已选 skill: {', '.join(s['id'] for s in skills) or '(无)'}\n"
+                f"{hist_note}\n"
                 "—— System（摘要）——\n"
                 + messages[0]["content"][:1800]
                 + ("…\n" if len(messages[0]["content"]) > 1800 else "\n")
-                + "\n—— User ——\n"
+                + "\n—— 完整 messages 角色序列 ——\n"
+                + " → ".join(m["role"] for m in messages)
+                + "\n\n—— 本轮 User ——\n"
                 + message
             ),
             "receipt": receipt,
@@ -358,7 +448,7 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
         }
 
     if mode == "cursor_sdk":
-        out = try_cursor_sdk(message, skills, cfg)
+        out = try_cursor_sdk(message, skills, cfg, history)
         if not out.get("ok"):
             return {"ok": False, "error": out.get("message") or "cursor_sdk failed", "detail": out, "meta": meta}
         return {
@@ -401,6 +491,7 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
         url = base + (path if path.startswith("/") else ("/" + path if path else ""))
         payload_body = {
             "message": message,
+            "history": history,
             "skills": [{"id": s["id"], "name": s["name"], "description": s["description"], "content": s["content"]} for s in skills],
             "messages": messages,
             "model": cfg.get("model"),
@@ -456,10 +547,32 @@ class Handler(SimpleHTTPRequestHandler):
             self._send_json({"ok": True, "skills": list_skills_in(SKILLS_DIR)})
             return
         if path == "/api/skills/sources":
+            scanned = scan_cursor_home_skills()
+            # Keep legacy keys for older clients; primary list is `scanned`.
             sources = {}
             for key, root in SOURCE_ROOTS.items():
-                sources[key] = {"root": str(root), "skills": list_skills_in(root)}
-            self._send_json({"ok": True, "sources": sources})
+                sources[key] = {
+                    "root": str(root),
+                    "label": "用户 skills" if key == "user" else "Cursor 内置",
+                    "skills": list_skills_in(root),
+                }
+            self._send_json(
+                {
+                    "ok": True,
+                    "cursorHome": str(CURSOR_HOME),
+                    "scanned": scanned,
+                    "sources": sources,
+                }
+            )
+            return
+        m_skill = re.match(r"^/api/skills/([^/]+)$", path)
+        if m_skill:
+            sid = m_skill.group(1)
+            bundle = load_skill_bundle(sid)
+            if not bundle:
+                self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json({"ok": True, "skill": bundle})
             return
         if path == "/api/agent/config":
             self._send_json({"ok": True, "config": public_config(load_config())})
@@ -507,17 +620,38 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if path == "/api/skills/import":
-            source = (body.get("source") if isinstance(body, dict) else None) or "user"
+            source = (body.get("source") if isinstance(body, dict) else None) or ""
             skill_id = (body.get("id") if isinstance(body, dict) else None) or ""
-            if source not in SOURCE_ROOTS:
-                self._send_json({"ok": False, "error": "source must be user|builtin"}, HTTPStatus.BAD_REQUEST)
+            rel = (body.get("rel") if isinstance(body, dict) else None) or ""
+
+            src: Path | None = None
+            if rel:
+                # Import by path relative to ~/.cursor (from scan_cursor_home_skills).
+                cand = (CURSOR_HOME / str(rel)).resolve()
+                try:
+                    cand.relative_to(CURSOR_HOME.resolve())
+                except ValueError:
+                    self._send_json({"ok": False, "error": "rel outside ~/.cursor"}, HTTPStatus.BAD_REQUEST)
+                    return
+                src = cand
+                skill_id = src.name
+            elif source in SOURCE_ROOTS and skill_id:
+                if not SKILL_NAME_RE.match(skill_id):
+                    self._send_json({"ok": False, "error": "invalid skill id"}, HTTPStatus.BAD_REQUEST)
+                    return
+                src = SOURCE_ROOTS[source] / skill_id
+            else:
+                self._send_json(
+                    {"ok": False, "error": "provide rel (under ~/.cursor) or source+id"},
+                    HTTPStatus.BAD_REQUEST,
+                )
                 return
+
             if not SKILL_NAME_RE.match(skill_id):
                 self._send_json({"ok": False, "error": "invalid skill id"}, HTTPStatus.BAD_REQUEST)
                 return
-            src = SOURCE_ROOTS[source] / skill_id
-            if not (src / "SKILL.md").is_file():
-                self._send_json({"ok": False, "error": f"skill not found: {source}/{skill_id}"}, HTTPStatus.NOT_FOUND)
+            if not src or not (src / "SKILL.md").is_file():
+                self._send_json({"ok": False, "error": f"skill not found: {src}"}, HTTPStatus.NOT_FOUND)
                 return
             SKILLS_DIR.mkdir(parents=True, exist_ok=True)
             dest = SKILLS_DIR / skill_id

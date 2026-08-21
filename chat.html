@@ -186,7 +186,13 @@
   }
   .skill-del:hover { color: var(--danger); border: 0; }
 
-  .source-block { margin-bottom: 10px; }
+  .source-block { margin-bottom: 12px; }
+  .source-group {
+    font-size: 11px;
+    color: var(--muted);
+    margin: 0 0 6px;
+    letter-spacing: 0.02em;
+  }
   .source-row {
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
     padding: 6px 0; border-bottom: 1px solid rgba(58,77,102,0.35);
@@ -201,6 +207,11 @@
     display: flex; flex-direction: column; gap: 10px;
     padding: 4px 2px 12px;
   }
+  .chat-toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin-bottom: 8px;
+  }
+  .chat-toolbar .grow { flex: 1; min-width: 8px; }
   .bubble {
     max-width: min(720px, 96%);
     padding: 10px 12px;
@@ -217,6 +228,37 @@
     font-family: var(--font); font-size: 0.84rem; line-height: 1.5;
   }
   .bubble-meta { margin-top: 6px; font-size: 0.65rem; color: var(--muted); font-family: var(--mono); }
+  .bubble-actions {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    margin-top: 8px;
+  }
+  .bubble-actions button {
+    padding: 3px 8px;
+    font-size: 0.68rem;
+  }
+
+  .preview-box {
+    margin-top: 10px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(18, 26, 38, 0.75);
+    max-height: 280px;
+    overflow: auto;
+  }
+  .preview-box[hidden] { display: none !important; }
+  .preview-head {
+    position: sticky; top: 0;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 8px 10px;
+    background: rgba(18, 26, 38, 0.96);
+    border-bottom: 1px solid var(--border);
+    font-size: 0.72rem; color: var(--muted);
+  }
+  .preview-body {
+    margin: 0; padding: 10px;
+    font-family: var(--mono); font-size: 0.68rem; line-height: 1.45;
+    white-space: pre-wrap; word-break: break-word; color: #c5d0e0;
+  }
 
   .composer {
     display: grid; gap: 8px;
@@ -282,16 +324,29 @@
     </h2>
     <p class="muted" id="selectedHint">未选择 skill</p>
     <div id="managedSkills"></div>
-    <h3>从本机导入</h3>
+    <div class="preview-box" id="skillPreview" hidden>
+      <div class="preview-head">
+        <span id="previewTitle">Skill 预览</span>
+        <button type="button" class="btn-sm" id="btnClosePreview">收起</button>
+      </div>
+      <pre class="preview-body" id="previewBody"></pre>
+    </div>
+    <h3 id="sourceHeading">~/.cursor Skills</h3>
     <div id="sourceSkills"></div>
   </aside>
 
   <main class="chat-main" aria-label="对话">
+    <div class="chat-toolbar">
+      <span class="muted" id="turnHint">新会话</span>
+      <span class="grow"></span>
+      <button type="button" class="btn-sm" id="btnClearChat" title="清空本页对话历史">清空对话</button>
+      <button type="button" class="btn-sm" id="btnExportChat" title="导出本页对话为 Markdown">导出 MD</button>
+    </div>
     <div id="chatLog"></div>
     <div class="composer">
-      <textarea id="chatInput" placeholder="输入诉求…（Ctrl/⌘ + Enter 发送）&#10;选中的 skill 会随消息一并交给 Agent。"></textarea>
+      <textarea id="chatInput" placeholder="输入诉求…（Ctrl/⌘ + Enter 发送）"></textarea>
       <div class="composer-row">
-        <span class="muted">回执显示在上方；dry_run 可先验证打包内容。</span>
+        <span class="muted"></span>
         <button type="button" class="btn-primary" id="btnSend">发送</button>
       </div>
     </div>
@@ -308,8 +363,6 @@
         <option value="cursor_sdk">cursor_sdk（可选 pip：cursor-sdk）</option>
       </select>
     </div>
-    <p class="hint" id="dryHint">不消耗额度：把 system（含 skill 正文）与 user 诉求打包成回执，便于联调前端。</p>
-    <p class="hint" id="cursorHint" hidden>需本机 <code>pip install cursor-sdk</code> 与 API Key；服务端会把选中 skill 写入临时 <code>.cursor/skills</code> 并以 <code>setting_sources=["project"]</code> 调用本地 Agent。</p>
     <div id="linkFields" hidden>
       <div class="field">
         <label for="cfgBaseUrl">Base URL</label>
@@ -338,6 +391,6 @@
 </div>
 
 <div id="toast" hidden></div>
-<script type="module" src="./chat.js"></script>
+<script type="module" src="./chat.js?v=3"></script>
 </body>
 </html>

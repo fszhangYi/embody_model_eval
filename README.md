@@ -97,15 +97,16 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 
 打开 `chat.html`（顶栏「页面」→ Chat）：
 
-1. **托管 Skills**：服务端目录 `agent_skills/`；可从本机 `~/.cursor/skills` / `skills-cursor` 一键导入
-2. **勾选 skill** 后填写诉求；正文与 skill 一并打包
-3. **Agent 链接模式**
+1. **托管 Skills**：服务端目录 `agent_skills/`；左侧会扫描并列出本机 `~/.cursor` 下的 skill（`skills` / `skills-cursor` 等），可一键导入；点击 skill 名称可预览 `SKILL.md`
+2. **勾选 skill** 后填写诉求（可用模板芯片）；**多轮对话**会自动带上本页上文
+3. **回执操作**：复制全文 / 复制 dry_run 打包 JSON / 导出单条或整段 Markdown
+4. **Agent 链接模式**
    - `dry_run`：不调外部，返回打包回执（默认，便于联调）
-   - `openai`：兼容 `/chat/completions` 网关
-   - `webhook`：向自定义 URL POST `{ message, skills, messages }`
+   - `openai`：兼容 `/chat/completions` 网关（提交完整 messages，含历史）
+   - `webhook`：向自定义 URL POST `{ message, history, skills, messages }`
    - `cursor_sdk`：可选 `pip install cursor-sdk`，用 API Key 跑本地 Agent（选中 skill 写入临时 project skills）
 
-配置保存在 `agent_skills/.agent_config.json`（已 gitignore）；也可用环境变量 `CURSOR_API_KEY` / `AGENT_API_KEY`。
+配置保存在 `agent_skills/.agent_config.json`（已 gitignore）；也可用环境变量 `CURSOR_API_KEY` / `AGENT_API_KEY`。会话历史仅存本机 `localStorage`，不与其它页面耦合。
 
 ## 评测数据
 
