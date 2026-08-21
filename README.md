@@ -48,14 +48,16 @@ embody_model_eval/
 ├── favicon.svg / .ico / .png
 ├── data/                   # 比对数据（按套件分子目录）
 │   ├── index.json          # 启动时由 serve.sh 实时刷新
-│   ├── 20260819/episode_*.json + media/   # 含观测演示 (F) + 任务/接触 (G)
+│   ├── 20260819/episode_*.json + media/   # SO-100 观测+任务演示 (F/G)
 │   ├── 20260405/episode_*.json + media/
-│   └── short/episode_*.json + media/      # 5–10 帧短轨迹
+│   ├── short/episode_*.json + media/      # SO-100 5–10 帧短轨迹
+│   ├── ec616_short/episode_*.json + media/# EC616 短轨迹（平行夹爪 8 关节）
+│   └── ec616/episode_*.json + media/      # EC616 中长轨迹评测
 ├── vendor/                 # 离线前端依赖（Three / Chart.js / urdf-loader）
 ├── scripts/
 │   ├── batch_score.py      # 批量跑分 + 门禁
 │   ├── bag_to_compare.py   # 日志 → episode JSON
-│   ├── gen_sim_episodes.py # 生成模拟 episode（--short 默认附带观测+任务）
+│   ├── gen_sim_episodes.py # 生成模拟 episode（--short / --ec616）
 │   ├── gen_obs_media.py    # 为套件补 RGB/Depth/注意力媒体 (F)
 │   ├── gen_task_demo.py    # 为套件补任务成功/接触/物体轨迹 (G)
 │   ├── refresh_data_index.py
@@ -114,7 +116,7 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 
 每个文件需含：
 
-- `meta.robot`：**必填**，机械臂型号 id（须在 `robots.json` 登记，当前为 `so100`）
+- `meta.robot`：**必填**，机械臂型号 id（须在 `robots.json` 登记，当前为 `so100` / `ec616`）
 - `meta` + 非空 `frames[]`（帧内 `current` / `next_gt` / `next_pred` 关节角）
 
 字段说明：
@@ -150,13 +152,17 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 - 批量生成模拟数据：
 
 ```bash
-python3 scripts/gen_sim_episodes.py --short          # 5–10 帧短轨迹（推荐演示，默认附带 obs+任务）
+python3 scripts/gen_sim_episodes.py --short          # SO-100 5–10 帧短轨迹（默认附带 obs+任务）
+python3 scripts/gen_sim_episodes.py --ec616          # EC616：ec616_short/ + ec616/（8 关节+平行夹爪）
 python3 scripts/gen_sim_episodes.py --preset --with-obs
 python3 scripts/gen_obs_media.py --all               # 仅为已有 episode 补观测媒体
 python3 scripts/gen_task_demo.py --all               # 仅为已有 episode 补任务/接触/物体 (G)
 # 或指定套件 / 机型：
 python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --n-frames 8 --robot so100 --overwrite --with-obs
+python3 scripts/gen_sim_episodes.py --suite ec616 --start 5 --count 2 --n-frames 40 --robot ec616 --overwrite --with-obs
 ```
+
+Hub 选 `ec616_short` / `ec616`；单轨迹示例：`/?data=./data/ec616_short/episode_1.json`
 
 重新生成模拟评测数据（可选，在 `act_robot` 中）：
 

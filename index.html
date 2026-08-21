@@ -66,6 +66,56 @@
     touch-action: none;
   }
   #arm3d canvas { display: block; width: 100% !important; height: 100% !important; }
+  #arm3d .view-tools {
+    position: absolute;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    max-width: min(520px, calc(100vw - 24px));
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: rgba(12, 18, 28, 0.88);
+    border: 1px solid rgba(58, 77, 102, 0.65);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(10px);
+    pointer-events: auto;
+  }
+  #arm3d .view-tools button {
+    min-width: 52px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(58, 77, 102, 0.75);
+    background: rgba(26, 35, 50, 0.9);
+    color: var(--text);
+    font-size: 0.78rem;
+    font-weight: 560;
+    cursor: pointer;
+  }
+  #arm3d .view-tools button:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  #arm3d .view-tools button.active {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+    color: var(--accent);
+  }
+  #arm3d .view-tools .view-tools-fit {
+    margin-left: 4px;
+  }
+  #arm3d .view-tools-hint {
+    flex: 1 1 100%;
+    text-align: center;
+    font-size: 0.68rem;
+    color: var(--muted);
+    padding-top: 2px;
+  }
   #arm3d .loading {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     color: var(--muted); background: rgba(11,16,24,0.72); z-index: 2; pointer-events: none;
@@ -826,6 +876,7 @@ import {
   resolveGoalAtFrame,
 } from './task_events.js';
 import { mountPageNav } from './nav_pages.js';
+import { mountViewTools } from './view_tools.js';
 
 mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'eval' });
 
@@ -841,6 +892,8 @@ let ACTIVE_ROBOT = null;
 let JOINTS = [];
 const TCP_OFFSET = new THREE.Vector3(0, -0.1062, 0);
 let TCP_LINK = 'gripper';
+/** Visual-only uniform scale (EC616 shrinks to SO-100 size). Metrics use unscaled meters. */
+let MODEL_SCALE = 1;
 
 function hexToInt(hex, fallback) {
   if (typeof hex !== 'string') return fallback;
@@ -855,6 +908,37 @@ function applyActiveRobot(robot) {
   TCP_LINK = robot.tcp.link || 'gripper';
   const o = robot.tcp.offset || [0, 0, 0];
   TCP_OFFSET.set(Number(o[0]) || 0, Number(o[1]) || 0, Number(o[2]) || 0);
+  const sc = Number(robot.model_scale);
+  MODEL_SCALE = Number.isFinite(sc) && sc > 0 ? sc : 1;
+}
+
+function applyModelScale(robot) {
+  if (!robot) return;
+  robot.scale.setScalar(MODEL_SCALE);
+  robot.updateMatrixWorld(true);
+}
+
+function toDisplayPos(p) {
+  if (!p) return p;
+  const s = MODEL_SCALE;
+  if (s === 1) return { x: Number(p.x) || 0, y: Number(p.y) || 0, z: Number(p.z) || 0 };
+  return { x: (Number(p.x) || 0) * s, y: (Number(p.y) || 0) * s, z: (Number(p.z) || 0) * s };
+}
+
+function pathsToMeters(paths) {
+  const s = MODEL_SCALE;
+  const inv = (v) => {
+    if (!v) return v;
+    if (s === 1) return { x: v.x, y: v.y, z: v.z };
+    return { x: v.x / s, y: v.y / s, z: v.z / s };
+  };
+  return {
+    cur: (paths.cur || []).map(inv),
+    gt: (paths.gt || []).map(inv),
+    pred: (paths.pred || []).map(inv),
+    gtQuat: paths.gtQuat,
+    predQuat: paths.predQuat,
+  };
 }
 
 /** 左右栏默认收起：悬停展开，移出自动收缩；点击侧边标签钉住/取消。 */
@@ -1294,6 +1378,7 @@ async function loadData() {
 }
 
 function softMaterial(robot) {
+  if (!robot) return;
   robot.traverse((c) => {
     if (!c.isMesh || !c.material) return;
     const mats = Array.isArray(c.material) ? c.material : [c.material];
@@ -1305,6 +1390,58 @@ function softMaterial(robot) {
       }
     });
   });
+}
+
+/** Tint meshes when cur/gt/pred share one URDF (e.g. EC616 has no colored copies). */
+function tintRobot(robot, colorHex, opacity = 0.72) {
+  if (!robot) return;
+  robot.userData.roleTint = { colorHex, opacity };
+  applyRoleTint(robot);
+}
+
+function applyRoleTint(robot) {
+  const spec = robot?.userData?.roleTint;
+  if (!spec) return;
+  const color = new THREE.Color(spec.colorHex);
+  const opacity = spec.opacity;
+  robot.traverse((c) => {
+    if (!c.isMesh || !c.material) return;
+    const mats = Array.isArray(c.material) ? c.material : [c.material];
+    mats.forEach((m) => {
+      if (!m?.color) return;
+      m.color.copy(color);
+      m.transparent = true;
+      m.opacity = opacity;
+      m.depthWrite = opacity >= 0.95;
+      m.needsUpdate = true;
+    });
+  });
+}
+
+function refreshRobotLook(robot) {
+  softMaterial(robot);
+  applyRoleTint(robot);
+}
+
+function fitEvalCamera(camera, controls, robot, { fog } = {}) {
+  if (!robot) return;
+  const box = new THREE.Box3().setFromObject(robot);
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  if (![size.x, size.y, size.z, center.x, center.y, center.z].every(Number.isFinite)) return;
+  const maxDim = Math.max(size.x, size.y, size.z, 0.25);
+  const dist = maxDim * 1.9;
+  controls.target.copy(center);
+  camera.position.set(center.x + dist * 0.75, center.y + dist * 0.45, center.z + dist * 0.85);
+  camera.near = Math.max(0.01, maxDim / 200);
+  camera.far = Math.max(20, maxDim * 20);
+  camera.updateProjectionMatrix();
+  controls.update();
+  if (fog) {
+    fog.near = Math.max(0.5, maxDim * 1.2);
+    fog.far = Math.max(fog.near + 1, maxDim * 4.5);
+  }
 }
 
 function setPose(robot, qDeg) {
@@ -1353,48 +1490,68 @@ function setLoadProgress(ratio, text, detail) {
 function loadRobot(urdfUrl, { onProgress, label, rootEulerDeg } = {}) {
   return new Promise((resolve, reject) => {
     const manager = new THREE.LoadingManager();
-    let robot = null;
     let settled = false;
-    const finish = () => {
-      if (settled || !robot) return;
+    let robotRef = null;
+
+    const fail = (err) => {
+      if (settled) return;
       settled = true;
-      softMaterial(robot);
-      onProgress?.(1, label || urdfUrl);
-      resolve(robot);
+      clearTimeout(hardTimer);
+      reject(err instanceof Error ? err : new Error(String(err)));
     };
+
+    const hardTimer = setTimeout(() => {
+      fail(new Error(`加载超时：${urdfUrl}`));
+    }, 45000);
+
+    const retint = () => {
+      if (robotRef) refreshRobotLook(robotRef);
+    };
+
     manager.onProgress = (_url, loaded, total) => {
-      const t = total > 0 ? loaded / total : 0;
-      onProgress?.(Math.min(0.99, t), label || _url);
+      if (total > 0) onProgress?.(Math.min(0.95, loaded / total), label || _url);
+      // Meshes stream in after URDF resolve — keep role colors applied.
+      retint();
     };
-    manager.onLoad = finish;
+    manager.onLoad = () => {
+      retint();
+      onProgress?.(1, label || urdfUrl);
+    };
     manager.onError = (url) => {
-      if (!settled) {
-        settled = true;
-        reject(new Error('资源加载失败: ' + url));
-      }
+      console.warn('[eval] asset error', url);
     };
+
     const loader = new URDFLoader(manager);
     loader.packages = '';
-    loader.workingPath = urdfUrl.replace(/[^/]+$/, '');
+    loader.parseCollision = false;
+    // Strip ?v= cache-bust so mesh paths stay under the robot folder (not broken by query).
+    const cleanUrl = String(urdfUrl).split('?')[0];
+    loader.workingPath = cleanUrl.replace(/[^/]+$/, '');
+
     loader.load(
       urdfUrl,
-      (r) => {
-        robot = r;
-        robot.ignoreLimits = true;
-        const e = rootEulerDeg || [0, 0, 0];
-        robot.rotation.set(
-          (Number(e[0]) || 0) * DEG2RAD,
-          (Number(e[1]) || 0) * DEG2RAD,
-          (Number(e[2]) || 0) * DEG2RAD,
-        );
-      },
-      undefined,
-      (err) => {
-        if (!settled) {
-          settled = true;
-          reject(err);
+      (robot) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(hardTimer);
+        try {
+          robotRef = robot;
+          robot.ignoreLimits = true;
+          const e = rootEulerDeg || [0, 0, 0];
+          robot.rotation.set(
+            (Number(e[0]) || 0) * DEG2RAD,
+            (Number(e[1]) || 0) * DEG2RAD,
+            (Number(e[2]) || 0) * DEG2RAD,
+          );
+          refreshRobotLook(robot);
+          onProgress?.(1, label || urdfUrl);
+          resolve(robot);
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error(String(err)));
         }
       },
+      undefined,
+      (err) => fail(err),
     );
   });
 }
@@ -1625,7 +1782,9 @@ async function initScene(container, frames, robotCfg) {
   key.position.set(1.5, 2.5, 1.2); scene.add(key);
   const fill = new THREE.DirectionalLight(0x88aaff, 0.35);
   fill.position.set(-1.5, 1.0, -1.0); scene.add(fill);
-  scene.add(new THREE.GridHelper(1.6, 16, 0x3a4d66, 0x243247));
+  // Industrial arms (EC616) are visually scaled to SO-100 size via model_scale.
+  const grid = new THREE.GridHelper(1.6, 16, 0x3a4d66, 0x243247);
+  scene.add(grid);
 
   setLoadProgress(
     0.02,
@@ -1659,9 +1818,31 @@ async function initScene(container, frames, robotCfg) {
       onProgress: (p) => { robotProgress[2] = p; bumpRobots(); },
     }),
   ]);
+  // Same mesh file for all three roles → force distinct colors (SO-100 already has colored URDFs).
+  const sharedUrdf = robotCfg.urdf.cur === robotCfg.urdf.gt
+    && robotCfg.urdf.gt === robotCfg.urdf.pred;
+  if (sharedUrdf) {
+    tintRobot(armCur, colorCur, 0.58);
+    tintRobot(armGT, colorGt, 0.64);
+    tintRobot(armPred, colorPred, 0.70);
+    // STL finishes after URDF resolve; re-apply a few times so gray/red/blue stick.
+    const retintAll = () => {
+      refreshRobotLook(armCur);
+      refreshRobotLook(armGT);
+      refreshRobotLook(armPred);
+    };
+    requestAnimationFrame(retintAll);
+    setTimeout(retintAll, 120);
+    setTimeout(retintAll, 600);
+    setTimeout(retintAll, 1800);
+  }
+  applyModelScale(armCur);
+  applyModelScale(armGT);
+  applyModelScale(armPred);
   scene.add(armCur, armGT, armPred);
+  fitEvalCamera(camera, controls, armGT, { fog: scene.fog });
 
-  setLoadProgress(0.78, '计算 TCP 轨迹…', '正运动学采样');
+  setLoadProgress(0.78, '计算 TCP 轨迹…', `${robotCfg.id} · 正运动学采样`);
   const paths = computeTcpPaths(armGT, frames);
   setLoadProgress(0.90, '构建场景对象…', '轨迹 / 散点 / TCP 轴');
   const scatterCur = makeScatter(colorCur);
@@ -1735,6 +1916,7 @@ async function initScene(container, frames, robotCfg) {
     setPathArmColors, applyCameraPreset, updateFollowCam,
     getCamMode: () => camMode,
     setCamMode: (m) => { camMode = m; },
+    fitCamera: () => fitEvalCamera(camera, controls, armGT, { fog: scene.fog }),
     paths,
     camera, controls,
     canvas: renderer.domElement,
@@ -2062,7 +2244,10 @@ function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
 
   const dist = buildObjectTcpDistances(
     DATA,
-    (tcp && world?.paths?.pred) ? world.paths.pred.map((p) => ({ x: p.x, y: p.y, z: p.z })) : [],
+    // Compare in physical meters (unscaled), matching episode object poses.
+    (tcp && world?.paths?.pred)
+      ? pathsToMeters({ pred: world.paths.pred }).pred
+      : [],
   );
   const distCtx = document.getElementById('objectDistChart');
   if (distCtx) {
@@ -2120,14 +2305,16 @@ function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
       const p = traj.pos[frameIdx];
       if (p) {
         mesh.visible = true;
-        mesh.position.set(p.x, p.y, p.z);
+        const d = toDisplayPos(p);
+        mesh.position.set(d.x, d.y, d.z);
       } else {
         mesh.visible = false;
       }
       const g = traj.grasp_pos[frameIdx];
       if (g) {
         grasp.visible = true;
-        grasp.position.set(g.x, g.y, g.z);
+        const d = toDisplayPos(g);
+        grasp.position.set(d.x, d.y, d.z);
       } else {
         grasp.visible = false;
       }
@@ -2564,12 +2751,22 @@ try {
   const world = await initScene(document.getElementById('arm3d'), DATA.frames, robotCfg);
   document.getElementById('loadHint')?.remove();
   world.resize();
+  mountViewTools(document.getElementById('arm3d'), world.controls, {
+    onFit: () => {
+      world.applyCameraPreset('free');
+      world.fitCamera();
+      const camHintEl = document.getElementById('camHint');
+      if (camHintEl) camHintEl.textContent = '自由轨道 · 画布底栏切换旋转/平移/缩放';
+    },
+  });
 
   const toPlainPos = (p) => ({ x: p.x, y: p.y, z: p.z });
   const toPlainQuat = (q) => ({ x: q.x, y: q.y, z: q.z, w: q.w });
+  // Paths are in display space (model_scale); metrics need physical meters.
+  const pathsM = pathsToMeters(world.paths);
   const tcp = computeTcpMetrics({
-    gtPos: world.paths.gt.map(toPlainPos),
-    predPos: world.paths.pred.map(toPlainPos),
+    gtPos: pathsM.gt.map(toPlainPos),
+    predPos: pathsM.pred.map(toPlainPos),
     gtQuat: world.paths.gtQuat.map(toPlainQuat),
     predQuat: world.paths.predQuat.map(toPlainQuat),
     fps: meta.fps,
@@ -2753,24 +2950,24 @@ try {
   document.getElementById('btnCamSide').addEventListener('click', () => {
     world.applyCameraPreset('side');
     setCamButtons('btnCamSide');
-    camHint.textContent = '侧视 · 可继续 Orbit';
+    camHint.textContent = '侧视 · 可用画布底栏继续操作';
   });
   document.getElementById('btnCamTop').addEventListener('click', () => {
     world.applyCameraPreset('top');
     setCamButtons('btnCamTop');
-    camHint.textContent = '顶视 · 可继续 Orbit';
+    camHint.textContent = '顶视 · 可用画布底栏继续操作';
   });
   document.getElementById('btnCamFollow').addEventListener('click', () => {
     const on = world.getCamMode() !== 'follow';
     world.applyCameraPreset(on ? 'follow' : 'free');
     setCamButtons(on ? 'btnCamFollow' : '');
-    camHint.textContent = on ? '跟随 TCP（GT）中…' : '自由轨道 · Orbit 拖拽';
+    camHint.textContent = on ? '跟随 TCP（GT）中…' : '自由轨道 · 画布底栏切换旋转/平移/缩放';
   });
   world.controls.addEventListener('start', () => {
     if (world.getCamMode() === 'follow') {
       world.setCamMode('free');
       setCamButtons('');
-      camHint.textContent = '自由轨道 · Orbit 拖拽';
+      camHint.textContent = '自由轨道 · 画布底栏切换旋转/平移/缩放';
     }
   });
 

@@ -10,6 +10,7 @@ import {
   listRobots,
   normalizeRobotProfile,
 } from './robots_registry.js';
+import { mountViewTools } from './view_tools.js';
 
 const DEG2RAD = Math.PI / 180;
 const RAD2DEG = 180 / Math.PI;
@@ -49,6 +50,10 @@ els.viewer.appendChild(renderer.domElement);
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.target.set(0, 0.2, 0);
+
+mountViewTools(els.viewer, controls, {
+  onFit: () => fitCamera(arm),
+});
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.55));
 const key = new THREE.DirectionalLight(0xffffff, 0.85);
@@ -94,7 +99,7 @@ function softMaterial(robot) {
   });
 }
 
-function loadRobot(urdfUrl, { onProgress, rootEulerDeg } = {}) {
+function loadRobot(urdfUrl, { onProgress, rootEulerDeg, modelScale } = {}) {
   return new Promise((resolve, reject) => {
     const manager = new THREE.LoadingManager();
     let settled = false;
@@ -141,6 +146,8 @@ function loadRobot(urdfUrl, { onProgress, rootEulerDeg } = {}) {
             (Number(e[1]) || 0) * DEG2RAD,
             (Number(e[2]) || 0) * DEG2RAD,
           );
+          const s = Number(modelScale);
+          robot.scale.setScalar(Number.isFinite(s) && s > 0 ? s : 1);
           softMaterial(robot);
           onProgress?.(1);
           resolve(robot);
@@ -242,6 +249,7 @@ function renderMeta(profile) {
     ['id', profile.id],
     ['URDF', profile.urdf.preview || profile.urdf.cur],
     ['自由度', String(profile.joint_names.length)],
+    ['显示缩放', String(profile.model_scale ?? 1)],
     ['TCP link', profile.tcp.link],
     ['TCP offset', profile.tcp.offset.map((x) => Number(x).toFixed(4)).join(', ')],
   ];
@@ -332,6 +340,7 @@ async function loadProfile(profile) {
   try {
     const robot = await loadRobot(profile.urdf.preview || profile.urdf.cur, {
       rootEulerDeg: profile.root_rotation_euler_xyz_deg,
+      modelScale: profile.model_scale,
       onProgress: (p) => {
         if (token !== loadToken) return;
         setLoadProgress(0.08 + p * 0.9, `加载 ${profile.label}…`, `${Math.round(p * 100)}%`);

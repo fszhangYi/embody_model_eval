@@ -67,6 +67,8 @@ export function normalizeRobotProfile(profile, fallbackId) {
   const home = Array.isArray(profile.home_q_deg)
     ? profile.home_q_deg.map(Number)
     : joint_names.map(() => 0);
+  const scaleRaw = Number(profile.model_scale);
+  const model_scale = Number.isFinite(scaleRaw) && scaleRaw > 0 ? scaleRaw : 1;
   return {
     id,
     label: profile.label || id,
@@ -79,6 +81,7 @@ export function normalizeRobotProfile(profile, fallbackId) {
       pred: urdf.pred,
     },
     root_rotation_euler_xyz_deg: root,
+    model_scale,
     tcp: {
       link: tcp.link || 'gripper',
       offset,
