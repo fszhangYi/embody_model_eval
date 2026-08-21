@@ -31,8 +31,29 @@
     --gt: #ef4444;
     --pred: #3b82f6;
     --danger: #f87171;
+    --scrollbar-thumb: rgba(61, 214, 198, 0.45);
+    --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
+    --scrollbar-size: 4px;
   }
   * { box-sizing: border-box; }
+  /* 全局统一滚动条（Firefox + Chromium） */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+  *::-webkit-scrollbar-corner { background: transparent; }
   html, body {
     margin: 0; height: 100%; overflow: hidden;
     font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
@@ -104,14 +125,90 @@
 
   .drawer-rail {
     top: 56px; bottom: 14px;
-    display: flex; flex-direction: column; gap: 8px;
-    max-width: min(400px, 92vw);
+    display: flex; align-items: flex-start;
+    width: 36px; /* 收起时只占侧边标签宽度，不挡画布 */
+    max-width: none;
+    pointer-events: none;
   }
-  .drawer-rail.left { left: 12px; align-items: flex-start; }
-  .drawer-rail.right { right: 12px; align-items: flex-end; }
+  .drawer-rail > * { pointer-events: auto; }
+  .drawer-rail.is-open,
+  .drawer-rail.is-pinned { width: auto; max-width: calc(100vw - 24px); }
+  .drawer-rail.left { left: 8px; flex-direction: row; }
+  .drawer-rail.right { right: 8px; flex-direction: row-reverse; }
+
+  .rail-tab {
+    flex: 0 0 auto;
+    width: 28px;
+    min-height: 88px;
+    margin-top: 2px;
+    padding: 10px 0;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    letter-spacing: 0.12em;
+    font-size: 0.72rem;
+    font-weight: 560;
+    color: var(--muted);
+    background: rgba(18, 26, 38, 0.88);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+    z-index: 2;
+  }
+  .rail-tab:hover { color: var(--accent); border-color: var(--accent); }
+  .rail-tab.pinned, .drawer-rail.is-pinned .rail-tab {
+    color: var(--accent);
+    border-color: rgba(61,214,198,0.65);
+    background: rgba(30, 61, 58, 0.92);
+  }
+  .rail-tab::before {
+    content: "";
+    display: block; width: 5px; height: 5px; border-radius: 50%;
+    background: var(--muted); margin-bottom: 8px; writing-mode: horizontal-tb;
+  }
+  .drawer-rail.is-open .rail-tab::before,
+  .drawer-rail.is-pinned .rail-tab::before { background: var(--accent); }
+
+  .rail-panels {
+    position: absolute;
+    top: 0; bottom: 0;
+    display: flex; flex-direction: column; gap: 8px;
+    width: min(360px, calc(100vw - 56px));
+    max-height: 100%;
+    overflow-x: hidden;
+    overflow-y: auto;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+      transform 0.28s cubic-bezier(.2,.8,.2,1),
+      opacity 0.2s ease,
+      visibility 0.2s;
+    z-index: 1;
+  }
+  .drawer-rail.left .rail-panels {
+    left: 100%;
+    padding-left: 8px;
+    transform: translateX(calc(-100% - 8px));
+  }
+  .drawer-rail.right .rail-panels {
+    right: 100%;
+    padding-right: 8px;
+    transform: translateX(calc(100% + 8px));
+  }
+  .drawer-rail.is-open .rail-panels,
+  .drawer-rail.is-pinned .rail-panels {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: none;
+  }
 
   .drawer {
-    width: min(360px, 88vw);
+    width: 100%;
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
@@ -136,17 +233,6 @@
     border-top: 1px solid rgba(58,77,102,0.45);
     max-height: min(48vh, 420px);
     overflow: auto;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(61,214,198,0.45) transparent;
-  }
-  .drawer .body::-webkit-scrollbar { width: 4px; height: 4px; }
-  .drawer .body::-webkit-scrollbar-track { background: transparent; }
-  .drawer .body::-webkit-scrollbar-thumb {
-    background: rgba(61,214,198,0.45);
-    border-radius: 999px;
-  }
-  .drawer .body::-webkit-scrollbar-thumb:hover {
-    background: rgba(61,214,198,0.7);
   }
   .drawer.compact .body { max-height: none; }
 
@@ -261,7 +347,7 @@
 
   @media (max-width: 900px) {
     .topbar .meta { display: none; }
-    .drawer { width: min(300px, 86vw); }
+    .rail-panels { width: min(300px, 86vw); }
   }
 </style>
 </head>
@@ -281,205 +367,211 @@
   <a class="pill" href="./hub.html" style="text-decoration:none;color:inherit">Hub · 多episode</a>
 </div>
 
-<aside class="hud drawer-rail left">
-  <details class="drawer compact" open>
-    <summary>播放控制</summary>
-    <div class="body">
-      <div class="btn-grid">
-        <button id="btnPlay" type="button">播放</button>
-        <button id="btnReset" type="button">重置</button>
-      </div>
-      <div class="ctrl-block">
-        <div class="ctrl-label"><span>帧</span><strong id="frameLabel">t=0</strong></div>
-        <input id="frameSlider" type="range" min="0" max="1" value="0"/>
-        <div class="heatmap-wrap" id="errHeatmapWrap" title="点击跳转到该帧（颜色 = TCP e_p）">
-          <canvas id="errHeatmap"></canvas>
-          <div class="heatmap-cursor" id="errHeatmapCursor"></div>
+<aside class="hud drawer-rail left" id="railLeft" data-side="left">
+  <button type="button" class="rail-tab" id="railTabLeft" aria-expanded="false" aria-pressed="false" title="悬停展开 · 点击钉住左侧栏">控制</button>
+  <div class="rail-panels">
+    <details class="drawer compact">
+      <summary>播放控制</summary>
+      <div class="body">
+        <div class="btn-grid">
+          <button id="btnPlay" type="button">播放</button>
+          <button id="btnReset" type="button">重置</button>
         </div>
-        <div class="heatmap-legend"><span>低 e_p</span><span>高 e_p</span></div>
+        <div class="ctrl-block">
+          <div class="ctrl-label"><span>帧</span><strong id="frameLabel">t=0</strong></div>
+          <input id="frameSlider" type="range" min="0" max="1" value="0"/>
+          <div class="heatmap-wrap" id="errHeatmapWrap" title="点击跳转到该帧（颜色 = TCP e_p）">
+            <canvas id="errHeatmap"></canvas>
+            <div class="heatmap-cursor" id="errHeatmapCursor"></div>
+          </div>
+          <div class="heatmap-legend"><span>低 e_p</span><span>高 e_p</span></div>
+        </div>
+        <div class="ctrl-block">
+          <div class="ctrl-label"><span>速度</span><strong id="speedLabel">0.20×</strong></div>
+          <input id="speedSlider" type="range" min="0.05" max="1.5" step="0.05" value="0.2"/>
+        </div>
       </div>
-      <div class="ctrl-block">
-        <div class="ctrl-label"><span>速度</span><strong id="speedLabel">0.20×</strong></div>
-        <input id="speedSlider" type="range" min="0.05" max="1.5" step="0.05" value="0.2"/>
-      </div>
-    </div>
-  </details>
+    </details>
 
-  <details class="drawer compact" open>
-    <summary>显示机械臂</summary>
-    <div class="body">
-      <div class="btn-grid triple">
-        <button id="btnToggleCur" class="toggle cur on" type="button">灰</button>
-        <button id="btnToggleGT" class="toggle gt on" type="button">红</button>
-        <button id="btnTogglePred" class="toggle pred on" type="button">蓝</button>
+    <details class="drawer compact">
+      <summary>显示机械臂</summary>
+      <div class="body">
+        <div class="btn-grid triple">
+          <button id="btnToggleCur" class="toggle cur on" type="button">灰</button>
+          <button id="btnToggleGT" class="toggle gt on" type="button">红</button>
+          <button id="btnTogglePred" class="toggle pred on" type="button">蓝</button>
+        </div>
+        <div class="btn-grid" style="margin-top:8px">
+          <button id="btnTogglePaths" class="toggle on" type="button">整段轨迹</button>
+          <button id="btnToggleErrArrow" class="toggle on" type="button">误差矢量</button>
+        </div>
       </div>
-      <div class="btn-grid" style="margin-top:8px">
-        <button id="btnTogglePaths" class="toggle on" type="button">整段轨迹</button>
-        <button id="btnToggleErrArrow" class="toggle on" type="button">误差矢量</button>
-      </div>
-    </div>
-  </details>
+    </details>
 
-  <details class="drawer compact" open>
-    <summary>相机</summary>
-    <div class="body">
-      <div class="btn-grid triple">
-        <button id="btnCamSide" type="button">侧视</button>
-        <button id="btnCamTop" type="button">顶视</button>
-        <button id="btnCamFollow" type="button">跟随 TCP</button>
+    <details class="drawer compact">
+      <summary>相机</summary>
+      <div class="body">
+        <div class="btn-grid triple">
+          <button id="btnCamSide" type="button">侧视</button>
+          <button id="btnCamTop" type="button">顶视</button>
+          <button id="btnCamFollow" type="button">跟随 TCP</button>
+        </div>
+        <p class="hint" style="margin-top:8px" id="camHint">自由轨道 · Orbit 拖拽</p>
       </div>
-      <p class="hint" style="margin-top:8px" id="camHint">自由轨道 · Orbit 拖拽</p>
-    </div>
-  </details>
+    </details>
 
-  <details class="drawer compact" open>
-    <summary>录制</summary>
-    <div class="body">
-      <div class="btn-grid triple">
-        <button id="btnRecStart" type="button">开始</button>
-        <button id="btnRecStop" class="danger" type="button" disabled>停止</button>
-        <button id="btnRecSave" type="button" disabled>保存</button>
+    <details class="drawer compact">
+      <summary>录制</summary>
+      <div class="body">
+        <div class="btn-grid triple">
+          <button id="btnRecStart" type="button">开始</button>
+          <button id="btnRecStop" class="danger" type="button" disabled>停止</button>
+          <button id="btnRecSave" type="button" disabled>保存</button>
+        </div>
+        <div class="rec-status" id="recStatus">未录制 · 保存为 WebM</div>
       </div>
-      <div class="rec-status" id="recStatus">未录制 · 保存为 WebM</div>
-    </div>
-  </details>
+    </details>
 
-  <details class="drawer compact" open>
-    <summary>导出 / 门禁</summary>
-    <div class="body">
-      <div class="btn-grid">
-        <button id="btnExportHtml" type="button">导出 HTML</button>
-        <button id="btnExportJson" type="button">导出 JSON</button>
+    <details class="drawer compact">
+      <summary>导出 / 门禁</summary>
+      <div class="body">
+        <div class="btn-grid">
+          <button id="btnExportHtml" type="button">导出 HTML</button>
+          <button id="btnExportJson" type="button">导出 JSON</button>
+        </div>
+        <label class="hint" style="display:flex;gap:6px;align-items:center;margin-top:8px">
+          <input id="chkExportShot" type="checkbox"/> 附带当前画布缩略图（更占内存）
+        </label>
+        <p class="hint" id="gateHint" style="margin-top:8px">门禁：加载 thresholds…</p>
       </div>
-      <label class="hint" style="display:flex;gap:6px;align-items:center;margin-top:8px">
-        <input id="chkExportShot" type="checkbox"/> 附带当前画布缩略图（更占内存）
-      </label>
-      <p class="hint" id="gateHint" style="margin-top:8px">门禁：加载 thresholds…</p>
-    </div>
-  </details>
+    </details>
+  </div>
 </aside>
 
-<aside class="hud drawer-rail right">
-  <details class="drawer compact" open>
-    <summary>概览</summary>
-    <div class="body">
-      <div class="stats-row" id="stats"></div>
-      <div class="stats-row" id="tcpStats" style="margin-top:8px"></div>
-      <p class="hint" id="tcpTemporalHint" style="margin-top:8px"></p>
-    </div>
-  </details>
+<aside class="hud drawer-rail right" id="railRight" data-side="right">
+  <button type="button" class="rail-tab" id="railTabRight" aria-expanded="false" aria-pressed="false" title="悬停展开 · 点击钉住右侧栏">评测</button>
+  <div class="rail-panels">
+    <details class="drawer compact">
+      <summary>概览</summary>
+      <div class="body">
+        <div class="stats-row" id="stats"></div>
+        <div class="stats-row" id="tcpStats" style="margin-top:8px"></div>
+        <p class="hint" id="tcpTemporalHint" style="margin-top:8px"></p>
+      </div>
+    </details>
 
-  <details class="drawer">
-    <summary>TCP 指标</summary>
-    <div class="body">
-      <div class="chart-card">
-        <div class="chart-head"><span class="name">TCP 位置 / 姿态误差</span><span class="sub" id="tcpErrSub">mm · deg</span></div>
-        <div class="chart-wrap tall"><canvas id="tcpErrChart" class="chart"></canvas></div>
+    <details class="drawer">
+      <summary>TCP 指标</summary>
+      <div class="body">
+        <div class="chart-card">
+          <div class="chart-head"><span class="name">TCP 位置 / 姿态误差</span><span class="sub" id="tcpErrSub">mm · deg</span></div>
+          <div class="chart-wrap tall"><canvas id="tcpErrChart" class="chart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span class="name">TCP 分轴 Δxyz</span><span class="sub">mm</span></div>
+          <div class="chart-wrap"><canvas id="tcpAxisChart" class="chart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span class="name">TCP 姿态分轴 Δrpy</span><span class="sub">°</span></div>
+          <div class="chart-wrap"><canvas id="tcpRpyChart" class="chart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span class="name">TCP 速度 / 加速度误差</span><span class="sub">m/s · °/s · m/s²</span></div>
+          <div class="chart-wrap"><canvas id="tcpVelChart" class="chart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span class="name">分段 TCP 误差</span><span class="sub">路径等长四段</span></div>
+          <div class="chart-wrap"><canvas id="tcpSegChart" class="chart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span class="name">任务 / 接近向量误差</span><span class="sub">相对 meta.goal_pose</span></div>
+          <div class="chart-wrap"><canvas id="tcpTaskChart" class="chart"></canvas></div>
+        </div>
+        <p class="hint" id="tcpTaskHint" style="margin-top:6px"></p>
       </div>
-      <div class="chart-card">
-        <div class="chart-head"><span class="name">TCP 分轴 Δxyz</span><span class="sub">mm</span></div>
-        <div class="chart-wrap"><canvas id="tcpAxisChart" class="chart"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-head"><span class="name">TCP 姿态分轴 Δrpy</span><span class="sub">°</span></div>
-        <div class="chart-wrap"><canvas id="tcpRpyChart" class="chart"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-head"><span class="name">TCP 速度 / 加速度误差</span><span class="sub">m/s · °/s · m/s²</span></div>
-        <div class="chart-wrap"><canvas id="tcpVelChart" class="chart"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-head"><span class="name">分段 TCP 误差</span><span class="sub">路径等长四段</span></div>
-        <div class="chart-wrap"><canvas id="tcpSegChart" class="chart"></canvas></div>
-      </div>
-      <div class="chart-card">
-        <div class="chart-head"><span class="name">任务 / 接近向量误差</span><span class="sub">相对 meta.goal_pose</span></div>
-        <div class="chart-wrap"><canvas id="tcpTaskChart" class="chart"></canvas></div>
-      </div>
-      <p class="hint" id="tcpTaskHint" style="margin-top:6px"></p>
-    </div>
-  </details>
+    </details>
 
-  <details class="drawer">
-    <summary>误差曲线</summary>
-    <div class="body">
-      <div class="chart-card">
-        <div class="chart-head"><span class="name">L2 误差随时间</span><span class="sub" id="errSub">—</span></div>
-        <div class="chart-wrap"><canvas id="errChart" class="chart"></canvas></div>
+    <details class="drawer">
+      <summary>误差曲线</summary>
+      <div class="body">
+        <div class="chart-card">
+          <div class="chart-head"><span class="name">L2 误差随时间</span><span class="sub" id="errSub">—</span></div>
+          <div class="chart-wrap"><canvas id="errChart" class="chart"></canvas></div>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span class="name">逐关节 MAE</span><span class="sub">deg</span></div>
+          <div class="chart-wrap"><canvas id="maeChart" class="chart"></canvas></div>
+        </div>
       </div>
-      <div class="chart-card">
-        <div class="chart-head"><span class="name">逐关节 MAE</span><span class="sub">deg</span></div>
-        <div class="chart-wrap"><canvas id="maeChart" class="chart"></canvas></div>
+    </details>
+
+    <details class="drawer">
+      <summary>关节轨迹</summary>
+      <div class="body">
+        <div class="row-ctrl">
+          <label>关节 <select id="jointSelect"></select></label>
+        </div>
+        <div class="chart-card">
+          <div class="chart-head"><span class="name">位姿轨迹</span><span class="sub">current · GT · pred</span></div>
+          <div class="chart-wrap tall"><canvas id="trajChart" class="chart"></canvas></div>
+        </div>
       </div>
-    </div>
-  </details>
+    </details>
 
-  <details class="drawer">
-    <summary>关节轨迹</summary>
-    <div class="body">
-      <div class="row-ctrl">
-        <label>关节 <select id="jointSelect"></select></label>
+    <details class="drawer">
+      <summary>当前帧数值</summary>
+      <div class="body">
+        <p class="hint" id="tcpFrameHint" style="margin-bottom:8px"></p>
+        <table>
+          <thead>
+            <tr><th>关节</th><th>当前</th><th>GT</th><th>pred</th><th>误差</th></tr>
+          </thead>
+          <tbody id="frameTable"></tbody>
+        </table>
+        <div class="chart-card" style="margin-top:10px">
+          <div class="chart-head"><span class="name">关节→TCP 贡献</span><span class="sub">‖JᵢΔqᵢ‖ mm</span></div>
+          <div class="chart-wrap"><canvas id="jointContribChart" class="chart"></canvas></div>
+        </div>
       </div>
-      <div class="chart-card">
-        <div class="chart-head"><span class="name">位姿轨迹</span><span class="sub">current · GT · pred</span></div>
-        <div class="chart-wrap tall"><canvas id="trajChart" class="chart"></canvas></div>
+    </details>
+
+    <details class="drawer">
+      <summary>最差帧 / 工作空间</summary>
+      <div class="body">
+        <p class="hint" style="margin-bottom:8px">Top‑K 按 TCP e_p；点击跳转。下方为俯视 XY，颜色=e_p。</p>
+        <ul class="worst-list" id="worstList"></ul>
+        <div class="ws-wrap" style="margin-top:10px"><canvas id="workspaceCanvas"></canvas></div>
+        <p class="hint" style="margin-top:6px" id="wsHint">红点 GT · 蓝点 pred · 点击点跳帧</p>
       </div>
-    </div>
-  </details>
+    </details>
 
-  <details class="drawer">
-    <summary>当前帧数值</summary>
-    <div class="body">
-      <p class="hint" id="tcpFrameHint" style="margin-bottom:8px"></p>
-      <table>
-        <thead>
-          <tr><th>关节</th><th>当前</th><th>GT</th><th>pred</th><th>误差</th></tr>
-        </thead>
-        <tbody id="frameTable"></tbody>
-      </table>
-      <div class="chart-card" style="margin-top:10px">
-        <div class="chart-head"><span class="name">关节→TCP 贡献</span><span class="sub">‖JᵢΔqᵢ‖ mm</span></div>
-        <div class="chart-wrap"><canvas id="jointContribChart" class="chart"></canvas></div>
+    <details class="drawer">
+      <summary>高级 · 协议 / 元数据 (C)</summary>
+      <div class="body">
+        <p class="hint" id="unitHint">单位 / action_mode 校验…</p>
+        <p class="hint" id="provHint" style="margin-top:6px">provenance…</p>
+        <p class="hint" style="margin-top:8px">失败分类（大 e_p / e_R / 抖动）· 点击跳转</p>
+        <ul class="adv-list" id="failClassList"></ul>
       </div>
-    </div>
-  </details>
+    </details>
 
-  <details class="drawer">
-    <summary>最差帧 / 工作空间</summary>
-    <div class="body">
-      <p class="hint" style="margin-bottom:8px">Top‑K 按 TCP e_p；点击跳转。下方为俯视 XY，颜色=e_p。</p>
-      <ul class="worst-list" id="worstList"></ul>
-      <div class="ws-wrap" style="margin-top:10px"><canvas id="workspaceCanvas"></canvas></div>
-      <p class="hint" style="margin-top:6px" id="wsHint">红点 GT · 蓝点 pred · 点击点跳帧</p>
-    </div>
-  </details>
+    <details class="drawer">
+      <summary>高级 · 安全 / 可执行 (D)</summary>
+      <div class="body">
+        <div class="stats-row" id="safetyStats"></div>
+        <p class="hint" style="margin-top:8px">越限 / 近奇异 / 超速 · 点击跳转（抽样计算以控内存）</p>
+        <ul class="adv-list" id="safetyList"></ul>
+        <p class="hint" style="margin-top:6px" id="collisionHint">碰撞粗检…</p>
+      </div>
+    </details>
 
-  <details class="drawer">
-    <summary>高级 · 协议 / 元数据 (C)</summary>
-    <div class="body">
-      <p class="hint" id="unitHint">单位 / action_mode 校验…</p>
-      <p class="hint" id="provHint" style="margin-top:6px">provenance…</p>
-      <p class="hint" style="margin-top:8px">失败分类（大 e_p / e_R / 抖动）· 点击跳转</p>
-      <ul class="adv-list" id="failClassList"></ul>
-    </div>
-  </details>
-
-  <details class="drawer">
-    <summary>高级 · 安全 / 可执行 (D)</summary>
-    <div class="body">
-      <div class="stats-row" id="safetyStats"></div>
-      <p class="hint" style="margin-top:8px">越限 / 近奇异 / 超速 · 点击跳转（抽样计算以控内存）</p>
-      <ul class="adv-list" id="safetyList"></ul>
-      <p class="hint" style="margin-top:6px" id="collisionHint">碰撞粗检…</p>
-    </div>
-  </details>
-
-  <details class="drawer">
-    <summary>说明</summary>
-    <div class="body">
-      <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。</p>
-    </div>
-  </details>
+    <details class="drawer">
+      <summary>说明</summary>
+      <div class="body">
+        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。</p>
+      </div>
+    </details>
+  </div>
 </aside>
 
 <script type="module">
@@ -512,6 +604,80 @@ const COLOR_GT = 0xef4444;
 const COLOR_PRED = 0x3b82f6;
 const TCP_WINDOW = 15;
 const TCP_MAX = TCP_WINDOW * 2 + 1;
+
+/** 左右栏默认收起：悬停展开，移出自动收缩；点击侧边标签钉住/取消。 */
+function setupAutoCollapsingRails() {
+  const CLOSE_MS = 420;
+  const rails = [...document.querySelectorAll('.drawer-rail')];
+
+  rails.forEach((rail) => {
+    let closeTimer = null;
+    const tab = rail.querySelector('.rail-tab');
+    const drawers = [...rail.querySelectorAll('details.drawer')];
+
+    const setOpen = (on) => {
+      rail.classList.toggle('is-open', on);
+      tab?.setAttribute('aria-expanded', on ? 'true' : 'false');
+      if (on) {
+        requestAnimationFrame(() => {
+          // 首次展开时若全部折叠，默认打开首个面板，避免空白栏
+          if (!drawers.some((d) => d.open) && drawers[0]) drawers[0].open = true;
+        });
+      }
+    };
+
+    const scheduleClose = () => {
+      if (rail.classList.contains('is-pinned')) return;
+      clearTimeout(closeTimer);
+      closeTimer = setTimeout(() => setOpen(false), CLOSE_MS);
+    };
+
+    rail.addEventListener('pointerenter', () => {
+      clearTimeout(closeTimer);
+      setOpen(true);
+    });
+    rail.addEventListener('pointerleave', scheduleClose);
+
+    tab?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const pinned = rail.classList.toggle('is-pinned');
+      tab.classList.toggle('pinned', pinned);
+      tab.setAttribute('aria-pressed', pinned ? 'true' : 'false');
+      tab.title = pinned
+        ? '已钉住 · 再点取消钉住'
+        : '悬停展开 · 点击钉住侧栏';
+      if (pinned) {
+        clearTimeout(closeTimer);
+        setOpen(true);
+      } else {
+        scheduleClose();
+      }
+    });
+
+    // 同侧手风琴：一次只展开一个抽屉，减少遮挡
+    drawers.forEach((d) => {
+      d.addEventListener('toggle', () => {
+        if (!d.open) return;
+        drawers.forEach((other) => {
+          if (other !== d) other.open = false;
+        });
+      });
+    });
+  });
+
+  const collapseUnpinned = () => {
+    rails.forEach((rail) => {
+      if (rail.classList.contains('is-pinned')) return;
+      rail.classList.remove('is-open');
+      rail.querySelector('.rail-tab')?.setAttribute('aria-expanded', 'false');
+    });
+  };
+
+  document.getElementById('arm3d')?.addEventListener('pointerdown', collapseUnpinned);
+}
+
+setupAutoCollapsingRails();
 
 async function loadData() {
   const qs = new URLSearchParams(location.search);

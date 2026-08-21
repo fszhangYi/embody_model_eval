@@ -9,8 +9,28 @@
   :root {
     --bg: #0b1018; --panel: #121a26; --border: #3a4d66;
     --text: #e7ecf3; --muted: #8b9bb4; --accent: #3dd6c6; --danger: #f87171;
+    --scrollbar-thumb: rgba(61, 214, 198, 0.45);
+    --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
+    --scrollbar-size: 4px;
   }
-  * { box-box: border-box; box-sizing: border-box; }
+  * { box-sizing: border-box; }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+  *::-webkit-scrollbar-corner { background: transparent; }
   body {
     margin: 0; min-height: 100vh;
     font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
