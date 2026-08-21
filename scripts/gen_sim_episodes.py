@@ -112,6 +112,7 @@ def build_payload(
     policy: str | None = None,
     model: str | None = None,
     goal_pose: dict | None = None,
+    robot_id: str = "so100",
 ) -> dict:
     states = ep["states"]
     gt_actions = ep["gt_actions"]
@@ -153,6 +154,7 @@ def build_payload(
 
     meta = {
         "title": title or "SO-100 六轴：GT 下一时刻位姿 vs 模型下一时刻位姿",
+        "robot": robot_id,
         "joint_names": JOINT_NAMES[:],
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "n_frames": int(n),
@@ -193,6 +195,7 @@ def main() -> int:
     ap.add_argument("--suite", action="append", dest="suites", help="data/<suite> name; repeatable")
     ap.add_argument("--count", type=int, default=0, help="episodes to write starting at --start (per suite)")
     ap.add_argument("--start", type=int, default=1, help="first episode index (episode_N.json)")
+    ap.add_argument("--robot", default="so100", help="meta.robot id registered in robots.json")
     ap.add_argument("--n-frames", type=int, default=120)
     ap.add_argument("--fps", type=int, default=30)
     ap.add_argument("--seed-base", type=int, default=42)
@@ -208,6 +211,16 @@ def main() -> int:
         help="write/overwrite short demos (5–10 frames) under short/ + refresh existing suites",
     )
     args = ap.parse_args()
+
+    robots_path = ROOT / "robots.json"
+    if robots_path.is_file():
+        reg = json.loads(robots_path.read_text(encoding="utf-8"))
+        if args.robot not in (reg.get("robots") or {}):
+            known = ", ".join((reg.get("robots") or {}).keys()) or "(无)"
+            print(f"error: --robot={args.robot} 未在 robots.json 登记；可用：{known}", file=sys.stderr)
+            return 2
+    else:
+        print("warning: robots.json missing; skip robot id check", file=sys.stderr)
 
     jobs: list[tuple[str, int, int, float, str, int]] = []
     # (suite, ep_idx, seed, error_scale, policy, n_frames)
@@ -291,6 +304,7 @@ def main() -> int:
             policy=policy,
             model=policy,
             goal_pose=goal,
+            robot_id=args.robot,
         )
         write_episode(out, payload)
         written.append(f"{out.relative_to(ROOT)} (n={n_frames})")

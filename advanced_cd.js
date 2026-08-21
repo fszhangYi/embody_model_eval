@@ -141,6 +141,7 @@ export function validateUnitsAndActionMode(data) {
  */
 export function extractProvenance(meta = {}) {
   return {
+    robot: meta.robot ?? meta.robot_id ?? meta.robot_model ?? meta.arm ?? null,
     dataset_id: meta.dataset_id ?? meta.dataset ?? null,
     policy: meta.policy ?? meta.policy_name ?? null,
     ckpt: meta.ckpt ?? meta.checkpoint ?? null,
@@ -192,6 +193,7 @@ export function summarizeEpisode(data, tcp = null, thresholds = {}) {
 
   return {
     title: meta.title || prov.episode_id || 'episode',
+    robot: prov.robot,
     n_frames: n,
     fps: meta.fps ?? null,
     mean_l2: meanL2,

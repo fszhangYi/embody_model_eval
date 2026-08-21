@@ -162,6 +162,7 @@ def build_compare(frames: list[dict[str, Any]], args: argparse.Namespace) -> dic
     return {
         "meta": {
             "title": args.title or f"Bag / log replay ({path_stem(args.input)})",
+            "robot": args.robot,
             "joint_names": names,
             "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "n_frames": n,
@@ -187,7 +188,8 @@ def path_stem(p: Path) -> str:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("input", type=Path, help="JSONL or CSV joint log")
-    ap.add_argument("-o", "--output", type=Path, default=Path("data/test1/episode_1.json"))
+    ap.add_argument("-o", "--output", type=Path, default=Path("data/20260819/episode_1.json"))
+    ap.add_argument("--robot", default="so100", help="meta.robot id registered in robots.json")
     ap.add_argument("--fps", type=float, default=30.0)
     ap.add_argument("--action-mode", default="absolute")
     ap.add_argument("--joint-names", default=None, help="comma-separated")
@@ -197,6 +199,14 @@ def main() -> int:
     ap.add_argument("--policy", default=None)
     ap.add_argument("--ckpt", default=None)
     args = ap.parse_args()
+
+    robots_path = Path(__file__).resolve().parents[1] / "robots.json"
+    if robots_path.is_file():
+        reg = json.loads(robots_path.read_text(encoding="utf-8"))
+        if args.robot not in (reg.get("robots") or {}):
+            known = ", ".join((reg.get("robots") or {}).keys()) or "(无)"
+            print(f"error: --robot={args.robot} 未在 robots.json 登记；可用：{known}", file=sys.stderr)
+            return 2
 
     suf = args.input.suffix.lower()
     if suf == ".jsonl" or suf == ".ndjson":

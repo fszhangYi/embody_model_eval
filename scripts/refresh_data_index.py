@@ -20,6 +20,9 @@ def is_valid_episode(obj: object) -> bool:
     frames = obj.get("frames")
     if not isinstance(meta, dict) or not isinstance(frames, list) or not frames:
         return False
+    robot = meta.get("robot") or meta.get("robot_id") or meta.get("robot_model") or meta.get("arm")
+    if not robot:
+        return False
     f0 = frames[0] if isinstance(frames[0], dict) else {}
     joints = f0.get("current") or f0.get("next_gt") or f0.get("next_pred")
     return isinstance(joints, list) and len(joints) > 0

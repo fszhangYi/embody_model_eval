@@ -43,6 +43,7 @@ export function buildReportSummary({ meta, tcp, gates = null, screenshotDataUrl 
       mean_l2: meta.mean_l2 ?? null,
       max_l2: meta.max_l2 ?? null,
       joint_names: meta.joint_names ?? null,
+      robot: meta.robot ?? meta.robot_id ?? null,
       dataset_id: meta.dataset_id ?? null,
       policy: meta.policy ?? null,
       ckpt: meta.ckpt ?? null,

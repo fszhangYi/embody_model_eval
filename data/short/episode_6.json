@@ -45,7 +45,8 @@
       "note": "simulate demo grasp goal for A5 task metrics"
     },
     "policy": "teleop_ref",
-    "model": "teleop_ref"
+    "model": "teleop_ref",
+    "robot": "so100"
   },
   "series": {
     "t": [

@@ -45,7 +45,8 @@
       "note": "simulate demo grasp goal for A5 task metrics"
     },
     "policy": "pi0_demo",
-    "model": "pi0_demo"
+    "model": "pi0_demo",
+    "robot": "so100"
   },
   "series": {
     "t": [

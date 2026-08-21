@@ -25,8 +25,10 @@ python3 -V   # 建议 >= 3.10，推荐 3.12
 
 ```
 embody_model_eval/
-├── index.html              # 评测主页面
+├── index.html              # 评测主页面（按 meta.robot 加载机型）
 ├── hub.html                # 多 episode 汇总（按 data/<suite> 选择）
+├── robots.json             # 当前可用机械臂型号注册表
+├── robots_registry.js      # 机型解析辅助
 ├── tcp_metrics.js          # TCP / 任务误差指标
 ├── export_report.js        # HTML/JSON 报告与门禁
 ├── favicon.svg / .ico / .png
@@ -45,7 +47,7 @@ embody_model_eval/
 ├── serve.sh
 ├── requirements.txt
 ├── README.md
-└── so100_colored/          # 灰 / 红 / 蓝 URDF + STL
+└── so100_colored/          # SO-100 灰 / 红 / 蓝 URDF + STL
     ├── so100_cur.urdf
     ├── so100_gt.urdf
     ├── so100_pred.urdf
@@ -75,25 +77,49 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 - `data/20260819/episode_1.json` …
 - `data/20260405/episode_1.json` …
 
-每个文件需含 `meta` + 非空 `frames[]`（帧内 `current` / `next_gt` / `next_pred` 关节角）。
+每个文件需含：
+
+- `meta.robot`：**必填**，机械臂型号 id（须在 `robots.json` 登记，当前为 `so100`）
+- `meta` + 非空 `frames[]`（帧内 `current` / `next_gt` / `next_pred` 关节角）
+
+字段说明：
+
+- `meta.robot`：机型 id → 决定加载哪套 URDF / 关节名 / TCP
+- `meta`：帧数、fps、mean/max L2、逐关节 MAE、来源
+- `series`：整段曲线（Chart.js）
+- `frames[]`：每帧 `current` / `next_gt` / `next_pred` / `err_l2` 等
+
+## 机械臂型号（多机型扩展）
+
+可用机型集中登记在根目录 **`robots.json`**。每条 episode 必须声明：
+
+```json
+"meta": { "robot": "so100", ... }
+```
+
+页面启动时：
+
+1. 读取 `robots.json`
+2. 用 `meta.robot` 解析机型配置（URDF 三色路径、`joint_names`、root 旋转、TCP link/offset）
+3. 自动加载对应模型；若 id 未登记或缺失则报错
+
+新增机型时：
+
+1. 准备三份着色 URDF + mesh，放入独立目录（参考 `so100_colored/`）
+2. 在 `robots.json` 的 `robots` 下增加一条配置（`id` / `urdf` / `joint_names` / `tcp` / `root_rotation_euler_xyz_deg`）
+3. 生成或转换数据时写上 `"meta": { "robot": "<新id>" }`
 
 - **单轨迹页**默认加载 `./data/20260819/episode_1.json`；可用 `?data=./data/<suite>/xxx.json` 指定。
-- **Hub**（`hub.html`）选框列出 `data/` 子目录；选中后加载该目录下全部合法 JSON，生成多条 episode。
+- **Hub**（`hub.html`）选框列出 `data/` 子目录；选中后加载该目录下全部合法 JSON（须含 `meta.robot`）。
 - **`./serve.sh` 启动前**会执行 `scripts/refresh_data_index.py`，实时重写 `data/index.json`。
 - 批量生成模拟数据：
 
 ```bash
 python3 scripts/gen_sim_episodes.py --short          # 5–10 帧短轨迹（推荐演示）
 python3 scripts/gen_sim_episodes.py --preset         # 较长默认布局
-# 或指定套件：
-python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --n-frames 8 --overwrite
+# 或指定套件 / 机型：
+python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --n-frames 8 --robot so100 --overwrite
 ```
-
-字段说明：
-
-- `meta`：帧数、fps、mean/max L2、逐关节 MAE、来源
-- `series`：整段曲线（Chart.js）
-- `frames[]`：每帧 `current` / `next_gt` / `next_pred` / `err_l2` 等
 
 重新生成模拟评测数据（可选，在 `act_robot` 中）：
 
@@ -103,7 +129,7 @@ python /root/autodl-tmp/act_robot/scripts/compare_pose_offline.py \
   --out-dir /root/autodl-tmp/embody_model_eval/data/20260819
 ```
 
-若脚本仍输出 `compare_result.json`，请改名为 `episode_N.json` 放入对应套件目录。
+若脚本仍输出 `compare_result.json`，请改名为 `episode_N.json`，并补上 `meta.robot` 后放入对应套件目录。
 
 ## 离线说明
 
@@ -196,52 +222,53 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 
 **建议后续优先：** 用真实多 episode manifest 填满 Hub；按机型写准 `meta.joint_limits`；碰撞粗检可再换成凸包/URDF collision。
 
-## 更换机械臂
+## 更换 / 新增机械臂
 
-默认可视化机型是 **SO-100**（`so100_colored/` 下三份着色 URDF + STL）。换成其它臂时，除替换模型文件外，还必须让 **关节名、关节顺序、TCP、评测 JSON** 与页面代码一致，否则会出现「加载成功但姿态错 / TCP 飞掉 / 图表关节对不上」。
+机型不再写死在 `index.html`，而是登记在 **`robots.json`**，由 episode 的 **`meta.robot`** 自动选用。
 
-### 1. 替换模型资源
+### 1. 准备模型资源
 
-1. 准备新臂的 URDF（或 xacro 已展开的 `.urdf`）及 mesh（`.stl` / `.dae` 等）。
-2. 复制出 **三份** URDF（或在同一 URDF 上改材质），分别给 current / GT / predict 着色，便于叠画区分，例如：
-   - 灰（current）· 红（GT）· 蓝（predict）——与现有 `so100_cur|gt|pred.urdf` 一致即可。
-3. 把新目录放到仓库根下（可改名，例如 `my_arm_colored/`），保证 URDF 内 `mesh filename="..."` 相对路径能找到 `assets/`。
-4. 在 `index.html` 中改加载路径：
+1. 准备新臂的 URDF（或已展开的 `.urdf`）及 mesh。
+2. 复制出 **三份** URDF（或改材质），分别给 current / GT / predict 着色（灰 / 红 / 蓝）。
+3. 放到仓库根下独立目录（如 `my_arm_colored/`），保证 URDF 内 mesh 相对路径正确。
 
-```js
-const URDF_CUR = './my_arm_colored/xxx_cur.urdf';
-const URDF_GT  = './my_arm_colored/xxx_gt.urdf';
-const URDF_PRED = './my_arm_colored/xxx_pred.urdf';
+### 2. 登记到 `robots.json`
+
+在 `robots.robots` 增加一条，例如：
+
+```json
+"my_arm": {
+  "id": "my_arm",
+  "label": "My Arm",
+  "joint_names": ["j1", "j2", "..."],
+  "urdf": {
+    "cur": "./my_arm_colored/xxx_cur.urdf",
+    "gt": "./my_arm_colored/xxx_gt.urdf",
+    "pred": "./my_arm_colored/xxx_pred.urdf"
+  },
+  "root_rotation_euler_xyz_deg": [-90, 0, 0],
+  "tcp": { "link": "gripper", "offset": [0, -0.1062, 0] }
+}
 ```
 
-加载文案（如「加载 3× SO-100 URDF…」）可顺手改成新机型名。
+### 3. 数据侧必填
 
-### 2. 必须同步修改的内容（清单）
+| 位置 | 改什么 |
+|------|--------|
+| episode JSON → `meta.robot` | 填 `robots.json` 中的 id |
+| episode JSON → `meta.joint_names` | 与该机型 `joint_names` **同名、同序** |
+| `frames[].current|next_gt|next_pred` | 长度与顺序 = 该机型关节数（默认单位：度） |
 
-| 位置 | 改什么 | 为何 |
-|------|--------|------|
-| `index.html` → `JOINTS` | 关节名数组，顺序与控制量一致 | `setPose` 按此名写 `robot.joints[name]` |
-| 评测 JSON → `meta.joint_names` | 与 `JOINTS` **同名、同序** | 右侧图表 / 数值面板依赖该字段 |
-| 评测 JSON → `frames[].current|next_gt|next_pred` | 每帧关节角数组长度与顺序 = `JOINTS` | 单位默认按 **度**（页面内 `* DEG2RAD`） |
-| 评测 JSON → `meta.per_joint_mae` / `series` | 键名或曲线通道与关节一致 | 概览 MAE、关节轨迹图 |
-| `index.html` → `getTcpPose` / `TCP_OFFSET_GRIPPER` | TCP 所在 **link 名** + 指尖相对该 link 的偏移 | 默认 link=`gripper`，偏移 `(0, -0.1062, 0)`（米，gripper 系） |
-| `index.html` → `loadRobot` 里 `robot.rotation.x` | 坐标系朝向（当前 `-π/2` 适配 SO-100） | 换臂后若模型躺倒/倒置，调此旋转或在 URDF 里改 root |
-| 生成脚本（可选） | `act_robot/scripts/compare_pose_offline.py` 等 | 重新导出 JSON 时关节定义要与新臂一致 |
-| `README.md` / 页面标题文案 | 机型名、TCP 说明、许可来源 | 文档与实际机型一致 |
+### 4. 建议自检
 
-关节自由度变化时（例如 7 轴），除改 `JOINTS` 外，还需保证 JSON 每帧数组长度、MAE 与 series 维度一并更新；自由度减少则删掉多余通道。
+1. `./serve.sh` 打开带新 `meta.robot` 的 episode，确认三色臂加载且无 mesh 404。
+2. 拖时间轴：姿态是否随数据合理变化。
+3. TCP 轴是否落在末端附近（不对则改 `tcp.link` / `tcp.offset`）。
+4. Hub 的「机型」列是否显示新 id。
 
-### 3. 建议自检
+### 5. 不必改的部分
 
-1. `./serve.sh` 打开页面，确认三色臂均加载、无 mesh 404。
-2. 拖时间轴：灰/红/蓝姿态是否随 `current` / `next_gt` / `next_pred` 合理变化。
-3. TCP 轴与散点是否落在末端执行器附近（不对则改 link 名或 `TCP_OFFSET_GRIPPER`）。
-4. 右侧「关节」下拉与曲线名称是否等于新 `joint_names`。
-
-### 4. 不必改的部分
-
-- `vendor/`（Three.js / Chart.js / urdf-loader）
-- 播放 / 显隐 / 录制等 UI 逻辑（与具体机型无关）
+- `vendor/`、播放 / 显隐 / 录制等与机型无关的 UI
 - `serve.sh` / 端口托管方式
 
 ## 许可与来源

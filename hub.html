@@ -82,7 +82,7 @@
 </header>
 <main>
   <div class="card">
-    <div class="muted">选择 <code>data/</code> 下的子目录（如 20260819），自动加载其中全部合法比对 JSON，并列出多个 episode。</div>
+    <div class="muted">选择 <code>data/</code> 下的子目录；自动加载合法比对 JSON（须含已登记的 <code>meta.robot</code>）。可用机型见 <code>robots.json</code>。</div>
     <div class="row" style="margin-top:10px">
       <label class="muted" for="suiteSelect">数据套件</label>
       <select id="suiteSelect" disabled>
@@ -117,7 +117,7 @@
       <table>
         <thead>
           <tr>
-            <th>ID</th><th>标题</th><th>模型</th><th>n</th>
+            <th>ID</th><th>标题</th><th>机型</th><th>模型</th><th>n</th>
             <th>mean L2</th><th>TCP e_p μ</th><th>双阈值达标</th>
             <th>单位</th><th>action</th><th>打开</th>
           </tr>
@@ -145,12 +145,18 @@
 
 <script type="module">
 import { summarizeEpisode, aggregateEpisodes, extractProvenance } from './advanced_cd.js';
+import {
+  loadRobotRegistry,
+  listRobots,
+  validateEpisodeAgainstRegistry,
+} from './robots_registry.js';
 
 const DATA_ROOT = './data';
 const SKIP_JSON = new Set(['index.json', 'catalog.json', 'manifest.json']);
 
 const $ = (id) => document.getElementById(id);
 const rows = []; // { id, label, model, path, summary }
+let robotRegistry = null;
 
 function fmt(x, d = 2) {
   return Number.isFinite(x) ? x.toFixed(d) : '—';
@@ -165,14 +171,10 @@ async function fetchJson(path) {
   return res.json();
 }
 
-/** 合法比对 JSON：含 meta + 非空 frames，且帧内有关节数组。 */
-function isValidEpisode(data) {
-  if (!data || typeof data !== 'object') return false;
-  if (!data.meta || typeof data.meta !== 'object') return false;
-  if (!Array.isArray(data.frames) || data.frames.length === 0) return false;
-  const f0 = data.frames[0];
-  const joints = f0?.current ?? f0?.next_gt ?? f0?.next_pred;
-  return Array.isArray(joints) && joints.length > 0;
+async function ensureRobotRegistry() {
+  if (robotRegistry) return robotRegistry;
+  robotRegistry = await loadRobotRegistry('./robots.json');
+  return robotRegistry;
 }
 
 /**
@@ -262,6 +264,7 @@ function render() {
     return `<tr>
       <td>${r.id}</td>
       <td>${r.label}</td>
+      <td>${r.summary.robot || '—'}</td>
       <td>${r.model || '—'}</td>
       <td>${r.summary.n_frames}</td>
       <td>${fmt(r.summary.mean_l2, 3)}</td>
@@ -271,7 +274,7 @@ function render() {
       <td>${r.summary.provenance.action_mode || '—'}</td>
       <td><a href="./index.html?data=${encodeURIComponent(r.path)}">评测</a></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="10" class="muted">暂无 episode</td></tr>';
+  }).join('') || '<tr><td colspan="11" class="muted">暂无 episode</td></tr>';
 
   const byModel = new Map();
   for (const r of rows) {
@@ -306,8 +309,12 @@ async function enrichFromSidecar(path, summary) {
 }
 
 async function ingest(path, { id, label, model } = {}) {
+  const registry = await ensureRobotRegistry();
   const data = await fetchJson(path);
-  if (!isValidEpisode(data)) throw new Error(`${path} 不是合法比对 JSON（需 meta + frames）`);
+  const check = validateEpisodeAgainstRegistry(data, registry);
+  if (!check.ok) {
+    throw new Error(`${path} 防呆失败：${check.errors.join('；')}`);
+  }
   const summary = summarizeEpisode(data, null);
   await enrichFromSidecar(path, summary);
   const base = path.split('/').pop().replace(/\.json$/i, '');
@@ -323,6 +330,7 @@ async function ingest(path, { id, label, model } = {}) {
 
 async function loadSuite(suiteId) {
   if (!suiteId) throw new Error('请选择数据套件');
+  const registry = await ensureRobotRegistry();
   rows.length = 0;
   $('status').textContent = `扫描 ${DATA_ROOT}/${suiteId}/ …`;
   const files = await listEpisodeFiles(suiteId);
@@ -331,8 +339,9 @@ async function loadSuite(suiteId) {
     const path = `${DATA_ROOT}/${suiteId}/${name}`;
     try {
       const data = await fetchJson(path);
-      if (!isValidEpisode(data)) {
-        skipped.push(`${name}（结构不合法）`);
+      const check = validateEpisodeAgainstRegistry(data, registry);
+      if (!check.ok) {
+        skipped.push(`${name}（${check.errors[0] || '校验失败'}）`);
         continue;
       }
       const summary = summarizeEpisode(data, null);
@@ -349,7 +358,8 @@ async function loadSuite(suiteId) {
       skipped.push(`${name}（${e.message}）`);
     }
   }
-  let msg = `套件 ${suiteId} · 已加载 ${rows.length} episode`;
+  const known = listRobots(registry).map((r) => r.id).join(', ');
+  let msg = `套件 ${suiteId} · 已加载 ${rows.length} episode · 可用机型 [${known}]`;
   if (files.length === 0) msg += ' · 目录下无 .json';
   if (skipped.length) msg += ` · 跳过 ${skipped.length}：${skipped.join('；')}`;
   $('status').textContent = msg;
@@ -378,12 +388,18 @@ async function refreshSuiteSelect(preferred) {
 
 async function loadManifest(path) {
   rows.length = 0;
+  const registry = await ensureRobotRegistry();
   $('status').textContent = `加载 ${path} …`;
   const man = await fetchJson(path);
   const thr = man.thresholds || {};
+  const skipped = [];
   for (const ep of man.episodes || []) {
     const data = await fetchJson(ep.path);
-    if (!isValidEpisode(data)) continue;
+    const check = validateEpisodeAgainstRegistry(data, registry);
+    if (!check.ok) {
+      skipped.push(`${ep.id || ep.path}（${check.errors[0] || '校验失败'}）`);
+      continue;
+    }
     const summary = summarizeEpisode(data, null, thr);
     rows.push({
       id: ep.id,
@@ -393,7 +409,9 @@ async function loadManifest(path) {
       summary,
     });
   }
-  $('status').textContent = `已加载 ${rows.length} episode · ${man.title || path}`;
+  let msg = `已加载 ${rows.length} episode · ${man.title || path}`;
+  if (skipped.length) msg += ` · 跳过 ${skipped.length}：${skipped.join('；')}`;
+  $('status').textContent = msg;
   render();
 }
 
@@ -439,6 +457,7 @@ $('btnAdd').onclick = async () => {
 
 (async () => {
   try {
+    await ensureRobotRegistry();
     const qs = new URLSearchParams(location.search);
     const preferred = qs.get('suite') || '';
     const id = await refreshSuiteSelect(preferred);

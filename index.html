@@ -433,6 +433,30 @@
     line-height: 1.55;
   }
 
+  .robot-guard {
+    position: fixed;
+    left: 50%;
+    top: 58px;
+    transform: translateX(-50%);
+    z-index: 35;
+    width: min(560px, calc(100vw - 28px));
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(90, 22, 30, 0.92);
+    border: 1px solid rgba(248, 113, 113, 0.55);
+    color: #fecaca;
+    font-size: 0.78rem;
+    line-height: 1.45;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    display: none;
+  }
+  .robot-guard.warn {
+    background: rgba(70, 50, 10, 0.92);
+    border-color: rgba(251, 191, 36, 0.55);
+    color: #fde68a;
+  }
+  .robot-guard.show { display: block; }
+
   @media (max-width: 900px) {
     .topbar .meta { display: none; }
     .rail-panels { width: min(300px, 86vw); }
@@ -467,6 +491,8 @@
   </span>
   <a class="pill tip" href="./hub.html" data-tip="hub" style="text-decoration:none;color:inherit" tabindex="0">Hub · 多episode</a>
 </div>
+
+<div class="robot-guard" id="robotGuard" role="alert"></div>
 
 <aside class="hud drawer-rail left" id="railLeft" data-side="left">
   <button type="button" class="rail-tab" id="railTabLeft" aria-expanded="false" aria-pressed="false" title="悬停展开 · 点击钉住左侧栏">控制</button>
@@ -704,19 +730,40 @@ import {
   classifyFailureFrames,
   buildSafetyReport,
 } from './advanced_cd.js';
+import {
+  loadRobotRegistry,
+  resolveRobot,
+  jointNamesMismatch,
+  validateEpisodeAgainstRegistry,
+} from './robots_registry.js';
 
-const JOINTS = [
-  'shoulder_pan', 'shoulder_lift', 'elbow_flex', 'wrist_flex', 'wrist_roll', 'gripper'
-];
 const DEG2RAD = Math.PI / 180;
-const URDF_CUR = './so100_colored/so100_cur.urdf';
-const URDF_GT = './so100_colored/so100_gt.urdf';
-const URDF_PRED = './so100_colored/so100_pred.urdf';
 const COLOR_CUR = 0x9ca3af;
 const COLOR_GT = 0xef4444;
 const COLOR_PRED = 0x3b82f6;
 const TCP_WINDOW = 15;
 const TCP_MAX = TCP_WINDOW * 2 + 1;
+
+/** Active robot profile for this page load (from robots.json + episode meta.robot). */
+let ACTIVE_ROBOT = null;
+let JOINTS = [];
+const TCP_OFFSET = new THREE.Vector3(0, -0.1062, 0);
+let TCP_LINK = 'gripper';
+
+function hexToInt(hex, fallback) {
+  if (typeof hex !== 'string') return fallback;
+  const s = hex.trim().replace('#', '');
+  const n = Number.parseInt(s, 16);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function applyActiveRobot(robot) {
+  ACTIVE_ROBOT = robot;
+  JOINTS = robot.joint_names.slice();
+  TCP_LINK = robot.tcp.link || 'gripper';
+  const o = robot.tcp.offset || [0, 0, 0];
+  TCP_OFFSET.set(Number(o[0]) || 0, Number(o[1]) || 0, Number(o[2]) || 0);
+}
 
 /** 左右栏默认收起：悬停展开，移出自动收缩；点击侧边标签钉住/取消。 */
 function setupAutoCollapsingRails() {
@@ -794,6 +841,10 @@ setupAutoCollapsingRails();
 
 /** 名词 / 指标释义：悬停带 data-tip 的文字时，在左下角半透明浮窗展示。 */
 const TERM_GLOSSARY = {
+  robot: {
+    title: '机型（meta.robot）',
+    body: '本条 episode 使用的机械臂型号 id，必须在 robots.json 中登记。页面据此加载对应 URDF、关节名与 TCP 定义。',
+  },
   cur: {
     title: 'cur（current）',
     body: '当前时刻观测到的机械臂状态（灰色）。用于对照「此刻真实在哪」，不参与 pred vs GT 的主误差计算。',
@@ -1137,19 +1188,18 @@ function setPose(robot, qDeg) {
   robot.updateMatrixWorld(true);
 }
 
-const TCP_OFFSET_GRIPPER = new THREE.Vector3(0, -0.1062, 0);
 const _tcpPos = new THREE.Vector3();
 const _tcpQuat = new THREE.Quaternion();
 
 function getTcpPose(robot, pos = _tcpPos, quat = _tcpQuat) {
-  const link = robot.links?.gripper;
+  const link = robot.links?.[TCP_LINK];
   if (!link) {
     pos.set(0, 0, 0);
     quat.identity();
     return { pos, quat };
   }
   link.updateWorldMatrix(true, false);
-  pos.copy(TCP_OFFSET_GRIPPER).applyMatrix4(link.matrixWorld);
+  pos.copy(TCP_OFFSET).applyMatrix4(link.matrixWorld);
   link.getWorldQuaternion(quat);
   return { pos, quat };
 }
@@ -1170,7 +1220,7 @@ function setLoadProgress(ratio, text, detail) {
   if (detail != null && detailEl) detailEl.textContent = detail;
 }
 
-function loadRobot(urdfUrl, { onProgress, label } = {}) {
+function loadRobot(urdfUrl, { onProgress, label, rootEulerDeg } = {}) {
   return new Promise((resolve, reject) => {
     const manager = new THREE.LoadingManager();
     let robot = null;
@@ -1201,7 +1251,12 @@ function loadRobot(urdfUrl, { onProgress, label } = {}) {
       (r) => {
         robot = r;
         robot.ignoreLimits = true;
-        robot.rotation.x = -Math.PI / 2;
+        const e = rootEulerDeg || [0, 0, 0];
+        robot.rotation.set(
+          (Number(e[0]) || 0) * DEG2RAD,
+          (Number(e[1]) || 0) * DEG2RAD,
+          (Number(e[2]) || 0) * DEG2RAD,
+        );
       },
       undefined,
       (err) => {
@@ -1410,7 +1465,13 @@ function computeTcpPaths(probe, frames) {
   return { cur, gt, pred, gtQuat, predQuat };
 }
 
-async function initScene(container, frames) {
+async function initScene(container, frames, robotCfg) {
+  applyActiveRobot(robotCfg);
+  const colorCur = hexToInt(robotCfg.colors?.cur, COLOR_CUR);
+  const colorGt = hexToInt(robotCfg.colors?.gt, COLOR_GT);
+  const colorPred = hexToInt(robotCfg.colors?.pred, COLOR_PRED);
+  const rootEuler = robotCfg.root_rotation_euler_xyz_deg;
+
   const w = container.clientWidth || window.innerWidth;
   const h = container.clientHeight || window.innerHeight;
   const scene = new THREE.Scene();
@@ -1436,29 +1497,35 @@ async function initScene(container, frames) {
   fill.position.set(-1.5, 1.0, -1.0); scene.add(fill);
   scene.add(new THREE.GridHelper(1.6, 16, 0x3a4d66, 0x243247));
 
-  setLoadProgress(0.02, '加载 3× SO-100 URDF…', '解析模型与网格');
+  setLoadProgress(
+    0.02,
+    `加载 3× ${robotCfg.label} URDF…`,
+    `机型 ${robotCfg.id} · 解析模型与网格`,
+  );
   const robotProgress = [0, 0, 0];
   const robotLabels = ['灰 cur', '红 GT', '蓝 pred'];
   const bumpRobots = () => {
     const avg = (robotProgress[0] + robotProgress[1] + robotProgress[2]) / 3;
-    // URDF 阶段占总体约 0~75%
     const parts = robotLabels
       .map((name, i) => `${name} ${Math.round(robotProgress[i] * 100)}%`)
       .join(' · ');
-    setLoadProgress(0.02 + avg * 0.73, '加载机械臂模型…', parts);
+    setLoadProgress(0.02 + avg * 0.73, `加载 ${robotCfg.label} 模型…`, parts);
   };
 
   const [armCur, armGT, armPred] = await Promise.all([
-    loadRobot(URDF_CUR, {
+    loadRobot(robotCfg.urdf.cur, {
       label: robotLabels[0],
+      rootEulerDeg: rootEuler,
       onProgress: (p) => { robotProgress[0] = p; bumpRobots(); },
     }),
-    loadRobot(URDF_GT, {
+    loadRobot(robotCfg.urdf.gt, {
       label: robotLabels[1],
+      rootEulerDeg: rootEuler,
       onProgress: (p) => { robotProgress[1] = p; bumpRobots(); },
     }),
-    loadRobot(URDF_PRED, {
+    loadRobot(robotCfg.urdf.pred, {
       label: robotLabels[2],
+      rootEulerDeg: rootEuler,
       onProgress: (p) => { robotProgress[2] = p; bumpRobots(); },
     }),
   ]);
@@ -1467,9 +1534,9 @@ async function initScene(container, frames) {
   setLoadProgress(0.78, '计算 TCP 轨迹…', '正运动学采样');
   const paths = computeTcpPaths(armGT, frames);
   setLoadProgress(0.90, '构建场景对象…', '轨迹 / 散点 / TCP 轴');
-  const scatterCur = makeScatter(COLOR_CUR);
-  const scatterGT = makeScatter(COLOR_GT);
-  const scatterPred = makeScatter(COLOR_PRED);
+  const scatterCur = makeScatter(colorCur);
+  const scatterGT = makeScatter(colorGt);
+  const scatterPred = makeScatter(colorPred);
   scene.add(scatterCur, scatterGT, scatterPred);
 
   const tcpCur = makeTcpAxes();
@@ -1477,9 +1544,9 @@ async function initScene(container, frames) {
   const tcpPred = makeTcpAxes();
   scene.add(tcpCur, tcpGT, tcpPred);
 
-  const pathLineCur = makeTimedPathLine(paths.cur, COLOR_CUR);
-  const pathLineGT = makeTimedPathLine(paths.gt, COLOR_GT);
-  const pathLinePred = makeTimedPathLine(paths.pred, COLOR_PRED);
+  const pathLineCur = makeTimedPathLine(paths.cur, colorCur);
+  const pathLineGT = makeTimedPathLine(paths.gt, colorGt);
+  const pathLinePred = makeTimedPathLine(paths.pred, colorPred);
   pathLineCur.material.opacity = 0.78;
   pathLineGT.material.opacity = 0.88;
   pathLinePred.material.opacity = 0.95;
@@ -1527,8 +1594,9 @@ async function initScene(container, frames) {
   }
   window.addEventListener('resize', resize);
 
-  setLoadProgress(1, '加载完成', '进入评测视图');
+  setLoadProgress(1, '加载完成', `${robotCfg.label} · 进入评测视图`);
   return {
+    robot: robotCfg,
     armCur, armGT, armPred,
     scatterCur, scatterGT, scatterPred,
     tcpCur, tcpGT, tcpPred,
@@ -2144,12 +2212,33 @@ try {
   const meta = DATA.meta;
   const names = meta.joint_names;
 
+  setLoadProgress(0.04, '加载机械臂配置…', 'robots.json');
+  const robotRegistry = await loadRobotRegistry('./robots.json');
+  const guard = validateEpisodeAgainstRegistry(DATA, robotRegistry);
+  if (!guard.ok) {
+    throw new Error(`机型防呆校验失败：${guard.errors.join('；')}`);
+  }
+  const robotCfg = guard.robot || resolveRobot(robotRegistry, meta, { allowDefault: false });
+  applyActiveRobot(robotCfg);
+  const mismatch = jointNamesMismatch(meta, robotCfg);
+  const guardEl = document.getElementById('robotGuard');
+  if (guard.warnings.length && guardEl) {
+    guardEl.className = 'robot-guard warn show';
+    guardEl.textContent = `机型提示（${robotCfg.id}）：${guard.warnings.join('；')}`;
+  } else if (mismatch && guardEl) {
+    // should already be in errors; keep as safety net
+    guardEl.className = 'robot-guard show';
+    guardEl.textContent = `机型不匹配：${mismatch}`;
+  }
+
+  document.getElementById('title').textContent = `Embody · ${robotCfg.label}`;
   document.getElementById('subtitle').textContent =
-    `${meta.source} · ${meta.n_frames}帧 · ${meta.generated_at}`;
-  setLoadProgress(0.08, '初始化界面…', `${meta.n_frames} 帧 · 准备 3D 场景`);
+    `${robotCfg.id} · ${meta.source} · ${meta.n_frames}帧 · ${meta.generated_at}`;
+  setLoadProgress(0.08, '初始化界面…', `${robotCfg.label} · ${meta.n_frames} 帧`);
 
   const stats = document.getElementById('stats');
   for (const [label, value, tipKey] of [
+    ['机型', robotCfg.label, 'robot'],
     ['平均 L2', meta.mean_l2.toFixed(3), 'l2_mean'],
     ['最大 L2', meta.max_l2.toFixed(3), 'l2_max'],
     ['帧数', String(meta.n_frames), 'n_frames'],
@@ -2159,9 +2248,9 @@ try {
   }
 
   setupCharts(DATA);
-  setLoadProgress(0.12, '加载机械臂模型…', '开始下载 URDF / STL');
+  setLoadProgress(0.12, `加载 ${robotCfg.label} 模型…`, '开始下载 URDF / STL');
 
-  const world = await initScene(document.getElementById('arm3d'), DATA.frames);
+  const world = await initScene(document.getElementById('arm3d'), DATA.frames, robotCfg);
   document.getElementById('loadHint')?.remove();
   world.resize();
 

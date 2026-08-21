@@ -45,7 +45,8 @@
       "note": "simulate demo grasp goal for A5 task metrics"
     },
     "policy": "baseline",
-    "model": "baseline"
+    "model": "baseline",
+    "robot": "so100"
   },
   "series": {
     "t": [
