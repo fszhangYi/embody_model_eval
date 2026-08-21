@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI Chat · Skills · Embody Eval</title>
+<link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+<style>
+  :root {
+    --bg: #0b1018;
+    --panel: rgba(12, 18, 28, 0.96);
+    --border: rgba(58, 77, 102, 0.55);
+    --text: #e7ecf3;
+    --muted: #8b9bb4;
+    --accent: #3dd6c6;
+    --accent-dim: rgba(61, 214, 198, 0.14);
+    --danger: #f87171;
+    --header-h: 56px;
+    --font: "IBM Plex Sans", "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --scrollbar-thumb: rgba(61, 214, 198, 0.45);
+    --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
+    --scrollbar-size: 4px;
+  }
+  * { box-sizing: border-box; }
+  /* 全局统一滚动条（Firefox + Chromium），与 index / hub / pipeline 一致 */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+  }
+  *::-webkit-scrollbar {
+    width: var(--scrollbar-size);
+    height: var(--scrollbar-size);
+  }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 999px;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--scrollbar-thumb-hover);
+  }
+  *::-webkit-scrollbar-corner { background: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: var(--font);
+    color: var(--text);
+    background:
+      radial-gradient(900px 420px at 8% -10%, rgba(26, 39, 64, 0.55), transparent 55%),
+      radial-gradient(700px 380px at 92% 0%, rgba(20, 48, 52, 0.35), transparent 50%),
+      var(--bg);
+  }
+  header {
+    position: relative; z-index: 40;
+    display: grid;
+    grid-template-columns: minmax(160px, 280px) minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    height: var(--header-h);
+    padding: 0 16px;
+    background: linear-gradient(180deg, rgba(11,16,24,0.96), rgba(11,16,24,0.82));
+    border-bottom: 1px solid var(--border);
+  }
+  header h1 { margin: 0; font-size: 1.05rem; font-weight: 600; }
+  .header-blurb { margin: 2px 0 0; color: var(--muted); font-size: 0.75rem; }
+  .header-status {
+    justify-self: start;
+    font-size: 0.75rem; color: var(--muted);
+  }
+  .header-status[data-ok="1"] { color: var(--accent); }
+  .header-status[data-ok="0"] { color: var(--danger); }
+
+  .pill {
+    display: inline-flex; gap: 8px; align-items: center;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: rgba(26,35,50,0.7);
+    font-size: 0.72rem; color: var(--muted);
+  }
+  .page-nav { position: relative; z-index: 50; }
+  .page-nav-btn {
+    cursor: pointer; gap: 6px; color: var(--text); text-decoration: none;
+    font: inherit; font-size: 0.72rem; background: rgba(26,35,50,0.7);
+  }
+  .page-nav-btn:hover, .page-nav.open .page-nav-btn {
+    border-color: var(--accent); color: var(--accent);
+  }
+  .page-nav-caret { opacity: 0.7; font-size: 0.65rem; }
+  .page-nav-menu {
+    position: absolute; top: calc(100% + 6px); right: 0;
+    min-width: 220px; padding: 6px;
+    background: rgba(18, 26, 38, 0.98);
+    border: 1px solid var(--border); border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.45); z-index: 60;
+  }
+  .page-nav-item {
+    display: block; padding: 8px 10px; border-radius: 8px;
+    text-decoration: none; color: var(--text);
+  }
+  .page-nav-item:hover { background: var(--accent-dim); }
+  .page-nav-item.active {
+    background: var(--accent-dim);
+    outline: 1px solid rgba(61,214,198,0.35);
+  }
+  .page-nav-item-title { display: block; font-size: 0.8rem; font-weight: 560; }
+  .page-nav-item-desc { display: block; margin-top: 2px; font-size: 0.68rem; color: var(--muted); }
+
+  .layout {
+    display: grid;
+    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(260px, 320px);
+    height: calc(100% - var(--header-h));
+    min-height: 0;
+  }
+  @media (max-width: 1100px) {
+    .layout {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto 1fr auto;
+      height: auto;
+      min-height: calc(100% - var(--header-h));
+    }
+  }
+
+  .panel {
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    padding: 14px 14px 18px;
+    overflow: auto;
+    min-height: 0;
+  }
+  .panel:last-child { border-right: 0; border-left: 1px solid var(--border); }
+  .panel h2 {
+    margin: 0 0 8px; font-size: 0.92rem; font-weight: 600;
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .panel h3 { margin: 14px 0 8px; font-size: 0.78rem; color: var(--muted); font-weight: 600; }
+  .muted { color: var(--muted); font-size: 0.75rem; line-height: 1.45; }
+  .empty { margin: 8px 0; }
+  code { font-family: var(--mono); font-size: 0.72rem; color: var(--accent); }
+
+  button, .btn-sm {
+    background: #243247; color: var(--text); border: 1px solid #354a66;
+    border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 0.8rem; cursor: pointer;
+  }
+  button:hover, .btn-sm:hover { border-color: var(--accent); color: var(--accent); }
+  button:disabled, .btn-sm:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn-sm { padding: 4px 10px; font-size: 0.72rem; }
+  .btn-primary {
+    background: #1e3d3a; border-color: var(--accent); color: var(--accent);
+  }
+
+  .skill-card {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: 8px;
+    align-items: start;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(18, 26, 38, 0.7);
+    cursor: pointer;
+  }
+  .skill-card:has(input:checked) {
+    border-color: rgba(61,214,198,0.55);
+    background: var(--accent-dim);
+  }
+  .skill-card input { margin-top: 3px; }
+  .skill-name { display: block; font-size: 0.82rem; font-weight: 600; }
+  .skill-id { display: block; font-family: var(--mono); font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+  .skill-desc {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden; margin-top: 4px; font-size: 0.7rem; color: #b7c3d6; line-height: 1.4;
+  }
+  .skill-del {
+    padding: 0 6px; line-height: 1.2; border: 0; background: transparent;
+    color: var(--muted); font-size: 1rem;
+  }
+  .skill-del:hover { color: var(--danger); border: 0; }
+
+  .source-block { margin-bottom: 10px; }
+  .source-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
+    padding: 6px 0; border-bottom: 1px solid rgba(58,77,102,0.35);
+  }
+
+  .chat-main {
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
+    padding: 12px 16px 14px;
+  }
+  #chatLog {
+    flex: 1; overflow: auto; min-height: 220px;
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 4px 2px 12px;
+  }
+  .bubble {
+    max-width: min(720px, 96%);
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(18, 26, 38, 0.88);
+  }
+  .bubble-user { align-self: flex-end; background: rgba(30, 61, 58, 0.55); border-color: rgba(61,214,198,0.35); }
+  .bubble-assistant { align-self: flex-start; }
+  .bubble-system { align-self: center; max-width: 90%; background: transparent; color: var(--muted); border-style: dashed; }
+  .bubble-who { font-size: 0.68rem; color: var(--muted); margin-bottom: 4px; }
+  .bubble-text {
+    margin: 0; white-space: pre-wrap; word-break: break-word;
+    font-family: var(--font); font-size: 0.84rem; line-height: 1.5;
+  }
+  .bubble-meta { margin-top: 6px; font-size: 0.65rem; color: var(--muted); font-family: var(--mono); }
+
+  .composer {
+    display: grid; gap: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+  }
+  #chatInput {
+    width: 100%; min-height: 88px; resize: vertical;
+    background: #121a26; color: var(--text);
+    border: 1px solid #354a66; border-radius: 10px;
+    padding: 10px 12px; font: inherit; font-size: 0.85rem; line-height: 1.45;
+  }
+  #chatInput:focus { outline: none; border-color: var(--accent); }
+  .composer-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  }
+
+  .field { display: grid; gap: 4px; margin-bottom: 10px; }
+  .field label { font-size: 0.72rem; color: var(--muted); }
+  .field input, .field select, .field textarea {
+    width: 100%;
+    background: #121a26; color: var(--text);
+    border: 1px solid #354a66; border-radius: 8px;
+    padding: 7px 10px; font: inherit; font-size: 0.8rem;
+  }
+  .field textarea { min-height: 72px; resize: vertical; }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--accent);
+  }
+  .hint {
+    margin: 0 0 10px; padding: 8px 10px;
+    border-radius: 8px; border: 1px dashed var(--border);
+    font-size: 0.72rem; color: var(--muted); line-height: 1.45;
+  }
+
+  #toast {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%);
+    z-index: 100;
+    padding: 8px 14px; border-radius: 999px;
+    background: rgba(18, 26, 38, 0.96);
+    border: 1px solid var(--border);
+    font-size: 0.78rem; box-shadow: 0 10px 28px rgba(0,0,0,0.4);
+  }
+  #toast[data-kind="ok"] { border-color: rgba(61,214,198,0.5); color: var(--accent); }
+  #toast[data-kind="err"] { border-color: rgba(248,113,113,0.5); color: var(--danger); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>AI Chat</h1>
+    <p class="header-blurb">选择托管 Skill → 配置 Agent 链接 → 发送诉求并查看回执</p>
+  </div>
+  <div class="header-status" id="apiStatus">检测 API…</div>
+  <div id="pageNavRoot"></div>
+</header>
+
+<div class="layout">
+  <aside class="panel" aria-label="托管 Skills">
+    <h2>
+      托管 Skills
+      <button type="button" class="btn-sm" id="btnRefresh" title="刷新列表与配置">刷新</button>
+    </h2>
+    <p class="muted" id="selectedHint">未选择 skill</p>
+    <div id="managedSkills"></div>
+    <h3>从本机导入</h3>
+    <p class="muted">读取 <code>~/.cursor/skills</code> 与 <code>skills-cursor</code>，复制到仓库 <code>agent_skills/</code>。</p>
+    <div id="sourceSkills"></div>
+  </aside>
+
+  <main class="chat-main" aria-label="对话">
+    <div id="chatLog"></div>
+    <div class="composer">
+      <textarea id="chatInput" placeholder="输入诉求…（Ctrl/⌘ + Enter 发送）&#10;选中的 skill 会随消息一并交给 Agent。"></textarea>
+      <div class="composer-row">
+        <span class="muted">回执显示在上方；dry_run 可先验证打包内容。</span>
+        <button type="button" class="btn-primary" id="btnSend">发送</button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel" aria-label="Agent 链接">
+    <h2>Agent 链接</h2>
+    <div class="field">
+      <label for="cfgMode">模式</label>
+      <select id="cfgMode">
+        <option value="dry_run">dry_run（本地回执，不调外部）</option>
+        <option value="openai">openai（兼容 /chat/completions）</option>
+        <option value="webhook">webhook（POST 诉求+skills JSON）</option>
+        <option value="cursor_sdk">cursor_sdk（可选 pip：cursor-sdk）</option>
+      </select>
+    </div>
+    <p class="hint" id="dryHint">不消耗额度：把 system（含 skill 正文）与 user 诉求打包成回执，便于联调前端。</p>
+    <p class="hint" id="cursorHint" hidden>需本机 <code>pip install cursor-sdk</code> 与 API Key；服务端会把选中 skill 写入临时 <code>.cursor/skills</code> 并以 <code>setting_sources=["project"]</code> 调用本地 Agent。</p>
+    <div id="linkFields" hidden>
+      <div class="field">
+        <label for="cfgBaseUrl">Base URL</label>
+        <input id="cfgBaseUrl" placeholder="https://api.openai.com/v1 或自建网关" />
+      </div>
+      <div class="field">
+        <label for="cfgPath">Path</label>
+        <input id="cfgPath" placeholder="/chat/completions 或 webhook 路径" />
+      </div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model</label>
+      <input id="cfgModel" placeholder="composer-2.5 / gpt-4o-mini …" />
+    </div>
+    <div class="field">
+      <label for="cfgApiKey">API Key</label>
+      <input id="cfgApiKey" type="password" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="cfgSystem">System 前缀</label>
+      <textarea id="cfgSystem"></textarea>
+    </div>
+    <button type="button" id="btnSaveConfig">保存到服务端</button>
+    <p class="muted" style="margin-top:10px">配置写入 <code>agent_skills/.agent_config.json</code>（勿提交密钥）。也可用环境变量 <code>CURSOR_API_KEY</code> / <code>AGENT_API_KEY</code>。</p>
+  </aside>
+</div>
+
+<div id="toast" hidden></div>
+<script type="module" src="./chat.js"></script>
+</body>
+</html>

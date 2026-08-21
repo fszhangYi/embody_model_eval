@@ -3,7 +3,5 @@ set -euo pipefail
 cd "$(dirname "$0")"
 PORT="${1:-6006}"
 
-# 启动前实时扫描 data/<suite>/*.json，更新 data/index.json
-python3 scripts/refresh_data_index.py
-
-exec python3 -m http.server "$PORT" --bind 0.0.0.0
+# 静态页 + /api/*（skills / agent chat）；启动前刷新 data/index.json
+exec python3 scripts/agent_server.py "$PORT" --bind 0.0.0.0

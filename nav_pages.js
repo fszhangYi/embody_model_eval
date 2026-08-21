@@ -24,12 +24,20 @@ export const PAGES = [
     short: '数据流',
     desc: 'ComfyUI 风格：训练 / 推理流向演示',
   },
+  {
+    id: 'chat',
+    href: './chat.html',
+    label: 'AI Chat · Skills',
+    short: 'Chat',
+    desc: '选 skill、配 Agent 链接、发送诉求看回执',
+  },
 ];
 
 export function resolveCurrentPageId(pathname = location.pathname) {
   const base = pathname.split('/').pop() || '';
   if (/hub\.html$/i.test(base)) return 'hub';
   if (/pipeline\.html$/i.test(base)) return 'pipeline';
+  if (/chat\.html$/i.test(base)) return 'chat';
   if (/index\.html$/i.test(base) || base === '' || base === '/') return 'eval';
   const hit = PAGES.find((p) => base && p.href.endsWith(base));
   return hit?.id || 'eval';

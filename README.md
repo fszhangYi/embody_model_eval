@@ -8,8 +8,9 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 - 右侧：概览、误差、关节轨迹、任务/接触 (G)、数值（可折叠）
 - Hub：多 episode 汇总，含 obs / 任务列与机型防呆；顶栏「页面」菜单可扩展更多 tab
 - 数据流：`pipeline.html` ComfyUI 风格画布，演示 ACT/SAM2 训练与推理张量流向
+- AI Chat：`chat.html` 选择托管 Skill、配置 Agent 链接，将诉求与 skill 一并发送并显示回执
 
-浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库静态托管即可。
+浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库托管静态页，并由同一进程提供 `/api/*`（skills / chat）。
 
 ## 环境
 
@@ -31,7 +32,10 @@ embody_model_eval/
 ├── hub.html                # 多 episode 汇总（按 data/<suite> 选择）
 ├── pipeline.html           # 模型训练/推理数据流画布（演示）
 ├── pipeline_flow.js        # 节点图引擎与 ACT/SAM2 流向定义
+├── chat.html               # AI Chat：选 skill + 配 Agent 链接 + 回执
+├── chat.js                 # Chat 前端逻辑
 ├── nav_pages.js            # 顶栏「页面」菜单（后续 tab 在此登记）
+├── agent_skills/           # 服务端托管的 Agent Skills（可从 ~/.cursor/skills 导入）
 ├── robots.json             # 当前可用机械臂型号注册表
 ├── robots_registry.js      # 机型解析辅助
 ├── tcp_metrics.js          # TCP / 任务误差指标
@@ -52,8 +56,9 @@ embody_model_eval/
 │   ├── gen_obs_media.py    # 为套件补 RGB/Depth/注意力媒体 (F)
 │   ├── gen_task_demo.py    # 为套件补任务成功/接触/物体轨迹 (G)
 │   ├── refresh_data_index.py
+│   ├── agent_server.py     # 静态托管 + /api/skills · /api/chat
 │   └── thresholds.example.json
-├── serve.sh
+├── serve.sh                # 启动 agent_server（默认 :6006）
 ├── requirements.txt
 ├── README.md
 └── so100_colored/          # SO-100 灰 / 红 / 蓝 URDF + STL
@@ -78,6 +83,22 @@ python3 -m http.server 6006 --bind 0.0.0.0
 
 本地：`http://127.0.0.1:6006/`  
 AutoDL 若映射端口 6006，使用控制台公网地址。
+
+> 仅静态浏览可用 `python3 -m http.server`；**AI Chat / skills API** 需要 `./serve.sh`（即 `scripts/agent_server.py`）。
+
+## AI Chat（Skills + Agent 链接）
+
+打开 `chat.html`（顶栏「页面」→ Chat）：
+
+1. **托管 Skills**：服务端目录 `agent_skills/`；可从本机 `~/.cursor/skills` / `skills-cursor` 一键导入
+2. **勾选 skill** 后填写诉求；正文与 skill 一并打包
+3. **Agent 链接模式**
+   - `dry_run`：不调外部，返回打包回执（默认，便于联调）
+   - `openai`：兼容 `/chat/completions` 网关
+   - `webhook`：向自定义 URL POST `{ message, skills, messages }`
+   - `cursor_sdk`：可选 `pip install cursor-sdk`，用 API Key 跑本地 Agent（选中 skill 写入临时 project skills）
+
+配置保存在 `agent_skills/.agent_config.json`（已 gitignore）；也可用环境变量 `CURSOR_API_KEY` / `AGENT_API_KEY`。
 
 ## 评测数据
 

@@ -1,6 +1,10 @@
-# Runtime: static eval viewer + stdlib HTTP server only.
+# Runtime: static eval viewer + stdlib HTTP server (scripts/agent_server.py).
 # Tested with Python 3.12.13 (conda env: lerobot).
-# No third-party packages are required to serve or open the page.
+# No third-party packages are required to serve pages or the skills/chat API.
+#
+# Optional — AI Chat mode=cursor_sdk:
+#   pip install cursor-sdk
+#   export CURSOR_API_KEY=...
 #
 # Optional — only if you regenerate compare_result.json with
 # act_robot/scripts/compare_pose_offline.py (--mode simulate):

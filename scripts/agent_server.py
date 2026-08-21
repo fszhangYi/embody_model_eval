@@ -1,0 +1,558 @@
+#!/usr/bin/env python3
+"""Static file server + Agent Chat / Skills API (stdlib only).
+
+Endpoints:
+  GET    /api/health
+  GET    /api/skills
+  GET    /api/skills/sources
+  POST   /api/skills/import
+  DELETE /api/skills/<id>
+  GET    /api/agent/config
+  PUT    /api/agent/config
+  POST   /api/chat
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import traceback
+import urllib.error
+import urllib.request
+from http import HTTPStatus
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from typing import Any
+from urllib.parse import unquote, urlparse
+
+ROOT = Path(__file__).resolve().parent.parent
+SKILLS_DIR = ROOT / "agent_skills"
+CONFIG_PATH = SKILLS_DIR / ".agent_config.json"
+SKILL_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
+
+SOURCE_ROOTS = {
+    "user": Path.home() / ".cursor" / "skills",
+    "builtin": Path.home() / ".cursor" / "skills-cursor",
+}
+
+
+def _json_bytes(obj: Any, status: int = 200) -> tuple[int, bytes, str]:
+    raw = json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
+    return status, raw, "application/json; charset=utf-8"
+
+
+def _read_json_body(handler: SimpleHTTPRequestHandler) -> Any:
+    length = int(handler.headers.get("Content-Length") or 0)
+    if length <= 0:
+        return {}
+    raw = handler.rfile.read(length)
+    if not raw:
+        return {}
+    return json.loads(raw.decode("utf-8"))
+
+
+def _parse_frontmatter(text: str) -> tuple[dict[str, Any], str]:
+    if not text.startswith("---"):
+        return {}, text
+    end = text.find("\n---", 3)
+    if end < 0:
+        return {}, text
+    block = text[3:end].strip()
+    body = text[end + 4 :].lstrip("\n")
+    meta: dict[str, Any] = {}
+    key = None
+    buf: list[str] = []
+    for line in block.splitlines():
+        if key and (line.startswith("  ") or line.startswith("\t") or line.startswith(">-") or line.startswith("|")):
+            buf.append(line.strip())
+            continue
+        if key and buf:
+            meta[key] = " ".join(x for x in buf if x).strip()
+            key, buf = None, []
+        if ":" not in line:
+            continue
+        k, v = line.split(":", 1)
+        k, v = k.strip(), v.strip()
+        if v in (">-", ">", "|"):
+            key, buf = k, []
+        else:
+            meta[k] = v.strip("\"'")
+    if key and buf:
+        meta[key] = " ".join(x for x in buf if x).strip()
+    return meta, body
+
+
+def list_skills_in(root: Path) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    if not root.is_dir():
+        return out
+    for child in sorted(root.iterdir()):
+        if not child.is_dir() or child.name.startswith("."):
+            continue
+        skill_md = child / "SKILL.md"
+        if not skill_md.is_file():
+            continue
+        text = skill_md.read_text(encoding="utf-8", errors="replace")
+        meta, _ = _parse_frontmatter(text)
+        out.append(
+            {
+                "id": child.name,
+                "name": meta.get("name") or child.name,
+                "description": meta.get("description") or "",
+                "path": str(child),
+                "bytes": skill_md.stat().st_size,
+            }
+        )
+    return out
+
+
+def load_skill_bundle(skill_id: str) -> dict[str, Any] | None:
+    if not SKILL_NAME_RE.match(skill_id):
+        return None
+    folder = SKILLS_DIR / skill_id
+    skill_md = folder / "SKILL.md"
+    if not skill_md.is_file():
+        return None
+    text = skill_md.read_text(encoding="utf-8", errors="replace")
+    meta, body = _parse_frontmatter(text)
+    return {
+        "id": skill_id,
+        "name": meta.get("name") or skill_id,
+        "description": meta.get("description") or "",
+        "content": text,
+        "body": body,
+    }
+
+
+def default_config() -> dict[str, Any]:
+    return {
+        "mode": "dry_run",
+        "baseUrl": "",
+        "apiKey": "",
+        "model": "composer-2.5",
+        "path": "/chat/completions",
+        "systemPrompt": "你是评测助手。优先遵循用户选中的 Agent Skill 指令。",
+    }
+
+
+def load_config() -> dict[str, Any]:
+    cfg = default_config()
+    if CONFIG_PATH.is_file():
+        try:
+            stored = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+            if isinstance(stored, dict):
+                cfg.update({k: stored[k] for k in cfg if k in stored})
+        except Exception:
+            pass
+    env_key = os.environ.get("CURSOR_API_KEY") or os.environ.get("AGENT_API_KEY")
+    if env_key and not cfg.get("apiKey"):
+        cfg["apiKey"] = env_key
+    return cfg
+
+
+def save_config(patch: dict[str, Any]) -> dict[str, Any]:
+    cfg = load_config()
+    for k in default_config():
+        if k in patch:
+            cfg[k] = patch[k]
+    SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+    CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    return cfg
+
+
+def public_config(cfg: dict[str, Any]) -> dict[str, Any]:
+    out = dict(cfg)
+    key = out.get("apiKey") or ""
+    out["apiKeySet"] = bool(key)
+    out["apiKeyMasked"] = (key[:4] + "…" + key[-4:]) if len(key) > 8 else ("***" if key else "")
+    out.pop("apiKey", None)
+    return out
+
+
+def build_messages(user_message: str, skills: list[dict[str, Any]], system_prompt: str) -> list[dict[str, str]]:
+    parts = [system_prompt.strip() or "You are a helpful assistant."]
+    if skills:
+        parts.append("\n\n# Active Agent Skills\n")
+        parts.append("The following skills are selected by the user. Follow them closely.\n")
+        for s in skills:
+            parts.append(f"\n## Skill: {s['name']} (`{s['id']}`)\n")
+            if s.get("description"):
+                parts.append(f"Description: {s['description']}\n")
+            parts.append("\n```skill\n")
+            parts.append(s["content"])
+            parts.append("\n```\n")
+    return [
+        {"role": "system", "content": "".join(parts)},
+        {"role": "user", "content": user_message},
+    ]
+
+
+def http_json(url: str, payload: dict[str, Any], api_key: str, timeout: float = 120.0) -> dict[str, Any]:
+    data = json.dumps(payload).encode("utf-8")
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "embody-model-eval-agent-chat/1.0",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+            try:
+                parsed = json.loads(body)
+            except json.JSONDecodeError:
+                parsed = {"raw": body}
+            return {"ok": True, "status": resp.status, "data": parsed}
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        try:
+            parsed = json.loads(err_body)
+        except json.JSONDecodeError:
+            parsed = {"raw": err_body}
+        return {"ok": False, "status": e.code, "error": parsed, "message": str(e)}
+    except Exception as e:
+        return {"ok": False, "status": 0, "message": str(e)}
+
+
+def extract_openai_text(data: Any) -> str:
+    if not isinstance(data, dict):
+        return str(data)
+    choices = data.get("choices")
+    if isinstance(choices, list) and choices:
+        msg = choices[0].get("message") or {}
+        content = msg.get("content")
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            bits = []
+            for block in content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    bits.append(block.get("text") or "")
+            return "".join(bits)
+    if isinstance(data.get("result"), str):
+        return data["result"]
+    if isinstance(data.get("reply"), str):
+        return data["reply"]
+    if isinstance(data.get("output"), str):
+        return data["output"]
+    return json.dumps(data, ensure_ascii=False, indent=2)
+
+
+def try_cursor_sdk(message: str, skills: list[dict[str, Any]], cfg: dict[str, Any]) -> dict[str, Any]:
+    """Optional path: local Cursor SDK with staged project skills."""
+    try:
+        from cursor_sdk import Agent, AgentOptions, LocalAgentOptions  # type: ignore
+    except Exception as e:
+        return {"ok": False, "message": f"cursor_sdk unavailable: {e}"}
+
+    # Stage selected skills into a temp project skills tree under agent_skills/.run
+    run_root = SKILLS_DIR / ".run"
+    proj_skills = run_root / ".cursor" / "skills"
+    if run_root.exists():
+        shutil.rmtree(run_root)
+    proj_skills.mkdir(parents=True, exist_ok=True)
+    for s in skills:
+        dest = proj_skills / s["id"]
+        dest.mkdir(parents=True, exist_ok=True)
+        (dest / "SKILL.md").write_text(s["content"], encoding="utf-8")
+
+    api_key = cfg.get("apiKey") or os.environ.get("CURSOR_API_KEY") or ""
+    model = cfg.get("model") or "composer-2.5"
+    try:
+        with Agent.create(
+            AgentOptions(
+                api_key=api_key,
+                model=model,
+                local=LocalAgentOptions(
+                    cwd=str(run_root),
+                    setting_sources=["project"],
+                ),
+            )
+        ) as agent:
+            run = agent.send(message)
+            result = run.wait()
+            text = getattr(result, "result", None) or getattr(result, "text", None)
+            if text is None and hasattr(run, "text"):
+                try:
+                    text = run.text()
+                except Exception:
+                    text = str(result)
+            return {
+                "ok": getattr(result, "status", "finished") != "error",
+                "reply": text if isinstance(text, str) else str(result),
+                "status": getattr(result, "status", "unknown"),
+                "agentId": getattr(agent, "agent_id", None),
+                "runId": getattr(result, "id", None),
+            }
+    except Exception as e:
+        return {"ok": False, "message": str(e), "trace": traceback.format_exc()[-1200:]}
+
+
+def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
+    message = (payload.get("message") or "").strip()
+    if not message:
+        return {"ok": False, "error": "message is required"}
+
+    skill_ids = payload.get("skillIds") or payload.get("skills") or []
+    if not isinstance(skill_ids, list):
+        return {"ok": False, "error": "skillIds must be a list"}
+
+    skills: list[dict[str, Any]] = []
+    missing: list[str] = []
+    for sid in skill_ids:
+        sid = str(sid)
+        bundle = load_skill_bundle(sid)
+        if not bundle:
+            missing.append(sid)
+        else:
+            skills.append(bundle)
+    if missing:
+        return {"ok": False, "error": f"unknown skills: {', '.join(missing)}"}
+
+    cfg = load_config()
+    override = payload.get("config") or {}
+    if isinstance(override, dict):
+        for k in default_config():
+            if k in override and override[k] is not None:
+                # empty apiKey in override means "keep stored"
+                if k == "apiKey" and override[k] == "":
+                    continue
+                cfg[k] = override[k]
+
+    messages = build_messages(message, skills, cfg.get("systemPrompt") or "")
+    mode = (cfg.get("mode") or "dry_run").strip()
+
+    meta = {
+        "mode": mode,
+        "model": cfg.get("model"),
+        "skillIds": [s["id"] for s in skills],
+        "skillCount": len(skills),
+    }
+
+    if mode == "dry_run":
+        receipt = {
+            "note": "dry_run：未调用外部 Agent，仅返回打包后的诉求与 skill。",
+            "messages": messages,
+        }
+        return {
+            "ok": True,
+            "reply": (
+                "【Dry-run 回执】\n"
+                f"模式: dry_run\n模型: {cfg.get('model')}\n"
+                f"已选 skill: {', '.join(s['id'] for s in skills) or '(无)'}\n\n"
+                "—— System（摘要）——\n"
+                + messages[0]["content"][:1800]
+                + ("…\n" if len(messages[0]["content"]) > 1800 else "\n")
+                + "\n—— User ——\n"
+                + message
+            ),
+            "receipt": receipt,
+            "meta": meta,
+        }
+
+    if mode == "cursor_sdk":
+        out = try_cursor_sdk(message, skills, cfg)
+        if not out.get("ok"):
+            return {"ok": False, "error": out.get("message") or "cursor_sdk failed", "detail": out, "meta": meta}
+        return {
+            "ok": True,
+            "reply": out.get("reply") or "",
+            "meta": {**meta, "agentId": out.get("agentId"), "runId": out.get("runId"), "status": out.get("status")},
+        }
+
+    base = (cfg.get("baseUrl") or "").rstrip("/")
+    if not base:
+        return {"ok": False, "error": "baseUrl is required for http modes", "meta": meta}
+
+    if mode == "openai":
+        path = cfg.get("path") or "/chat/completions"
+        if not path.startswith("/"):
+            path = "/" + path
+        url = base + path
+        payload_body = {
+            "model": cfg.get("model") or "gpt-4o-mini",
+            "messages": messages,
+            "temperature": 0.2,
+        }
+        resp = http_json(url, payload_body, cfg.get("apiKey") or "")
+        if not resp.get("ok"):
+            return {
+                "ok": False,
+                "error": resp.get("message") or "HTTP error",
+                "detail": resp.get("error") or resp,
+                "meta": {**meta, "url": url, "httpStatus": resp.get("status")},
+            }
+        return {
+            "ok": True,
+            "reply": extract_openai_text(resp.get("data")),
+            "meta": {**meta, "url": url, "httpStatus": resp.get("status")},
+            "raw": resp.get("data"),
+        }
+
+    if mode == "webhook":
+        path = cfg.get("path") or ""
+        url = base + (path if path.startswith("/") else ("/" + path if path else ""))
+        payload_body = {
+            "message": message,
+            "skills": [{"id": s["id"], "name": s["name"], "description": s["description"], "content": s["content"]} for s in skills],
+            "messages": messages,
+            "model": cfg.get("model"),
+        }
+        resp = http_json(url, payload_body, cfg.get("apiKey") or "")
+        if not resp.get("ok"):
+            return {
+                "ok": False,
+                "error": resp.get("message") or "webhook error",
+                "detail": resp.get("error") or resp,
+                "meta": {**meta, "url": url, "httpStatus": resp.get("status")},
+            }
+        data = resp.get("data")
+        reply = extract_openai_text(data) if isinstance(data, dict) else str(data)
+        return {"ok": True, "reply": reply, "meta": {**meta, "url": url}, "raw": data}
+
+    return {"ok": False, "error": f"unknown mode: {mode}", "meta": meta}
+
+
+class Handler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, directory=str(ROOT), **kwargs)
+
+    def log_message(self, fmt: str, *args: Any) -> None:
+        print("[%s] %s" % (self.log_date_time_string(), fmt % args), file=sys.stderr)
+
+    def _send(self, status: int, body: bytes, content_type: str) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _send_json(self, obj: Any, status: int = 200) -> None:
+        st, raw, ctype = _json_bytes(obj, status)
+        self._send(st, raw, ctype)
+
+    def do_OPTIONS(self) -> None:  # noqa: N802
+        self._send(204, b"", "text/plain")
+
+    def do_GET(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        if path == "/api/health":
+            self._send_json({"ok": True, "skillsDir": str(SKILLS_DIR), "root": str(ROOT)})
+            return
+        if path == "/api/skills":
+            SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+            self._send_json({"ok": True, "skills": list_skills_in(SKILLS_DIR)})
+            return
+        if path == "/api/skills/sources":
+            sources = {}
+            for key, root in SOURCE_ROOTS.items():
+                sources[key] = {"root": str(root), "skills": list_skills_in(root)}
+            self._send_json({"ok": True, "sources": sources})
+            return
+        if path == "/api/agent/config":
+            self._send_json({"ok": True, "config": public_config(load_config())})
+            return
+        super().do_GET()
+
+    def do_PUT(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        if path == "/api/agent/config":
+            try:
+                body = _read_json_body(self)
+                cfg = save_config(body if isinstance(body, dict) else {})
+                self._send_json({"ok": True, "config": public_config(cfg)})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+
+    def do_DELETE(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        m = re.match(r"^/api/skills/([^/]+)$", path)
+        if m:
+            sid = m.group(1)
+            if not SKILL_NAME_RE.match(sid):
+                self._send_json({"ok": False, "error": "invalid skill id"}, HTTPStatus.BAD_REQUEST)
+                return
+            target = SKILLS_DIR / sid
+            if not target.is_dir():
+                self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+                return
+            shutil.rmtree(target)
+            self._send_json({"ok": True, "deleted": sid})
+            return
+        self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+
+    def do_POST(self) -> None:  # noqa: N802
+        parsed = urlparse(self.path)
+        path = unquote(parsed.path)
+        try:
+            body = _read_json_body(self)
+        except Exception as e:
+            self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/skills/import":
+            source = (body.get("source") if isinstance(body, dict) else None) or "user"
+            skill_id = (body.get("id") if isinstance(body, dict) else None) or ""
+            if source not in SOURCE_ROOTS:
+                self._send_json({"ok": False, "error": "source must be user|builtin"}, HTTPStatus.BAD_REQUEST)
+                return
+            if not SKILL_NAME_RE.match(skill_id):
+                self._send_json({"ok": False, "error": "invalid skill id"}, HTTPStatus.BAD_REQUEST)
+                return
+            src = SOURCE_ROOTS[source] / skill_id
+            if not (src / "SKILL.md").is_file():
+                self._send_json({"ok": False, "error": f"skill not found: {source}/{skill_id}"}, HTTPStatus.NOT_FOUND)
+                return
+            SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+            dest = SKILLS_DIR / skill_id
+            if dest.exists():
+                shutil.rmtree(dest)
+            shutil.copytree(src, dest)
+            self._send_json({"ok": True, "skill": load_skill_bundle(skill_id)})
+            return
+
+        if path == "/api/chat":
+            result = run_chat(body if isinstance(body, dict) else {})
+            status = 200 if result.get("ok") else HTTPStatus.BAD_REQUEST
+            self._send_json(result, status)
+            return
+
+        self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Embody eval static + agent chat server")
+    parser.add_argument("port", nargs="?", type=int, default=6006)
+    parser.add_argument("--bind", default="0.0.0.0")
+    args = parser.parse_args()
+    SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+    refresh = ROOT / "scripts" / "refresh_data_index.py"
+    if refresh.is_file():
+        subprocess.run([sys.executable, str(refresh)], check=False)
+    httpd = ThreadingHTTPServer((args.bind, args.port), Handler)
+    print(f"Serving {ROOT} on http://{args.bind}:{args.port}/ (agent API enabled)", flush=True)
+    print(f"Skills dir: {SKILLS_DIR}", flush=True)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        print("\nbye", flush=True)
+
+
+if __name__ == "__main__":
+    main()
