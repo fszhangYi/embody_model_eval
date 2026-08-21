@@ -509,7 +509,7 @@
       <summary><span class="tip" data-tip="play" tabindex="0">播放控制</span></summary>
       <div class="body">
         <div class="btn-grid">
-          <button id="btnPlay" type="button">播放</button>
+          <button id="btnPlay" type="button" title="空格：播放 / 暂停">播放</button>
           <button id="btnReset" type="button">重置</button>
         </div>
         <div class="ctrl-block">
@@ -915,7 +915,7 @@ const TERM_GLOSSARY = {
   },
   play: {
     title: '播放控制',
-    body: '按数据 FPS×速度倍率逐帧播放。帧滑条可 scrub；下方热力轴按 TCP e_p 着色，点击跳帧。',
+    body: '按数据 FPS×速度倍率逐帧播放。空格键切换播放/暂停；帧滑条可 scrub；下方热力轴按 TCP e_p 着色，点击跳帧。',
   },
   frame: {
     title: '帧索引 t',
@@ -3005,6 +3005,14 @@ try {
     const b = document.getElementById('btnPlay');
     b.textContent = playing ? '暂停' : '播放';
     b.classList.toggle('active', playing);
+  });
+  // 空格：播放 / 暂停共用同一快捷键（输入框内不拦截）
+  window.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' && e.key !== ' ') return;
+    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) return;
+    e.preventDefault();
+    document.getElementById('btnPlay').click();
   });
   document.getElementById('btnReset').addEventListener('click', () => {
     playing = false;
