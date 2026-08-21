@@ -5,9 +5,10 @@ Schema matches existing viewer payloads (meta / series / frames), including
 optional meta.goal_pose for TCP task metrics.
 
 Examples:
-  python3 scripts/gen_sim_episodes.py
+  python3 scripts/gen_sim_episodes.py --short
+  python3 scripts/gen_sim_episodes.py --preset
   python3 scripts/gen_sim_episodes.py --suite 20260819 --count 4 --start 2
-  python3 scripts/gen_sim_episodes.py --suite 20260405 --count 3 --start 1
+  python3 scripts/gen_sim_episodes.py --suite demo --count 3 --n-frames 8 --overwrite
 """
 
 from __future__ import annotations
@@ -201,12 +202,38 @@ def main() -> int:
         action="store_true",
         help="default demo layout: 20260819 (ep2-5) + 20260405 (ep1-3)",
     )
+    ap.add_argument(
+        "--short",
+        action="store_true",
+        help="write/overwrite short demos (5–10 frames) under short/ + refresh existing suites",
+    )
     args = ap.parse_args()
 
-    jobs: list[tuple[str, int, int, float, str]] = []
-    # (suite, ep_idx, seed, error_scale, policy)
+    jobs: list[tuple[str, int, int, float, str, int]] = []
+    # (suite, ep_idx, seed, error_scale, policy, n_frames)
 
-    if args.preset or not args.suites:
+    if args.short:
+        short_specs = [
+            # suite, ep, scale, policy, n_frames
+            ("short", 1, 1.00, "baseline", 5),
+            ("short", 2, 1.20, "baseline", 6),
+            ("short", 3, 0.85, "act_v1", 7),
+            ("short", 4, 1.35, "act_v1", 8),
+            ("short", 5, 0.95, "pi0_demo", 9),
+            ("short", 6, 1.10, "teleop_ref", 10),
+            ("20260819", 1, 1.00, "baseline", 8),
+            ("20260819", 2, 0.85, "baseline", 6),
+            ("20260819", 3, 1.15, "baseline", 10),
+            ("20260819", 4, 1.40, "act_v1", 5),
+            ("20260819", 5, 0.70, "act_v1", 7),
+            ("20260405", 1, 1.00, "teleop_ref", 6),
+            ("20260405", 2, 1.25, "teleop_ref", 9),
+            ("20260405", 3, 0.90, "pi0_demo", 5),
+        ]
+        for i, (suite, ep_idx, scale, policy, n_frames) in enumerate(short_specs):
+            jobs.append((suite, ep_idx, args.seed_base + 300 + i * 13, scale, policy, n_frames))
+        args.overwrite = True
+    elif args.preset or not args.suites:
         # Keep existing 20260819/episode_1.json; add more variants.
         for i, (ep_idx, scale, policy) in enumerate(
             [
@@ -217,7 +244,7 @@ def main() -> int:
             ],
             start=0,
         ):
-            jobs.append(("20260819", ep_idx, args.seed_base + 100 + i, scale, policy))
+            jobs.append(("20260819", ep_idx, args.seed_base + 100 + i, scale, policy, args.n_frames))
         for i, (ep_idx, scale, policy) in enumerate(
             [
                 (1, 1.00, "teleop_ref"),
@@ -226,7 +253,7 @@ def main() -> int:
             ],
             start=0,
         ):
-            jobs.append(("20260405", ep_idx, args.seed_base + 200 + i, scale, policy))
+            jobs.append(("20260405", ep_idx, args.seed_base + 200 + i, scale, policy, args.n_frames))
     else:
         count = args.count or 3
         for suite in args.suites:
@@ -234,17 +261,21 @@ def main() -> int:
                 ep_idx = args.start + k
                 scale = 0.8 + 0.2 * ((k % 5) + 1)
                 policy = "baseline" if k % 2 == 0 else "act_v1"
-                jobs.append((suite, ep_idx, args.seed_base + ep_idx * 17, scale, policy))
+                # Spread 5–10 frames when caller asks for short n_frames default via --n-frames
+                n_frames = args.n_frames
+                if n_frames <= 10:
+                    n_frames = 5 + (k % 6)
+                jobs.append((suite, ep_idx, args.seed_base + ep_idx * 17, scale, policy, n_frames))
 
     written = []
     skipped = []
-    for suite, ep_idx, seed, scale, policy in jobs:
+    for suite, ep_idx, seed, scale, policy, n_frames in jobs:
         out = DATA / suite / f"episode_{ep_idx}.json"
         if out.is_file() and not args.overwrite:
             skipped.append(str(out.relative_to(ROOT)))
             continue
         ep = simulate_episode(
-            args.n_frames,
+            n_frames,
             seed,
             error_scale=scale,
             fps=args.fps,
@@ -256,13 +287,13 @@ def main() -> int:
         goal["pos"]["y"] = round(0.01 * ((ep_idx % 3) - 1), 3)
         payload = build_payload(
             ep,
-            title=f"SO-100 模拟评测 · {suite} · episode_{ep_idx}",
+            title=f"SO-100 模拟评测 · {suite} · episode_{ep_idx} ({n_frames}帧)",
             policy=policy,
             model=policy,
             goal_pose=goal,
         )
         write_episode(out, payload)
-        written.append(str(out.relative_to(ROOT)))
+        written.append(f"{out.relative_to(ROOT)} (n={n_frames})")
 
     print(f"wrote {len(written)} file(s)")
     for p in written:

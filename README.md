@@ -33,7 +33,8 @@ embody_model_eval/
 ├── data/                   # 比对数据（按套件分子目录）
 │   ├── index.json          # 启动时由 serve.sh 实时刷新
 │   ├── 20260819/episode_*.json
-│   └── 20260405/episode_*.json
+│   ├── 20260405/episode_*.json
+│   └── short/episode_*.json   # 5–10 帧短轨迹
 ├── vendor/                 # 离线前端依赖（Three / Chart.js / urdf-loader）
 ├── scripts/
 │   ├── batch_score.py      # 批量跑分 + 门禁
@@ -82,9 +83,10 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 - 批量生成模拟数据：
 
 ```bash
-python3 scripts/gen_sim_episodes.py --preset
+python3 scripts/gen_sim_episodes.py --short          # 5–10 帧短轨迹（推荐演示）
+python3 scripts/gen_sim_episodes.py --preset         # 较长默认布局
 # 或指定套件：
-python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --overwrite
+python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --n-frames 8 --overwrite
 ```
 
 字段说明：
