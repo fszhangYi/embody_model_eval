@@ -1,7 +1,7 @@
 /**
  * AI Chat tab — skill picker + multi-turn chat + agent link (standalone).
  */
-import { mountPageNav } from './nav_pages.js';
+import { mountPageNav } from './nav_pages.js?v=4';
 
 const $ = (sel) => document.querySelector(sel);
 const STORAGE_KEY = 'embody_chat_v1';

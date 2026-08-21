@@ -38,7 +38,10 @@
     color: var(--text);
   }
   header {
+    position: relative;
+    z-index: 2147483000;
     padding: 18px 22px 8px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+    overflow: visible;
   }
   header h1 { margin: 0; font-size: 1.15rem; }
   header a { color: var(--accent); font-size: 0.85rem; }
@@ -195,7 +198,7 @@ import {
 } from './robots_registry.js';
 import { hasObservation, getCameras } from './obs_align.js';
 import { analyzeTaskEpisode, outcomeTagClass } from './task_events.js';
-import { mountPageNav } from './nav_pages.js';
+import { mountPageNav } from './nav_pages.js?v=4';
 
 mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'hub' });
 

@@ -40,6 +40,8 @@ export const PAGES = [
   },
 ];
 
+const PAGE_NAV_Z = '2147483000';
+
 export function resolveCurrentPageId(pathname = location.pathname) {
   const base = pathname.split('/').pop() || '';
   if (/hub\.html$/i.test(base)) return 'hub';
@@ -53,6 +55,8 @@ export function resolveCurrentPageId(pathname = location.pathname) {
 
 /**
  * Mount a dropdown page switcher into `root`.
+ * Menu is portaled to document.body with position:fixed so Hub cards /
+ * animated stacking contexts cannot cover it.
  * @param {HTMLElement} root
  * @param {{ currentId?: string }} [opts]
  */
@@ -67,33 +71,52 @@ export function mountPageNav(root, opts = {}) {
       <span class="page-nav-label">${current.short || current.label}</span>
       <span class="page-nav-caret" aria-hidden="true">▾</span>
     </button>
-    <div class="page-nav-menu" id="pageNavMenu" role="menu" hidden>
-      ${PAGES.map((p) => `
-        <a role="menuitem" class="page-nav-item${p.id === currentId ? ' active' : ''}"
-           href="${p.href}" data-page="${p.id}">
-          <span class="page-nav-item-title">${p.label}</span>
-          <span class="page-nav-item-desc">${p.desc || ''}</span>
-        </a>
-      `).join('')}
-    </div>
   `;
 
   const btn = root.querySelector('#pageNavBtn');
-  const menu = root.querySelector('#pageNavMenu');
+  const menu = document.createElement('div');
+  menu.id = 'pageNavMenu';
+  menu.className = 'page-nav-menu page-nav-menu-portal';
+  menu.setAttribute('role', 'menu');
+  menu.hidden = true;
+  menu.innerHTML = PAGES.map((p) => `
+    <a role="menuitem" class="page-nav-item${p.id === currentId ? ' active' : ''}"
+       href="${p.href}" data-page="${p.id}">
+      <span class="page-nav-item-title">${p.label}</span>
+      <span class="page-nav-item-desc">${p.desc || ''}</span>
+    </a>
+  `).join('');
+  document.body.appendChild(menu);
+
+  const placeMenu = () => {
+    const rect = btn.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = `${Math.round(rect.bottom + 6)}px`;
+    menu.style.right = `${Math.round(Math.max(8, window.innerWidth - rect.right))}px`;
+    menu.style.left = 'auto';
+    menu.style.zIndex = PAGE_NAV_Z;
+  };
+
   const setOpen = (open) => {
     menu.hidden = !open;
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
     root.classList.toggle('open', open);
+    if (open) placeMenu();
   };
 
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     setOpen(menu.hidden);
   });
-  document.addEventListener('click', (e) => {
-    if (!root.contains(e.target)) setOpen(false);
-  });
+  menu.addEventListener('click', (e) => e.stopPropagation());
+  document.addEventListener('click', () => setOpen(false));
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') setOpen(false);
   });
+  window.addEventListener('resize', () => {
+    if (!menu.hidden) placeMenu();
+  });
+  window.addEventListener('scroll', () => {
+    if (!menu.hidden) placeMenu();
+  }, true);
 }

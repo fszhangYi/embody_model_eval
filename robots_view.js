@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import URDFLoader from 'urdf-loader';
-import { mountPageNav } from './nav_pages.js';
+import { mountPageNav } from './nav_pages.js?v=4';
 import {
   loadRobotRegistry,
   listRobots,

@@ -15,14 +15,53 @@
 /* —— Page switcher: never covered —— */
 .hud.topbar,
 header {
+  position: relative;
   z-index: var(--z-page-nav) !important;
+  overflow: visible !important;
 }
 .page-nav {
   position: relative !important;
   z-index: var(--z-page-nav) !important;
 }
-.page-nav-menu {
+.page-nav-menu,
+.page-nav-menu-portal {
   z-index: var(--z-page-nav) !important;
+}
+.page-nav-menu-portal {
+  position: fixed !important;
+  min-width: 220px;
+  padding: 6px;
+  background: rgba(18, 26, 38, 0.98);
+  border: 1px solid rgba(58, 77, 102, 0.75);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.page-nav-menu-portal .page-nav-item {
+  display: block;
+  padding: 8px 10px;
+  border-radius: 8px;
+  text-decoration: none;
+  color: #e7ecf3;
+}
+.page-nav-menu-portal .page-nav-item:hover {
+  background: rgba(61, 214, 198, 0.1);
+}
+.page-nav-menu-portal .page-nav-item.active {
+  background: rgba(61, 214, 198, 0.14);
+  outline: 1px solid rgba(61, 214, 198, 0.35);
+}
+.page-nav-menu-portal .page-nav-item-title {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 560;
+}
+.page-nav-menu-portal .page-nav-item-desc {
+  display: block;
+  margin-top: 2px;
+  font-size: 0.68rem;
+  color: #8b9bb4;
 }
 
 /* —— Ambient wash (very soft, matches existing radial bg) —— */
@@ -52,6 +91,10 @@ body::before {
 @keyframes ui-rise {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: none; }
+}
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @keyframes ui-fade {
   from { opacity: 0; }
@@ -104,14 +147,15 @@ header h1::after,
   to   { transform: scaleX(1); opacity: 1; }
 }
 
-main,
-.layout,
-.panel,
-.card,
-.side,
-#nodeSide {
-  animation: ui-rise var(--motion-slow) var(--motion-ease) both;
-}
+  /* Prefer opacity-only enter on content so transform stacking cannot cover page-nav */
+  main,
+  .layout,
+  .panel,
+  .card,
+  .side,
+  #nodeSide {
+    animation: ui-fade-in var(--motion-slow) var(--motion-ease) both;
+  }
 main { animation-delay: 40ms; }
 .layout > .panel:nth-child(1) { animation-delay: 60ms; }
 .layout > .panel:nth-child(2),
