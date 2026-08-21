@@ -121,6 +121,37 @@
     font-size: 0.72rem; color: var(--muted); flex-shrink: 0;
   }
   .pill .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+
+  .page-nav { position: relative; flex-shrink: 0; }
+  .page-nav-btn {
+    cursor: pointer; gap: 6px;
+    color: var(--text); text-decoration: none;
+    font: inherit; font-size: 0.72rem;
+  }
+  .page-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .page-nav.open .page-nav-btn { border-color: var(--accent); color: var(--accent); }
+  .page-nav-caret { opacity: 0.7; font-size: 0.65rem; }
+  .page-nav-menu {
+    position: absolute; top: calc(100% + 6px); right: 0;
+    min-width: 220px; padding: 6px;
+    background: rgba(18, 26, 38, 0.96);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+    z-index: 30;
+  }
+  .page-nav-item {
+    display: block; padding: 8px 10px; border-radius: 8px;
+    text-decoration: none; color: var(--text);
+  }
+  .page-nav-item:hover { background: rgba(61,214,198,0.1); }
+  .page-nav-item.active {
+    background: rgba(61,214,198,0.14);
+    outline: 1px solid rgba(61,214,198,0.35);
+  }
+  .page-nav-item-title { display: block; font-size: 0.8rem; font-weight: 560; }
+  .page-nav-item-desc { display: block; margin-top: 2px; font-size: 0.68rem; color: var(--muted); }
   .rec-pill {
     display: none; align-items: center; gap: 6px;
     padding: 4px 10px; border-radius: 999px;
@@ -497,7 +528,7 @@
     <i class="dot" style="background:var(--gt)"></i><span class="tip" data-tip="gt" tabindex="0">GT</span>
     <i class="dot" style="background:var(--pred)"></i><span class="tip" data-tip="pred" tabindex="0">pred</span>
   </span>
-  <a class="pill tip" href="./hub.html" data-tip="hub" style="text-decoration:none;color:inherit" tabindex="0">Hub · 多episode</a>
+  <div id="pageNavRoot" class="tip" data-tip="pages" tabindex="0"></div>
 </div>
 
 <div class="robot-guard" id="robotGuard" role="alert"></div>
@@ -510,7 +541,7 @@
       <div class="body">
         <div class="btn-grid">
           <button id="btnPlay" type="button" title="空格：播放 / 暂停">播放</button>
-          <button id="btnReset" type="button">重置</button>
+          <button id="btnReset" type="button" title="Home：回到第 0 帧">重置</button>
         </div>
         <div class="ctrl-block">
           <div class="ctrl-label"><span class="tip" data-tip="frame" tabindex="0">帧</span><strong id="frameLabel">t=0</strong></div>
@@ -578,11 +609,11 @@
       <summary><span class="tip" data-tip="record" tabindex="0">录制</span></summary>
       <div class="body">
         <div class="btn-grid triple">
-          <button id="btnRecStart" type="button">开始</button>
-          <button id="btnRecStop" class="danger" type="button" disabled>停止</button>
-          <button id="btnRecSave" type="button" disabled>保存</button>
+          <button id="btnRecStart" type="button" title="快捷键 R：开始录制">开始</button>
+          <button id="btnRecStop" class="danger" type="button" disabled title="快捷键 T：停止录制">停止</button>
+          <button id="btnRecSave" type="button" disabled title="快捷键 S：保存录制">保存</button>
         </div>
-        <div class="rec-status" id="recStatus">未录制 · 保存为 WebM</div>
+        <div class="rec-status" id="recStatus">未录制 · WebM · 快捷键 R/T/S</div>
       </div>
     </details>
 
@@ -794,6 +825,9 @@ import {
   buildObjectTcpDistances,
   resolveGoalAtFrame,
 } from './task_events.js';
+import { mountPageNav } from './nav_pages.js';
+
+mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'eval' });
 
 const DEG2RAD = Math.PI / 180;
 const COLOR_CUR = 0x9ca3af;
@@ -910,12 +944,20 @@ const TERM_GLOSSARY = {
     body: '模型预测的下一时刻关节 / TCP（蓝色）。与 GT 的差即策略误差，是本页评测核心。',
   },
   hub: {
-    title: 'Hub · 多 episode',
-    body: '跨多条轨迹 / 多模型的汇总对比页。在 data/ 下按套件分子目录，Hub 选框切换套件并加载其中全部合法 episode JSON。',
+    title: 'Hub · 汇总',
+    body: '跨多条轨迹 / 多模型的汇总对比页。在顶栏「页面」菜单中打开；按 data/<suite> 加载合法 episode。',
+  },
+  pages: {
+    title: '页面切换',
+    body: '顶栏下拉入口，可在单轨迹评测、Hub 汇总等页面间跳转。后续新 tab 会登记到同一菜单（nav_pages.js）。',
   },
   play: {
     title: '播放控制',
-    body: '按数据 FPS×速度倍率逐帧播放。空格键切换播放/暂停；帧滑条可 scrub；下方热力轴按 TCP e_p 着色，点击跳帧。',
+    body: '空格：播放/暂停；←/→：上一帧/下一帧；Home：重置到第 0 帧。下方热力轴按 TCP e_p 着色，点击跳帧。',
+  },
+  record: {
+    title: '录制',
+    body: '把当前 3D 画布录成 WebM。快捷键：R 开始 · T 停止 · S 保存（输入框内不触发）。',
   },
   frame: {
     title: '帧索引 t',
@@ -990,10 +1032,6 @@ const TERM_GLOSSARY = {
   object_pose: {
     title: '物体 / 夹取目标位姿 (G30)',
     body: 'frames[].objects 与可选 frames[].goal_pose 动态目标序列；曲线为 pred TCP 到物体/grasp 的距离（mm）。',
-  },
-  record: {
-    title: '录制',
-    body: '把当前 3D 画布录成 WebM，便于汇报或对比不同模型回放。',
   },
   gate: {
     title: '导出 / 门禁',
@@ -3006,14 +3044,6 @@ try {
     b.textContent = playing ? '暂停' : '播放';
     b.classList.toggle('active', playing);
   });
-  // 空格：播放 / 暂停共用同一快捷键（输入框内不拦截）
-  window.addEventListener('keydown', (e) => {
-    if (e.code !== 'Space' && e.key !== ' ') return;
-    const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : '';
-    if (tag === 'input' || tag === 'textarea' || tag === 'select' || e.target?.isContentEditable) return;
-    e.preventDefault();
-    document.getElementById('btnPlay').click();
-  });
   document.getElementById('btnReset').addEventListener('click', () => {
     playing = false;
     document.getElementById('btnPlay').textContent = '播放';
@@ -3028,6 +3058,68 @@ try {
   const recStatus = document.getElementById('recStatus');
   const recPill = document.getElementById('recPill');
   const recTimerEl = document.getElementById('recTimer');
+
+  function isTypingTarget(el) {
+    if (!el) return false;
+    const tag = (el.tagName || '').toLowerCase();
+    return tag === 'input' || tag === 'textarea' || tag === 'select' || el.isContentEditable;
+  }
+
+  function setPlaying(on) {
+    playing = !!on;
+    const b = document.getElementById('btnPlay');
+    b.textContent = playing ? '暂停' : '播放';
+    b.classList.toggle('active', playing);
+  }
+
+  function stepFrame(delta) {
+    setPlaying(false);
+    const n = meta.n_frames;
+    const next = Math.max(0, Math.min(n - 1, frameIdx + delta));
+    showFrame(next);
+  }
+
+  // 快捷键：空格播放/暂停；←/→ 切帧；R/T/S 录制；Home 重置
+  window.addEventListener('keydown', (e) => {
+    if (isTypingTarget(e.target)) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+
+    if (e.code === 'Space' || e.key === ' ') {
+      e.preventDefault();
+      document.getElementById('btnPlay').click();
+      return;
+    }
+    if (e.code === 'ArrowLeft' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      stepFrame(-1);
+      return;
+    }
+    if (e.code === 'ArrowRight' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      stepFrame(1);
+      return;
+    }
+    if (e.code === 'Home' || e.key === 'Home') {
+      e.preventDefault();
+      document.getElementById('btnReset').click();
+      return;
+    }
+    const key = (e.key || '').toLowerCase();
+    if (key === 'r' && !e.shiftKey) {
+      e.preventDefault();
+      if (!btnRecStart.disabled) btnRecStart.click();
+      return;
+    }
+    if (key === 't') {
+      e.preventDefault();
+      if (!btnRecStop.disabled) btnRecStop.click();
+      return;
+    }
+    if (key === 's') {
+      e.preventDefault();
+      if (!btnRecSave.disabled) btnRecSave.click();
+    }
+  });
 
   let mediaRecorder = null;
   let recChunks = [];

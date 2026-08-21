@@ -38,11 +38,50 @@
     color: var(--text);
   }
   header {
-    padding: 18px 22px 8px; display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap;
+    padding: 18px 22px 8px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
   }
   header h1 { margin: 0; font-size: 1.15rem; }
   header a { color: var(--accent); font-size: 0.85rem; }
   .muted { color: var(--muted); font-size: 0.8rem; }
+  .header-spacer { flex: 1; min-width: 8px; }
+
+  .pill {
+    display: inline-flex; gap: 8px; align-items: center;
+    padding: 4px 10px; border-radius: 999px;
+    border: 1px solid var(--border); background: rgba(26,35,50,0.7);
+    font-size: 0.72rem; color: var(--muted); flex-shrink: 0;
+  }
+  .page-nav { position: relative; flex-shrink: 0; }
+  .page-nav-btn {
+    cursor: pointer; gap: 6px;
+    color: var(--text); text-decoration: none;
+    font: inherit; font-size: 0.72rem;
+    background: rgba(26,35,50,0.7);
+  }
+  .page-nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .page-nav.open .page-nav-btn { border-color: var(--accent); color: var(--accent); }
+  .page-nav-caret { opacity: 0.7; font-size: 0.65rem; }
+  .page-nav-menu {
+    position: absolute; top: calc(100% + 6px); right: 0;
+    min-width: 220px; padding: 6px;
+    background: rgba(18, 26, 38, 0.96);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    box-shadow: 0 12px 28px rgba(0,0,0,0.4);
+    backdrop-filter: blur(10px);
+    z-index: 30;
+  }
+  .page-nav-item {
+    display: block; padding: 8px 10px; border-radius: 8px;
+    text-decoration: none; color: var(--text);
+  }
+  .page-nav-item:hover { background: rgba(61,214,198,0.1); }
+  .page-nav-item.active {
+    background: rgba(61,214,198,0.14);
+    outline: 1px solid rgba(61,214,198,0.35);
+  }
+  .page-nav-item-title { display: block; font-size: 0.8rem; font-weight: 560; }
+  .page-nav-item-desc { display: block; margin-top: 2px; font-size: 0.68rem; color: var(--muted); }
   main { padding: 8px 22px 40px; width: 100%; max-width: none; box-sizing: border-box; }
   .card {
     background: rgba(18,26,38,0.92); border: 1px solid var(--border);
@@ -80,7 +119,8 @@
 <header>
   <h1>Embody Eval Hub</h1>
   <span class="muted">C13 多 episode 汇总 · C14 多模型对比 · 数据目录 <code>data/&lt;suite&gt;/</code></span>
-  <a href="./index.html">← 单轨迹评测页</a>
+  <span class="header-spacer"></span>
+  <div id="pageNavRoot"></div>
 </header>
 <main>
   <div class="card">
@@ -154,6 +194,9 @@ import {
 } from './robots_registry.js';
 import { hasObservation, getCameras } from './obs_align.js';
 import { analyzeTaskEpisode, outcomeTagClass } from './task_events.js';
+import { mountPageNav } from './nav_pages.js';
+
+mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'hub' });
 
 const DATA_ROOT = './data';
 const SKIP_JSON = new Set(['index.json', 'catalog.json', 'manifest.json']);
