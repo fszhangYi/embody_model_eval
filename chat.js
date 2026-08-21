@@ -8,11 +8,6 @@ const STORAGE_KEY = 'embody_chat_v1';
 
 mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'chat' });
 
-const GROUP_LABELS = {
-  skills: '~/.cursor/skills',
-  'skills-cursor': '~/.cursor/skills-cursor',
-};
-
 const state = {
   managed: [],
   sources: {},
@@ -336,37 +331,26 @@ function renderSources() {
   const box = $('#sourceSkills');
   const scanned = state.scanned || [];
   if (!scanned.length) {
-    box.innerHTML = '<p class="muted empty">未扫描到 ~/.cursor 下的 skill</p>';
+    box.innerHTML = '<p class="muted empty">暂无可导入 skill</p>';
     return;
   }
 
-  const byGroup = new Map();
+  const parts = ['<div class="source-block">'];
   for (const s of scanned) {
-    const g = s.group || 'other';
-    if (!byGroup.has(g)) byGroup.set(g, []);
-    byGroup.get(g).push(s);
+    const already = state.managed.some((m) => m.id === s.id);
+    const desc = (s.description || '').trim();
+    parts.push(`
+      <div class="source-row" title="${escAttr(desc)}">
+        <div>
+          <div class="skill-name">${escHtml(s.name || s.id)}</div>
+          ${desc ? `<div class="skill-desc">${escHtml(desc)}</div>` : ''}
+        </div>
+        <button type="button" class="btn-sm" data-rel="${escAttr(s.rel)}" ${already ? 'disabled' : ''}>
+          ${already ? '已托管' : '导入'}
+        </button>
+      </div>`);
   }
-
-  const parts = [];
-  for (const [group, skills] of byGroup) {
-    const label = GROUP_LABELS[group] || `~/.cursor/${group}`;
-    parts.push(`<div class="source-block"><div class="source-group">${label} · ${skills.length}</div>`);
-    for (const s of skills) {
-      const already = state.managed.some((m) => m.id === s.id);
-      const desc = (s.description || '').trim();
-      parts.push(`
-        <div class="source-row" title="${escAttr(desc)}">
-          <div>
-            <div class="skill-name">${escHtml(s.name || s.id)}</div>
-            <div class="skill-id">${escHtml(s.rel || s.id)}</div>
-          </div>
-          <button type="button" class="btn-sm" data-rel="${escAttr(s.rel)}" ${already ? 'disabled' : ''}>
-            ${already ? '已托管' : '导入'}
-          </button>
-        </div>`);
-    }
-    parts.push('</div>');
-  }
+  parts.push('</div>');
   box.innerHTML = parts.join('');
 
   box.querySelectorAll('button[data-rel]').forEach((btn) => {
@@ -436,7 +420,7 @@ async function refreshSkills() {
   const head = $('#sourceHeading');
   if (head) {
     const n = state.scanned.length;
-    head.textContent = n ? `~/.cursor Skills · ${n}` : '~/.cursor Skills';
+    head.textContent = n ? `可导入 · ${n}` : '可导入';
   }
   for (const id of [...state.selected]) {
     if (!state.managed.some((s) => s.id === id)) state.selected.delete(id);

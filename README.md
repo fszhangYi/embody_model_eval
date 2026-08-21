@@ -97,7 +97,7 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 
 打开 `chat.html`（顶栏「页面」→ Chat）：
 
-1. **托管 Skills**：服务端目录 `agent_skills/`；左侧会扫描并列出本机 `~/.cursor` 下的 skill（`skills` / `skills-cursor` 等），可一键导入；点击 skill 名称可预览 `SKILL.md`
+1. **托管 Skills**：服务端目录 `agent_skills/`；左侧列出可导入的本机 skill，一键导入；点击 skill 名称可预览 `SKILL.md`
 2. **勾选 skill** 后填写诉求（可用模板芯片）；**多轮对话**会自动带上本页上文
 3. **回执操作**：复制全文 / 复制 dry_run 打包 JSON / 导出单条或整段 Markdown
 4. **Agent 链接模式**
