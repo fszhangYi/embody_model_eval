@@ -9,6 +9,7 @@
   :root {
     --bg: #0b1018; --panel: #121a26; --border: #3a4d66;
     --text: #e7ecf3; --muted: #8b9bb4; --accent: #3dd6c6; --danger: #f87171;
+    --spark: #f0b429; --spark-dim: rgba(240, 180, 41, 0.14);
     --scrollbar-thumb: rgba(61, 214, 198, 0.45);
     --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
     --scrollbar-size: 4px;
@@ -34,7 +35,8 @@
   body {
     margin: 0; min-height: 100vh;
     font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
-    background: radial-gradient(900px 480px at 10% -10%, #1a2740, var(--bg) 55%);
+    background: radial-gradient(900px 480px at 10% -10%, #1a2740, var(--bg) 55%),
+    radial-gradient(480px 280px at 95% 0%, rgba(240, 180, 41, 0.07), transparent 65%);
     color: var(--text);
   }
   header {
@@ -117,7 +119,7 @@
   }
   details.adv > summary:hover { color: var(--accent); }
 </style>
-<link rel="stylesheet" href="./css/ui_motion.css"/>
+<link rel="stylesheet" href="./css/ui_motion.css?v=3"/>
 </head>
 <body>
 <header>
