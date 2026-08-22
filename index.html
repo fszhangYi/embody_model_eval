@@ -887,7 +887,7 @@ import {
   applyExtrinsicsToPose,
 } from './js/kinematics_cal.js';
 import { sampleCollisionClouds, analyzeHullCollisions, makeCollisionCloudPoints, syncCollisionCloudPoints, setRobotMeshesVisible } from './js/collision_geom.js?v=2';
-import { mountPageNav } from './js/nav_pages.js?v=4';
+import { mountPageNav } from './js/nav_pages.js?v=5';
 import { mountViewTools } from './js/view_tools.js';
 
 mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'eval' });
@@ -1057,7 +1057,7 @@ const TERM_GLOSSARY = {
   },
   pages: {
     title: '页面切换',
-    body: '顶栏下拉入口，可在单轨迹评测、Hub 汇总等页面间跳转。后续新 tab 会登记到同一菜单（nav_pages.js）。',
+    body: '顶栏下拉入口，可在单轨迹评测、Hub 汇总等页面间跳转。快捷键：Alt+1…N 直达；Alt+←/→（或 Alt+[/]）切换相邻页；输入框内不生效。',
   },
   play: {
     title: '播放控制',

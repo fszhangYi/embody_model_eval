@@ -53,10 +53,24 @@ export function resolveCurrentPageId(pathname = location.pathname) {
   return hit?.id || 'eval';
 }
 
+function isTypingTarget(el) {
+  if (!el || !(el instanceof Element)) return false;
+  const tag = el.tagName;
+  if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  if (el.isContentEditable) return true;
+  return !!el.closest?.('[contenteditable="true"]');
+}
+
 /**
  * Mount a dropdown page switcher into `root`.
  * Menu is portaled to document.body with position:fixed so Hub cards /
  * animated stacking contexts cannot cover it.
+ *
+ * Shortcuts (ignored while typing in inputs):
+ *   Alt+1…N  → jump to page N
+ *   Alt+←/→  or Alt+[/] → previous / next page
+ *   Esc      → close menu
+ *
  * @param {HTMLElement} root
  * @param {{ currentId?: string }} [opts]
  */
@@ -64,10 +78,12 @@ export function mountPageNav(root, opts = {}) {
   if (!root) return;
   const currentId = opts.currentId || resolveCurrentPageId();
   const current = PAGES.find((p) => p.id === currentId) || PAGES[0];
+  const currentIdx = Math.max(0, PAGES.findIndex((p) => p.id === currentId));
 
   root.classList.add('page-nav');
   root.innerHTML = `
-    <button type="button" class="page-nav-btn pill" id="pageNavBtn" aria-expanded="false" aria-haspopup="true" title="切换页面">
+    <button type="button" class="page-nav-btn pill" id="pageNavBtn" aria-expanded="false" aria-haspopup="true"
+      title="切换页面 · Alt+1–${PAGES.length} 直达 · Alt+←/→ 上/下页">
       <span class="page-nav-label">${current.short || current.label}</span>
       <span class="page-nav-caret" aria-hidden="true">▾</span>
     </button>
@@ -79,14 +95,46 @@ export function mountPageNav(root, opts = {}) {
   menu.className = 'page-nav-menu page-nav-menu-portal';
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
-  menu.innerHTML = PAGES.map((p) => `
+  menu.innerHTML = PAGES.map((p, i) => `
     <a role="menuitem" class="page-nav-item${p.id === currentId ? ' active' : ''}"
-       href="${p.href}" data-page="${p.id}">
-      <span class="page-nav-item-title">${p.label}</span>
-      <span class="page-nav-item-desc">${p.desc || ''}</span>
+       href="${p.href}" data-page="${p.id}" data-idx="${i}"
+       title="Alt+${i + 1}">
+      <span class="page-nav-item-main">
+        <span class="page-nav-item-title">${p.label}</span>
+        <span class="page-nav-item-desc">${p.desc || ''}</span>
+      </span>
+      <kbd class="page-nav-item-key">Alt+${i + 1}</kbd>
     </a>
-  `).join('');
+  `).join('') + `
+    <div class="page-nav-hint" role="note">Alt+← / Alt+→ 切换相邻页</div>
+  `;
   document.body.appendChild(menu);
+
+  // Inject shared shortcut styles once (pages may not share a CSS file for this).
+  if (!document.getElementById('pageNavShortcutStyle')) {
+    const style = document.createElement('style');
+    style.id = 'pageNavShortcutStyle';
+    style.textContent = `
+      .page-nav-item {
+        display: flex; align-items: flex-start; justify-content: space-between;
+        gap: 12px;
+      }
+      .page-nav-item-main { min-width: 0; flex: 1; }
+      .page-nav-item-key {
+        flex-shrink: 0; margin-top: 2px; padding: 1px 6px;
+        font: 560 0.65rem/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: var(--muted, #8b9bb4);
+        border: 1px solid rgba(148,163,184,0.35);
+        border-radius: 4px; background: rgba(15,23,42,0.35);
+      }
+      .page-nav-hint {
+        margin: 4px 8px 8px; padding-top: 6px;
+        border-top: 1px solid rgba(148,163,184,0.2);
+        font-size: 0.65rem; color: var(--muted, #8b9bb4);
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
   const placeMenu = () => {
     const rect = btn.getBoundingClientRect();
@@ -104,15 +152,55 @@ export function mountPageNav(root, opts = {}) {
     if (open) placeMenu();
   };
 
+  const goToIndex = (idx) => {
+    if (idx < 0 || idx >= PAGES.length) return;
+    const page = PAGES[idx];
+    if (!page || page.id === currentId) return;
+    location.href = page.href;
+  };
+
+  const cycle = (delta) => {
+    const next = (currentIdx + delta + PAGES.length) % PAGES.length;
+    goToIndex(next);
+  };
+
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     setOpen(menu.hidden);
   });
   menu.addEventListener('click', (e) => e.stopPropagation());
   document.addEventListener('click', () => setOpen(false));
+
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') setOpen(false);
+    if (e.key === 'Escape') {
+      setOpen(false);
+      return;
+    }
+    if (isTypingTarget(e.target)) return;
+    if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+
+    // Alt+1 … Alt+N
+    const digit = e.code?.startsWith('Digit')
+      ? Number(e.code.slice(5))
+      : (/^[1-9]$/.test(e.key) ? Number(e.key) : 0);
+    if (digit >= 1 && digit <= PAGES.length) {
+      e.preventDefault();
+      goToIndex(digit - 1);
+      return;
+    }
+
+    // Alt+← / Alt+[  previous · Alt+→ / Alt+]  next
+    if (e.key === 'ArrowLeft' || e.key === '[' || e.code === 'BracketLeft') {
+      e.preventDefault();
+      cycle(-1);
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === ']' || e.code === 'BracketRight') {
+      e.preventDefault();
+      cycle(1);
+    }
   });
+
   window.addEventListener('resize', () => {
     if (!menu.hidden) placeMenu();
   });
