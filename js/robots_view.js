@@ -385,7 +385,7 @@ function populateSelect(defaultId) {
 
 async function boot() {
   setLoadProgress(0.02, '加载机械臂配置…', 'robots.json');
-  registry = await loadRobotRegistry('./robots.json');
+  registry = await loadRobotRegistry('./config/robots.json');
   profiles = Object.keys(registry.robots || {}).map((id) =>
     normalizeRobotProfile(registry.robots[id], id),
   );

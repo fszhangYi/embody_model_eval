@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Embody · 模型数据流画布</title>
-<link rel="icon" href="./favicon.svg" type="image/svg+xml"/>
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml"/>
 <style>
   :root {
     --bg: #0b1018; --panel: #121a26; --border: #3a4d66;
@@ -302,7 +302,7 @@
     display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
   }
 </style>
-<link rel="stylesheet" href="./ui_motion.css"/>
+<link rel="stylesheet" href="./css/ui_motion.css"/>
 </head>
 <body>
 <header>
@@ -364,8 +364,8 @@
 </div>
 
 <script type="module">
-import { mountPageNav } from './nav_pages.js?v=4';
-import { FlowCanvas, PIPELINES, graphKey } from './pipeline_flow.js?v=3';
+import { mountPageNav } from './js/nav_pages.js?v=4';
+import { FlowCanvas, PIPELINES, graphKey } from './js/pipeline_flow.js?v=3';
 
 mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'pipeline' });
 

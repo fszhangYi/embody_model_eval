@@ -68,7 +68,7 @@ def _clip(x: float, lo: float, hi: float) -> float:
 
 
 def _load_robot_joints(robot_id: str) -> list[str]:
-    robots_path = ROOT / "robots.json"
+    robots_path = ROOT / "config" / "robots.json"
     if robots_path.is_file():
         reg = json.loads(robots_path.read_text(encoding="utf-8"))
         profile = (reg.get("robots") or {}).get(robot_id) or {}
@@ -381,7 +381,7 @@ def main() -> int:
     if args.with_obs is None:
         args.with_obs = bool(args.short or args.ec616)
 
-    robots_path = ROOT / "robots.json"
+    robots_path = ROOT / "config" / "robots.json"
     if robots_path.is_file():
         reg = json.loads(robots_path.read_text(encoding="utf-8"))
         known_robots = reg.get("robots") or {}

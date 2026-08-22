@@ -7,7 +7,7 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 - 左侧：播放 / 显隐 / 观测相机同步 (F) / 画布录制（WebM）
 - 右侧：概览、误差、关节轨迹、任务/接触 (G)、数值（可折叠）
 - Hub：多 episode 汇总，含 obs / 任务列与机型防呆；顶栏「页面」菜单可扩展更多 tab
-- 机械臂 3D：`robots.html` 下拉选择 `robots.json` 中的机型并浏览 URDF（当前含 SO-100 / EC616）
+- 机械臂 3D：`robots.html` 下拉选择 `config/robots.json` 中的机型并浏览 URDF（当前含 SO-100 / EC616）
 - 数据流：`pipeline.html` ComfyUI 风格画布，演示 ACT/SAM2 训练与推理张量流向
 - AI Chat：`chat.html` 选择托管 Skill、配置 Agent 链接，将诉求与 skill 一并发送并显示回执
 
@@ -29,53 +29,38 @@ python3 -V   # 建议 >= 3.10，推荐 3.12
 
 ```
 embody_model_eval/
-├── index.html              # 评测主页面（按 meta.robot 加载机型）
-├── hub.html                # 多 episode 汇总（按 data/<suite> 选择）
-├── pipeline.html           # 模型训练/推理数据流画布（演示）
-├── pipeline_flow.js        # 节点图引擎与 ACT/SAM2 流向定义
-├── chat.html               # AI Chat：选 skill + 配 Agent 链接 + 回执
-├── chat.js                 # Chat 前端逻辑
-├── nav_pages.js            # 顶栏「页面」菜单（后续 tab 在此登记）
-├── agent_skills/           # 服务端托管的 Agent Skills（可从 ~/.cursor/skills 导入）
-├── robots.html             # 机械臂 3D 浏览（下拉选机型）
-├── robots_view.js          # 机型 3D 页逻辑
-├── robots.json             # 当前可用机械臂型号注册表
-├── robots_registry.js      # 机型解析辅助
-├── tcp_metrics.js          # TCP / 任务误差指标
-├── obs_align.js            # 观测对齐 / 相机同步 / 叠加 (F)
-├── task_events.js          # 任务成功 / 接触事件 / 动态目标 (G)
-├── export_report.js        # HTML/JSON 报告与门禁
-├── favicon.svg / .ico / .png
+├── index.html · hub.html · pipeline.html · chat.html · robots.html   # 页面入口（根路径不变）
+├── serve.sh · requirements.txt · README.md
+├── js/                     # 前端模块
+│   ├── nav_pages.js · view_tools.js · robots_registry.js
+│   ├── tcp_metrics.js · obs_align.js · task_events.js
+│   ├── export_report.js · advanced_cd.js
+│   ├── chat.js · robots_view.js · pipeline_flow.js
+├── css/
+│   └── ui_motion.css       # 全站动效
+├── assets/                 # favicon.svg / .ico / .png
+├── config/
+│   ├── robots.json         # 机型注册表
+│   └── episodes.manifest.example.json
+├── models/                 # URDF + mesh
+│   ├── so100_colored/      # SO-100 灰/红/蓝
+│   └── ec616/              # EC616 + 平行夹爪
 ├── data/                   # 比对数据（按套件分子目录）
 │   ├── index.json          # 启动时由 serve.sh 实时刷新
-│   ├── 20260819/episode_*.json + media/   # SO-100 观测+任务演示 (F/G)
-│   ├── 20260405/episode_*.json + media/
-│   ├── short/episode_*.json + media/      # SO-100 5–10 帧短轨迹
-│   ├── ec616_short/episode_*.json + media/# EC616 短轨迹（平行夹爪 8 关节）
-│   └── ec616/episode_*.json + media/      # EC616 中长轨迹评测
-├── vendor/                 # 离线前端依赖（Three / Chart.js / urdf-loader）
-├── scripts/
-│   ├── batch_score.py      # 批量跑分 + 门禁
-│   ├── bag_to_compare.py   # 日志 → episode JSON
-│   ├── gen_sim_episodes.py # 生成模拟 episode（--short / --ec616）
-│   ├── gen_obs_media.py    # 为套件补 RGB/Depth/注意力媒体 (F)
-│   ├── gen_task_demo.py    # 为套件补任务成功/接触/物体轨迹 (G)
-│   ├── refresh_data_index.py
-│   ├── agent_server.py     # 静态托管 + /api/skills · /api/chat
+│   ├── 20260819/ · 20260405/ · short/
+│   └── ec616_short/ · ec616/
+├── vendor/                 # 离线 Three / Chart.js / urdf-loader
+├── scripts/                # Python 工具与 agent_server
+│   ├── agent_server.py     # 静态托管 + /api/*
+│   ├── batch_score.py · bag_to_compare.py · refresh_data_index.py
+│   ├── gen_sim_episodes.py · gen_obs_media.py · gen_task_demo.py
 │   └── thresholds.example.json
-├── serve.sh                # 启动 agent_server（默认 :6006）
-├── requirements.txt
-├── README.md
-├── so100_colored/          # SO-100 灰 / 红 / 蓝 URDF + STL
-│   ├── so100_cur.urdf
-│   ├── so100_gt.urdf
-│   ├── so100_pred.urdf
-│   └── assets/*.stl
-└── ec616/                  # EC616 URDF + meshes（第二机型）
-    ├── ec616.urdf
-    └── meshes/*.STL
+├── agent_skills/           # Chat 托管 Skills
+└── docs/
+    └── TODOLIST.md
 ```
-目录自包含：着色 URDF 为独有资源，mesh 为从 SO-ARM100 复制的 STL（无软链）。
+
+页面入口仍在仓库根目录，便于 `./serve.sh` 后直接打开 `/`、`/hub.html` 等；脚本与资源按职责分目录。
 
 ## 启动
 
@@ -117,7 +102,7 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 
 每个文件需含：
 
-- `meta.robot`：**必填**，机械臂型号 id（须在 `robots.json` 登记，当前为 `so100` / `ec616`）
+- `meta.robot`：**必填**，机械臂型号 id（须在 `config/robots.json` 登记，当前为 `so100` / `ec616`）
 - `meta` + 非空 `frames[]`（帧内 `current` / `next_gt` / `next_pred` 关节角）
 
 字段说明：
@@ -129,7 +114,7 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 
 ## 机械臂型号（多机型扩展）
 
-可用机型集中登记在根目录 **`robots.json`**。每条 episode 必须声明：
+可用机型集中登记在 **`config/robots.json`**。每条 episode 必须声明：
 
 ```json
 "meta": { "robot": "so100", ... }
@@ -137,14 +122,14 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 
 页面启动时：
 
-1. 读取 `robots.json`
+1. 读取 `config/robots.json`
 2. 用 `meta.robot` 解析机型配置（URDF 三色路径、`joint_names`、root 旋转、TCP link/offset）
 3. 自动加载对应模型；若 id 未登记或缺失则报错
 
 新增机型时：
 
-1. 准备三份着色 URDF + mesh，放入独立目录（参考 `so100_colored/`）
-2. 在 `robots.json` 的 `robots` 下增加一条配置（`id` / `urdf` / `joint_names` / `tcp` / `root_rotation_euler_xyz_deg`）
+1. 准备三份着色 URDF + mesh，放入 `models/` 下独立目录（参考 `models/so100_colored/`）
+2. 在 `config/robots.json` 的 `robots` 下增加一条配置（`id` / `urdf` / `joint_names` / `tcp` / `root_rotation_euler_xyz_deg`）
 3. 生成或转换数据时写上 `"meta": { "robot": "<新id>" }`
 
 - **单轨迹页**默认加载 `./data/20260819/episode_1.json`；可用 `?data=./data/<suite>/xxx.json` 指定。
@@ -198,7 +183,7 @@ python /root/autodl-tmp/act_robot/scripts/compare_pose_offline.py \
 - **观测 (F)**：左侧「观测相机 (F)」与帧滑条/播放同步；Hub Episode 表有 `obs` 列
 - **任务 (G)**：右侧「任务 / 接触 (G)」看 success/fail、力事件与动态物体；Hub 有「任务」列
 - **TCP**：gripper 系指尖中点约 `(0, -0.1062, 0)`；任务误差需 `meta.goal_pose = {pos, quat, approach?}`
-- **浏览器图标**：`favicon.svg` / `favicon.ico` / `favicon.png`（标签页与书签）
+- **浏览器图标**：`assets/favicon.svg` / `.ico` / `.png`（标签页与书签）
 
 ## 批量跑分与真机日志
 
@@ -329,15 +314,15 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 
 ## 更换 / 新增机械臂
 
-机型不再写死在 `index.html`，而是登记在 **`robots.json`**，由 episode 的 **`meta.robot`** 自动选用。
+机型不再写死在 `index.html`，而是登记在 **`config/robots.json`**，由 episode 的 **`meta.robot`** 自动选用。
 
 ### 1. 准备模型资源
 
 1. 准备新臂的 URDF（或已展开的 `.urdf`）及 mesh。
 2. 复制出 **三份** URDF（或改材质），分别给 current / GT / predict 着色（灰 / 红 / 蓝）。
-3. 放到仓库根下独立目录（如 `my_arm_colored/`），保证 URDF 内 mesh 相对路径正确。
+3. 放到 `models/` 下独立目录（如 `models/my_arm_colored/`），保证 URDF 内 mesh 相对路径正确。
 
-### 2. 登记到 `robots.json`
+### 2. 登记到 `config/robots.json`
 
 在 `robots.robots` 增加一条，例如：
 
@@ -347,9 +332,9 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
   "label": "My Arm",
   "joint_names": ["j1", "j2", "..."],
   "urdf": {
-    "cur": "./my_arm_colored/xxx_cur.urdf",
-    "gt": "./my_arm_colored/xxx_gt.urdf",
-    "pred": "./my_arm_colored/xxx_pred.urdf"
+    "cur": "./models/my_arm_colored/xxx_cur.urdf",
+    "gt": "./models/my_arm_colored/xxx_gt.urdf",
+    "pred": "./models/my_arm_colored/xxx_pred.urdf"
   },
   "root_rotation_euler_xyz_deg": [-90, 0, 0],
   "tcp": { "link": "gripper", "offset": [0, -0.1062, 0] }
@@ -360,7 +345,7 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 
 | 位置 | 改什么 |
 |------|--------|
-| episode JSON → `meta.robot` | 填 `robots.json` 中的 id |
+| episode JSON → `meta.robot` | 填 `config/robots.json` 中的 id |
 | episode JSON → `meta.joint_names` | 与该机型 `joint_names` **同名、同序** |
 | `frames[].current|next_gt|next_pred` | 长度与顺序 = 该机型关节数（默认单位：度） |
 

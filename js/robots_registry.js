@@ -2,7 +2,7 @@
  * Robot registry helpers — load robots.json and resolve episode meta.robot.
  */
 
-export async function loadRobotRegistry(path = './robots.json') {
+export async function loadRobotRegistry(path = './config/robots.json') {
   const res = await fetch(path + (path.includes('?') ? '&' : '?') + '_=' + Date.now());
   if (!res.ok) throw new Error(`无法加载机械臂配置 ${path} → ${res.status}`);
   const cfg = await res.json();

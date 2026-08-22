@@ -93,7 +93,7 @@ def _resolve_robot(meta: dict) -> tuple[str, list[str], dict, str, tuple[float, 
     contact_link = "gripper"
     object_xyz = (0.20, 0.00, 0.022)
 
-    robots_path = ROOT / "robots.json"
+    robots_path = ROOT / "config" / "robots.json"
     if robots_path.is_file():
         reg = json.loads(robots_path.read_text(encoding="utf-8"))
         profile = (reg.get("robots") or {}).get(robot_id) or {}

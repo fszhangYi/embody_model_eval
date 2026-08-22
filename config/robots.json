@@ -14,10 +14,10 @@
         "gripper"
       ],
       "urdf": {
-        "preview": "./so100_colored/so100_cur.urdf",
-        "cur": "./so100_colored/so100_cur.urdf",
-        "gt": "./so100_colored/so100_gt.urdf",
-        "pred": "./so100_colored/so100_pred.urdf"
+        "preview": "./models/so100_colored/so100_cur.urdf",
+        "cur": "./models/so100_colored/so100_cur.urdf",
+        "gt": "./models/so100_colored/so100_gt.urdf",
+        "pred": "./models/so100_colored/so100_pred.urdf"
       },
       "root_rotation_euler_xyz_deg": [-90, 0, 0],
       "model_scale": 1,
@@ -47,10 +47,10 @@
         "gripper_2_joint"
       ],
       "urdf": {
-        "preview": "./ec616/ec616.urdf?v=14",
-        "cur": "./ec616/ec616.urdf?v=14",
-        "gt": "./ec616/ec616.urdf?v=14",
-        "pred": "./ec616/ec616.urdf?v=14"
+        "preview": "./models/ec616/ec616.urdf?v=14",
+        "cur": "./models/ec616/ec616.urdf?v=14",
+        "gt": "./models/ec616/ec616.urdf?v=14",
+        "pred": "./models/ec616/ec616.urdf?v=14"
       },
       "root_rotation_euler_xyz_deg": [-90, 0, 0],
       "model_scale": 0.38,

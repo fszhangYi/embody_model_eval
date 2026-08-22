@@ -4,9 +4,9 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Embody Model Eval</title>
-<link rel="icon" href="./favicon.svg" type="image/svg+xml"/>
-<link rel="icon" href="./favicon.ico" sizes="any"/>
-<link rel="apple-touch-icon" href="./favicon.png"/>
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml"/>
+<link rel="icon" href="./assets/favicon.ico" sizes="any"/>
+<link rel="apple-touch-icon" href="./assets/favicon.png"/>
 
 <script src="./vendor/chart/chart.umd.min.js"></script>
 <script type="importmap">
@@ -553,7 +553,7 @@
     .rail-panels { width: min(300px, 86vw); }
   }
 </style>
-<link rel="stylesheet" href="./ui_motion.css"/>
+<link rel="stylesheet" href="./css/ui_motion.css"/>
 </head>
 <body>
 
@@ -847,39 +847,39 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import URDFLoader from 'urdf-loader';
-import { computeTcpMetrics, formatSummaryLine } from './tcp_metrics.js';
+import { computeTcpMetrics, formatSummaryLine } from './js/tcp_metrics.js';
 import {
   buildReportHtml,
   buildReportSummary,
   evaluateGates,
   downloadText,
-} from './export_report.js';
+} from './js/export_report.js';
 import {
   validateUnitsAndActionMode,
   extractProvenance,
   classifyFailureFrames,
   buildSafetyReport,
-} from './advanced_cd.js';
+} from './js/advanced_cd.js';
 import {
   loadRobotRegistry,
   resolveRobot,
   jointNamesMismatch,
   validateEpisodeAgainstRegistry,
-} from './robots_registry.js';
+} from './js/robots_registry.js';
 import {
   hasObservation,
   getCameras,
   auditObsAlignment,
   paintObsCanvas,
-} from './obs_align.js';
+} from './js/obs_align.js';
 import {
   analyzeTaskEpisode,
   outcomeTagClass,
   buildObjectTcpDistances,
   resolveGoalAtFrame,
-} from './task_events.js';
-import { mountPageNav } from './nav_pages.js?v=4';
-import { mountViewTools } from './view_tools.js';
+} from './js/task_events.js';
+import { mountPageNav } from './js/nav_pages.js?v=4';
+import { mountViewTools } from './js/view_tools.js';
 
 mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'eval' });
 
@@ -2714,7 +2714,7 @@ try {
   const names = meta.joint_names;
 
   setLoadProgress(0.04, '加载机械臂配置…', 'robots.json');
-  const robotRegistry = await loadRobotRegistry('./robots.json');
+  const robotRegistry = await loadRobotRegistry('./config/robots.json');
   const guard = validateEpisodeAgainstRegistry(DATA, robotRegistry);
   if (!guard.ok) {
     throw new Error(`机型防呆校验失败：${guard.errors.join('；')}`);

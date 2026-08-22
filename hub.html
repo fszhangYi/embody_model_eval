@@ -4,7 +4,7 @@
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <title>Embody Eval Hub · C 高级汇总</title>
-<link rel="icon" href="./favicon.svg" type="image/svg+xml"/>
+<link rel="icon" href="./assets/favicon.svg" type="image/svg+xml"/>
 <style>
   :root {
     --bg: #0b1018; --panel: #121a26; --border: #3a4d66;
@@ -117,7 +117,7 @@
   }
   details.adv > summary:hover { color: var(--accent); }
 </style>
-<link rel="stylesheet" href="./ui_motion.css"/>
+<link rel="stylesheet" href="./css/ui_motion.css"/>
 </head>
 <body>
 <header>
@@ -190,15 +190,15 @@
 </main>
 
 <script type="module">
-import { summarizeEpisode, aggregateEpisodes, extractProvenance } from './advanced_cd.js';
+import { summarizeEpisode, aggregateEpisodes, extractProvenance } from './js/advanced_cd.js';
 import {
   loadRobotRegistry,
   listRobots,
   validateEpisodeAgainstRegistry,
-} from './robots_registry.js';
-import { hasObservation, getCameras } from './obs_align.js';
-import { analyzeTaskEpisode, outcomeTagClass } from './task_events.js';
-import { mountPageNav } from './nav_pages.js?v=4';
+} from './js/robots_registry.js';
+import { hasObservation, getCameras } from './js/obs_align.js';
+import { analyzeTaskEpisode, outcomeTagClass } from './js/task_events.js';
+import { mountPageNav } from './js/nav_pages.js?v=4';
 
 mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'hub' });
 
@@ -224,7 +224,7 @@ async function fetchJson(path) {
 
 async function ensureRobotRegistry() {
   if (robotRegistry) return robotRegistry;
-  robotRegistry = await loadRobotRegistry('./robots.json');
+  robotRegistry = await loadRobotRegistry('./config/robots.json');
   return robotRegistry;
 }
 

@@ -200,7 +200,7 @@ def main() -> int:
     ap.add_argument("--ckpt", default=None)
     args = ap.parse_args()
 
-    robots_path = Path(__file__).resolve().parents[1] / "robots.json"
+    robots_path = Path(__file__).resolve().parents[1] / "config" / "robots.json"
     if robots_path.is_file():
         reg = json.loads(robots_path.read_text(encoding="utf-8"))
         if args.robot not in (reg.get("robots") or {}):
