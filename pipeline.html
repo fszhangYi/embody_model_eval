@@ -301,6 +301,36 @@
   .rec-group {
     display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;
   }
+  button.dirty {
+    border-color: rgba(251, 191, 36, 0.65);
+    color: #fbbf24;
+  }
+  .save-status {
+    font-size: 0.72rem; color: var(--muted); max-width: 180px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .save-status.ok { color: var(--accent); }
+  .save-status.err { color: #f87171; }
+  .node-edit-form {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .node-edit-form label {
+    display: flex; flex-direction: column; gap: 4px;
+    font-size: 0.72rem; color: var(--muted);
+  }
+  .node-edit-form input,
+  .node-edit-form select,
+  .node-edit-form textarea {
+    background: #1a2434; color: var(--text);
+    border: 1px solid #354a66; border-radius: 8px;
+    padding: 7px 9px; font: inherit; font-size: 0.8rem;
+  }
+  .node-edit-form textarea {
+    resize: vertical; min-height: 88px; line-height: 1.45;
+  }
+  .node-edit-actions {
+    display: flex; gap: 8px; margin-top: 4px;
+  }
 </style>
 <link rel="stylesheet" href="./css/ui_motion.css"/>
 </head>
@@ -319,6 +349,8 @@
     </div>
     <button type="button" id="btnAnim">流动演示</button>
     <button type="button" id="btnFit">适配视图</button>
+    <button type="button" id="btnSaveGraph" title="将当前四套图（含节点文案与位置）保存到服务器 config/pipeline_graphs.json">保存图</button>
+    <span class="save-status" id="saveStatus"></span>
     <span class="rec-pill" id="recPill"><i class="blink"></i>REC <span id="recTimer">00:00</span></span>
     <div class="rec-group" aria-label="录像">
       <button type="button" id="btnRecStart" title="快捷键 R：开始录制画布">录像</button>
@@ -356,18 +388,28 @@
     </div>
     <ul class="hint-list">
       <li>下拉切换 <strong>SAM2Grasp</strong> 与 <strong>纯 ACT (CVAE)</strong>；再选训练 / 推理。</li>
+      <li><strong>双击节点</strong>可编辑标题 / 类型 / 说明 / 文件；拖动可改位置。</li>
+      <li>顶栏 <strong>保存图</strong> 将改动写入服务器 <code>config/pipeline_graphs.json</code>。</li>
       <li>连线表示张量 / 控制流，结构对齐 <code>act_robot</code> 源码路径。</li>
-      <li>SAM2Grasp：冻 SAM2 + 轻量 ACT 头；纯 ACT：ResNet 骨干端到端 + CVAE。</li>
-      <li>顶栏 <strong>录像</strong> 可录制当前画布为 WebM（快捷键 R 开始 / T 停止 / S 保存）；录制时自动开流动演示。</li>
+      <li>顶栏 <strong>录像</strong> 可录制当前画布为 WebM（快捷键 R 开始 / T 停止 / S 保存）。</li>
     </ul>
   </aside>
 </div>
 
 <script type="module">
 import { mountPageNav } from './js/nav_pages.js?v=5';
-import { FlowCanvas, PIPELINES, graphKey } from './js/pipeline_flow.js?v=3';
+import {
+  FlowCanvas,
+  PIPELINES,
+  graphKey,
+  applyServerGraphs,
+  exportCanonicalGraphs,
+} from './js/pipeline_flow.js?v=4';
 
 mountPageNav(document.getElementById('pageNavRoot'), { currentId: 'pipeline' });
+
+const btnSaveGraph = document.getElementById('btnSaveGraph');
+const saveStatus = document.getElementById('saveStatus');
 
 const flow = new FlowCanvas({
   stage: document.getElementById('flowStage'),
@@ -375,6 +417,13 @@ const flow = new FlowCanvas({
   detailEl: document.getElementById('nodeDetail'),
   titleEl: document.getElementById('graphTitle'),
   blurbEl: document.getElementById('graphBlurb'),
+  onDirtyChange: (dirty) => {
+    btnSaveGraph.classList.toggle('dirty', dirty);
+    if (dirty) {
+      saveStatus.textContent = '有未保存改动';
+      saveStatus.className = 'save-status';
+    }
+  },
 });
 
 const layoutEl = document.getElementById('pipelineLayout');
@@ -416,10 +465,50 @@ function refresh() {
   btnAnim.classList.remove('active');
 }
 
+async function loadServerGraphs() {
+  try {
+    const res = await fetch('/api/pipeline/graphs', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const n = applyServerGraphs(data.graphs || {});
+    if (n > 0) {
+      saveStatus.textContent = `已加载服务器图 ×${n}`;
+      saveStatus.className = 'save-status ok';
+    }
+  } catch (err) {
+    console.warn('pipeline graphs load skipped', err);
+  }
+}
+
+async function saveGraphsToServer() {
+  flow.commitGraphToStore();
+  btnSaveGraph.disabled = true;
+  saveStatus.textContent = '保存中…';
+  saveStatus.className = 'save-status';
+  try {
+    const res = await fetch('/api/pipeline/graphs', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ graphs: exportCanonicalGraphs() }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    flow.markDirty(false);
+    saveStatus.textContent = `已保存 · ${data.path || 'config/pipeline_graphs.json'}`;
+    saveStatus.className = 'save-status ok';
+  } catch (err) {
+    saveStatus.textContent = `保存失败：${err.message || err}`;
+    saveStatus.className = 'save-status err';
+  } finally {
+    btnSaveGraph.disabled = false;
+  }
+}
+
 pipelineSelect.addEventListener('change', refresh);
 btnTrain.addEventListener('click', () => { mode = 'train'; refresh(); });
 btnInfer.addEventListener('click', () => { mode = 'infer'; refresh(); });
 document.getElementById('btnFit').addEventListener('click', () => flow.fitView());
+btnSaveGraph.addEventListener('click', () => { saveGraphsToServer(); });
 btnAnim.addEventListener('click', () => {
   if (flow.animating) {
     flow.stopAnim();
@@ -596,6 +685,7 @@ window.addEventListener('keydown', (e) => {
 
 setRecUI('idle');
 
+await loadServerGraphs();
 refresh();
 </script>
 </body>

@@ -334,6 +334,42 @@ export const GRAPHS = {
   infer: SAM2_INFER,
 };
 
+export const CANONICAL_GRAPH_KEYS = [
+  'sam2grasp_train',
+  'sam2grasp_infer',
+  'act_train',
+  'act_infer',
+];
+
+const KIND_OPTIONS = Object.keys(KIND_COLORS);
+
+function syncAliases() {
+  if (GRAPHS.sam2grasp_train) GRAPHS.train = GRAPHS.sam2grasp_train;
+  if (GRAPHS.sam2grasp_infer) GRAPHS.infer = GRAPHS.sam2grasp_infer;
+}
+
+/** Apply server-saved graph overrides onto in-memory GRAPHS. */
+export function applyServerGraphs(graphs) {
+  if (!graphs || typeof graphs !== 'object') return 0;
+  let n = 0;
+  for (const [k, g] of Object.entries(graphs)) {
+    if (!g || typeof g !== 'object' || !Array.isArray(g.nodes)) continue;
+    GRAPHS[k] = structuredClone(g);
+    n += 1;
+  }
+  syncAliases();
+  return n;
+}
+
+/** Snapshot of editable graphs for PUT /api/pipeline/graphs. */
+export function exportCanonicalGraphs() {
+  const out = {};
+  for (const k of CANONICAL_GRAPH_KEYS) {
+    if (GRAPHS[k]) out[k] = structuredClone(GRAPHS[k]);
+  }
+  return out;
+}
+
 function portKey(side, name) {
   return `${side}:${name}`;
 }
@@ -351,14 +387,19 @@ export class FlowCanvas {
     this.blurbEl = els.blurbEl || null;
 
     this.graph = null;
+    this.graphKey = null;
     this.nodeEls = new Map();
     this.selectedId = null;
+    this.editingId = null;
+    this.dirty = false;
+    this.onDirtyChange = typeof els.onDirtyChange === 'function' ? els.onDirtyChange : null;
     this.animT = 0;
     this.animating = false;
     this.raf = 0;
 
     this.view = { x: 40, y: 40, scale: 1 };
     this._drag = null; // { type:'node'|'pan', id?, ox, oy, vx, vy }
+    this._moved = false;
     this._ro = new ResizeObserver(() => this.resize());
     this._ro.observe(this.stage);
 
@@ -366,6 +407,17 @@ export class FlowCanvas {
     window.addEventListener('pointermove', (e) => this.onPointerMove(e));
     window.addEventListener('pointerup', () => this.onPointerUp());
     this.stage.addEventListener('wheel', (e) => this.onWheel(e), { passive: false });
+  }
+
+  markDirty(on = true) {
+    this.dirty = !!on;
+    this.onDirtyChange?.(this.dirty);
+  }
+
+  commitGraphToStore() {
+    if (!this.graphKey || !this.graph) return;
+    GRAPHS[this.graphKey] = structuredClone(this.graph);
+    syncAliases();
   }
 
   resize() {
@@ -383,7 +435,9 @@ export class FlowCanvas {
   setGraph(key) {
     const g = GRAPHS[key];
     if (!g) return;
+    this.graphKey = key;
     this.graph = structuredClone(g);
+    this.editingId = null;
     if (this.titleEl) {
       this.titleEl.textContent = g.label;
       this.titleEl.setAttribute('title', g.label);
@@ -431,14 +485,23 @@ export class FlowCanvas {
         if (e.button !== 0) return;
         e.stopPropagation();
         this.selectNode(n.id);
+        this._moved = false;
         const rect = el.getBoundingClientRect();
         this._drag = {
           type: 'node',
           id: n.id,
           ox: e.clientX - rect.left,
           oy: e.clientY - rect.top,
+          sx: e.clientX,
+          sy: e.clientY,
         };
         el.setPointerCapture?.(e.pointerId);
+      });
+      el.addEventListener('dblclick', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        this._drag = null;
+        this.openNodeEditor(n.id);
       });
       this.stage.appendChild(el);
       this.nodeEls.set(n.id, el);
@@ -462,14 +525,18 @@ export class FlowCanvas {
   selectNode(id) {
     this.selectedId = id;
     const n = this.graph?.nodes.find((x) => x.id === id) || null;
-    this.showDetail(n);
+    if (this.editingId && this.editingId !== id) {
+      this.editingId = null;
+    }
+    if (this.editingId === id) this.openNodeEditor(id);
+    else this.showDetail(n);
     this.syncNodePositions();
   }
 
   showDetail(n) {
     if (!this.detailEl) return;
     if (!n) {
-      this.detailEl.innerHTML = '<p class="muted">点击节点查看说明；拖动画布空白处平移，滚轮缩放。</p>';
+      this.detailEl.innerHTML = '<p class="muted">点击节点查看说明；双击编辑；拖动画布空白处平移，滚轮缩放。</p>';
       return;
     }
     this.detailEl.innerHTML = `
@@ -478,7 +545,70 @@ export class FlowCanvas {
       <p>${escapeHtml(n.detail || '')}</p>
       ${n.file ? `<p class="mono">↪ ${escapeHtml(n.file)}</p>` : ''}
       <p class="muted">输入：${(n.inputs || []).join(', ') || '—'} · 输出：${(n.outputs || []).join(', ') || '—'}</p>
+      <p class="muted" style="margin-top:10px">双击节点可编辑标题 / 类型 / 说明 / 文件路径。</p>
     `;
+  }
+
+  openNodeEditor(id) {
+    const n = this.nodeById(id);
+    if (!n || !this.detailEl) return;
+    this.editingId = id;
+    this.selectedId = id;
+    this.syncNodePositions();
+    const kindOpts = KIND_OPTIONS.map((k) =>
+      `<option value="${escapeHtml(k)}"${k === n.kind ? ' selected' : ''}>${escapeHtml(k)}</option>`
+    ).join('');
+    this.detailEl.innerHTML = `
+      <form class="node-edit-form" id="nodeEditForm">
+        <div class="detail-kicker" style="color:${KIND_COLORS[n.kind] || '#94a3b8'}">编辑节点 · ${escapeHtml(n.id)}</div>
+        <label>标题
+          <input name="title" type="text" value="${escapeAttr(n.title || '')}" autocomplete="off" />
+        </label>
+        <label>类型
+          <select name="kind">${kindOpts}</select>
+        </label>
+        <label>说明
+          <textarea name="detail" rows="5">${escapeHtml(n.detail || '')}</textarea>
+        </label>
+        <label>文件 / 路径
+          <input name="file" type="text" value="${escapeAttr(n.file || '')}" autocomplete="off" />
+        </label>
+        <div class="node-edit-actions">
+          <button type="submit">应用</button>
+          <button type="button" id="nodeEditCancel">取消</button>
+        </div>
+      </form>
+    `;
+    const form = this.detailEl.querySelector('#nodeEditForm');
+    form?.querySelector('input[name="title"]')?.focus();
+    form?.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const fd = new FormData(form);
+      this.applyNodeEdit(id, {
+        title: String(fd.get('title') || '').trim() || n.title,
+        kind: String(fd.get('kind') || n.kind),
+        detail: String(fd.get('detail') || ''),
+        file: String(fd.get('file') || '').trim(),
+      });
+    });
+    this.detailEl.querySelector('#nodeEditCancel')?.addEventListener('click', () => {
+      this.editingId = null;
+      this.showDetail(this.nodeById(id));
+    });
+  }
+
+  applyNodeEdit(id, patch) {
+    const n = this.nodeById(id);
+    if (!n) return;
+    n.title = patch.title;
+    n.kind = KIND_COLORS[patch.kind] ? patch.kind : n.kind;
+    n.detail = patch.detail;
+    n.file = patch.file;
+    this.editingId = null;
+    this.commitGraphToStore();
+    this.markDirty(true);
+    this.renderNodes();
+    this.selectNode(id);
   }
 
   portAnchor(nodeId, side, portName) {
@@ -597,6 +727,11 @@ export class FlowCanvas {
       return;
     }
     if (this._drag.type === 'node') {
+      if (this._drag.sx != null) {
+        const dx = e.clientX - this._drag.sx;
+        const dy = e.clientY - this._drag.sy;
+        if (dx * dx + dy * dy > 16) this._moved = true;
+      }
       const n = this.nodeById(this._drag.id);
       const el = this.nodeEls.get(this._drag.id);
       if (!n || !el) return;
@@ -609,7 +744,12 @@ export class FlowCanvas {
   }
 
   onPointerUp() {
+    if (this._drag?.type === 'node' && this._moved) {
+      this.commitGraphToStore();
+      this.markDirty(true);
+    }
     this._drag = null;
+    this._moved = false;
   }
 
   onWheel(e) {
@@ -851,6 +991,10 @@ function escapeHtml(s) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;');
+}
+
+function escapeAttr(s) {
+  return escapeHtml(s).replace(/'/g, '&#39;');
 }
 
 /** @param {CanvasRenderingContext2D} ctx */

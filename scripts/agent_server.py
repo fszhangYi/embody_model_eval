@@ -10,6 +10,8 @@ Endpoints:
   DELETE /api/skills/<id>
   GET    /api/agent/config
   PUT    /api/agent/config
+  GET    /api/pipeline/graphs
+  PUT    /api/pipeline/graphs
   POST   /api/chat   (body: message, skillIds?, history?, config?)
 """
 
@@ -34,7 +36,9 @@ from urllib.parse import unquote, urlparse
 ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = ROOT / "agent_skills"
 CONFIG_PATH = SKILLS_DIR / ".agent_config.json"
+PIPELINE_GRAPHS_PATH = ROOT / "config" / "pipeline_graphs.json"
 SKILL_NAME_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
+PIPELINE_GRAPH_KEY_RE = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$")
 
 SOURCE_ROOTS = {
     "user": Path.home() / ".cursor" / "skills",
@@ -210,6 +214,58 @@ def save_config(patch: dict[str, Any]) -> dict[str, Any]:
     SKILLS_DIR.mkdir(parents=True, exist_ok=True)
     CONFIG_PATH.write_text(json.dumps(cfg, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return cfg
+
+
+def load_pipeline_graphs() -> dict[str, Any]:
+    if not PIPELINE_GRAPHS_PATH.is_file():
+        return {}
+    try:
+        data = json.loads(PIPELINE_GRAPHS_PATH.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    graphs = data.get("graphs", data)
+    return graphs if isinstance(graphs, dict) else {}
+
+
+def _validate_pipeline_graph(g: Any) -> dict[str, Any] | None:
+    if not isinstance(g, dict):
+        return None
+    nodes = g.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        return None
+    for n in nodes:
+        if not isinstance(n, dict) or not n.get("id"):
+            return None
+    edges = g.get("edges")
+    if edges is not None and not isinstance(edges, list):
+        return None
+    return g
+
+
+def save_pipeline_graphs(graphs: dict[str, Any]) -> dict[str, Any]:
+    cleaned: dict[str, Any] = {}
+    for key, g in graphs.items():
+        if not isinstance(key, str) or not PIPELINE_GRAPH_KEY_RE.match(key):
+            continue
+        if key in ("train", "infer"):
+            continue
+        valid = _validate_pipeline_graph(g)
+        if valid is None:
+            continue
+        cleaned[key] = valid
+    PIPELINE_GRAPHS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "version": 1,
+        "updated_at": __import__("datetime").datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "graphs": cleaned,
+    }
+    PIPELINE_GRAPHS_PATH.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return cleaned
 
 
 def public_config(cfg: dict[str, Any]) -> dict[str, Any]:
@@ -587,6 +643,17 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/agent/config":
             self._send_json({"ok": True, "config": public_config(load_config())})
             return
+        if path == "/api/pipeline/graphs":
+            graphs = load_pipeline_graphs()
+            self._send_json(
+                {
+                    "ok": True,
+                    "path": str(PIPELINE_GRAPHS_PATH.relative_to(ROOT)),
+                    "graphs": graphs,
+                    "keys": sorted(graphs.keys()),
+                }
+            )
+            return
         super().do_GET()
 
     def do_PUT(self) -> None:  # noqa: N802
@@ -597,6 +664,28 @@ class Handler(SimpleHTTPRequestHandler):
                 body = _read_json_body(self)
                 cfg = save_config(body if isinstance(body, dict) else {})
                 self._send_json({"ok": True, "config": public_config(cfg)})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/api/pipeline/graphs":
+            try:
+                body = _read_json_body(self)
+                raw = body.get("graphs") if isinstance(body, dict) else None
+                if not isinstance(raw, dict):
+                    self._send_json(
+                        {"ok": False, "error": "body.graphs must be an object"},
+                        HTTPStatus.BAD_REQUEST,
+                    )
+                    return
+                saved = save_pipeline_graphs(raw)
+                self._send_json(
+                    {
+                        "ok": True,
+                        "path": str(PIPELINE_GRAPHS_PATH.relative_to(ROOT)),
+                        "keys": sorted(saved.keys()),
+                        "n": len(saved),
+                    }
+                )
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
