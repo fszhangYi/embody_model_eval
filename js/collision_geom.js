@@ -175,3 +175,68 @@ export function analyzeHullCollisions(hullSeries, cfg = {}) {
     method: 'hull',
   };
 }
+
+/**
+ * Create an empty THREE.Points buffer for collision-cloud visualization.
+ * @param {object} THREE
+ * @param {number} colorHex
+ * @param {number} [capacity]
+ */
+export function makeCollisionCloudPoints(THREE, colorHex, capacity = 512) {
+  const geo = new THREE.BufferGeometry();
+  const positions = new Float32Array(capacity * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setDrawRange(0, 0);
+  const mat = new THREE.PointsMaterial({
+    color: colorHex,
+    size: 0.012,
+    sizeAttenuation: true,
+    transparent: true,
+    opacity: 0.95,
+    depthWrite: false,
+  });
+  const pts = new THREE.Points(geo, mat);
+  pts.name = 'collisionCloud';
+  pts.renderOrder = 40;
+  pts.frustumCulled = false;
+  pts.visible = false;
+  pts.userData.capacity = capacity;
+  return pts;
+}
+
+/**
+ * Sample robot collision meshes into a Points object (display / matrixWorld frame).
+ * @returns {number} point count written
+ */
+export function syncCollisionCloudPoints(pointsObj, robot, THREE, opts = {}) {
+  if (!pointsObj || !robot || !THREE) return 0;
+  const clouds = sampleCollisionClouds(robot, THREE, {
+    links: opts.links,
+    maxPointsPerLink: opts.maxPointsPerLink || 28,
+    invScale: opts.invScale != null ? opts.invScale : 1,
+  });
+  const attr = pointsObj.geometry.getAttribute('position');
+  const capacity = attr.count;
+  let n = 0;
+  for (const c of clouds) {
+    for (const p of c.points) {
+      if (n >= capacity) break;
+      attr.setXYZ(n++, p.x, p.y, p.z);
+    }
+    if (n >= capacity) break;
+  }
+  attr.needsUpdate = true;
+  pointsObj.geometry.setDrawRange(0, n);
+  pointsObj.geometry.computeBoundingSphere();
+  pointsObj.userData.nPoints = n;
+  pointsObj.userData.nLinks = clouds.length;
+  return n;
+}
+
+/** Hide / show URDF mesh bodies (keep link transforms for sampling). */
+export function setRobotMeshesVisible(robot, visible) {
+  if (!robot) return;
+  robot.traverse((o) => {
+    if (o.isMesh) o.visible = visible;
+  });
+}

@@ -624,6 +624,9 @@
           <button id="btnTogglePaths" class="toggle on tip" type="button" data-tip="full_path">整段轨迹</button>
           <button id="btnToggleErrArrow" class="toggle on tip" type="button" data-tip="err_arrow">误差矢量</button>
         </div>
+        <div class="btn-grid" style="margin-top:8px">
+          <button id="btnToggleCloud" class="toggle off tip" type="button" data-tip="cloud_view">点云视图</button>
+        </div>
       </div>
     </details>
 
@@ -883,7 +886,7 @@ import {
   resolveBaseExtrinsics,
   applyExtrinsicsToPose,
 } from './js/kinematics_cal.js';
-import { sampleCollisionClouds, analyzeHullCollisions } from './js/collision_geom.js';
+import { sampleCollisionClouds, analyzeHullCollisions, makeCollisionCloudPoints, syncCollisionCloudPoints, setRobotMeshesVisible } from './js/collision_geom.js?v=2';
 import { mountPageNav } from './js/nav_pages.js?v=4';
 import { mountViewTools } from './js/view_tools.js';
 
@@ -1078,7 +1081,7 @@ const TERM_GLOSSARY = {
   },
   visibility: {
     title: '显示机械臂',
-    body: '切换灰/红/蓝三臂显隐，以及整段 TCP 轨迹与 GT→pred 误差矢量，减少画面遮挡。',
+    body: '切换灰/红/蓝三臂显隐，以及整段 TCP 轨迹、误差矢量与点云视图（collision 采样点）。',
   },
   full_path: {
     title: '整段轨迹',
@@ -1087,6 +1090,10 @@ const TERM_GLOSSARY = {
   err_arrow: {
     title: '误差矢量',
     body: '当前帧从 GT TCP 指向 pred TCP 的箭头，直观显示「差在哪个方向、差多远」。',
+  },
+  cloud_view: {
+    title: '点云视图',
+    body: '切换后隐藏实体 mesh，显示当前帧 URDF collision 采样点（与安全栏桌面碰/自碰同一套点云）。灰/红/蓝分别对应三臂。',
   },
   camera: {
     title: '相机',
@@ -1898,6 +1905,13 @@ async function initScene(container, frames, robotCfg) {
   pathLinePred.material.opacity = 0.95;
   scene.add(pathLineCur, pathLineGT, pathLinePred);
 
+  const colCfgInit = robotCfg.collision || {};
+  const cloudCap = Math.max(128, (colCfgInit.links?.length || 8) * (colCfgInit.max_points_per_link || 28));
+  const cloudCur = makeCollisionCloudPoints(THREE, colorCur, cloudCap);
+  const cloudGT = makeCollisionCloudPoints(THREE, colorGt, cloudCap);
+  const cloudPred = makeCollisionCloudPoints(THREE, colorPred, cloudCap);
+  scene.add(cloudCur, cloudGT, cloudPred);
+
   const errArrow = makeErrArrow();
   scene.add(errArrow);
 
@@ -1948,6 +1962,7 @@ async function initScene(container, frames, robotCfg) {
     scatterCur, scatterGT, scatterPred,
     tcpCur, tcpGT, tcpPred,
     pathLineCur, pathLineGT, pathLinePred, errArrow,
+    cloudCur, cloudGT, cloudPred,
     setPathArmColors, applyCameraPreset, updateFollowCam,
     getCamMode: () => camMode,
     setCamMode: (m) => { camMode = m; },
@@ -2943,22 +2958,56 @@ try {
 
   let frameIdx = 0;
   let playing = false;
-  const visibility = { cur: true, gt: true, pred: true, paths: true, errArrow: true };
+  const visibility = { cur: true, gt: true, pred: true, paths: true, errArrow: true, cloudView: false };
+  const cloudSampleOpts = () => {
+    const cfg = ACTIVE_ROBOT?.collision || {};
+    return {
+      links: (cfg.links && cfg.links.length)
+        ? cfg.links
+        : ['base', 'shoulder', 'upper_arm', 'lower_arm', 'wrist', 'gripper'],
+      maxPointsPerLink: cfg.max_points_per_link || 28,
+      invScale: 1,
+    };
+  };
+
+  function refreshCollisionClouds() {
+    if (!visibility.cloudView) return;
+    // Late-loaded STL meshes may reappear; keep them suppressed in cloud mode.
+    setRobotMeshesVisible(world.armCur, false);
+    setRobotMeshesVisible(world.armGT, false);
+    setRobotMeshesVisible(world.armPred, false);
+    const opts = cloudSampleOpts();
+    if (visibility.cur) syncCollisionCloudPoints(world.cloudCur, world.armCur, THREE, opts);
+    if (visibility.gt) syncCollisionCloudPoints(world.cloudGT, world.armGT, THREE, opts);
+    if (visibility.pred) syncCollisionCloudPoints(world.cloudPred, world.armPred, THREE, opts);
+  }
 
   function applyVisibility() {
+    const cloudOn = visibility.cloudView;
+    // Keep arm groups "visible" so FK / matrixWorld still update; hide meshes in cloud mode.
     world.armCur.visible = visibility.cur;
-    world.scatterCur.visible = visibility.cur;
-    world.tcpCur.visible = visibility.cur;
     world.armGT.visible = visibility.gt;
-    world.scatterGT.visible = visibility.gt;
-    world.tcpGT.visible = visibility.gt;
     world.armPred.visible = visibility.pred;
-    world.scatterPred.visible = visibility.pred;
+    setRobotMeshesVisible(world.armCur, visibility.cur && !cloudOn);
+    setRobotMeshesVisible(world.armGT, visibility.gt && !cloudOn);
+    setRobotMeshesVisible(world.armPred, visibility.pred && !cloudOn);
+
+    world.scatterCur.visible = visibility.cur && !cloudOn;
+    world.tcpCur.visible = visibility.cur;
+    world.scatterGT.visible = visibility.gt && !cloudOn;
+    world.tcpGT.visible = visibility.gt;
+    world.scatterPred.visible = visibility.pred && !cloudOn;
     world.tcpPred.visible = visibility.pred;
-    world.pathLineCur.visible = visibility.paths && visibility.cur;
-    world.pathLineGT.visible = visibility.paths && visibility.gt;
-    world.pathLinePred.visible = visibility.paths && visibility.pred;
-    world.errArrow.visible = visibility.errArrow;
+
+    world.pathLineCur.visible = visibility.paths && visibility.cur && !cloudOn;
+    world.pathLineGT.visible = visibility.paths && visibility.gt && !cloudOn;
+    world.pathLinePred.visible = visibility.paths && visibility.pred && !cloudOn;
+    world.errArrow.visible = visibility.errArrow && !cloudOn;
+
+    world.cloudCur.visible = cloudOn && visibility.cur;
+    world.cloudGT.visible = cloudOn && visibility.gt;
+    world.cloudPred.visible = cloudOn && visibility.pred;
+    if (cloudOn) refreshCollisionClouds();
   }
 
   function wireToggle(btnId, key) {
@@ -2975,6 +3024,7 @@ try {
   wireToggle('btnTogglePred', 'pred');
   wireToggle('btnTogglePaths', 'paths');
   wireToggle('btnToggleErrArrow', 'errArrow');
+  wireToggle('btnToggleCloud', 'cloudView');
 
   const camHint = document.getElementById('camHint');
   function setCamButtons(activeId) {
@@ -3093,7 +3143,9 @@ try {
     syncTcpAxes(world.tcpPred, world.armPred);
 
     syncErrArrow(world.errArrow, world.paths.gt[i], world.paths.pred[i]);
-    if (!visibility.errArrow) world.errArrow.visible = false;
+    if (!visibility.errArrow || visibility.cloudView) world.errArrow.visible = false;
+
+    if (visibility.cloudView) refreshCollisionClouds();
 
     world.updateFollowCam(world.paths.gt[i]);
 

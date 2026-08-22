@@ -40,6 +40,26 @@
       ]
     },
     {
+      "id": "koch",
+      "episodes": [
+        "episode_1.json",
+        "episode_2.json",
+        "episode_3.json",
+        "episode_4.json"
+      ]
+    },
+    {
+      "id": "koch_short",
+      "episodes": [
+        "episode_1.json",
+        "episode_2.json",
+        "episode_3.json",
+        "episode_4.json",
+        "episode_5.json",
+        "episode_6.json"
+      ]
+    },
+    {
       "id": "short",
       "episodes": [
         "episode_1.json",

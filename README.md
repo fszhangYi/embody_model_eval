@@ -326,7 +326,7 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 
 | # | 项 | 状态 |
 |---|----|------|
-| I34 | 多机型入库（URDF 限位 + collision + 标定 TCP） | ✅ so100 / ec616 / koch；`joint_limits` + `collision` + `tcp.calibration` |
+| I34 | 多机型入库（URDF 限位 + collision + 标定 TCP） | ✅ so100 / ec616 / koch（各自独立 mesh）；`joint_limits` + `collision` + `tcp.calibration` |
 | I35 | URDF collision / 凸包点云碰撞 | ✅ 替换纯球粗检；阈值在 `robots.json` |
 | I36 | 手眼 / 基座位姿标定进 meta 并参与 TCP | ✅ `meta.tcp_calibration` + `meta.extrinsics.base_in_world` |
 

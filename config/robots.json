@@ -117,43 +117,43 @@
     "koch": {
       "id": "koch",
       "label": "Koch v1.1",
-      "description": "与 SO-100 同构桌面臂（共享 mesh）；独立限位带与 TCP 标定，用于多机型门禁对照",
+      "description": "Koch v1.1 follower（独立 URDF/mesh，来源 s1lent4gnt/koch-v1-1 simulation）；6 关节含夹爪 joint_6",
       "joint_names": [
-        "shoulder_pan",
-        "shoulder_lift",
-        "elbow_flex",
-        "wrist_flex",
-        "wrist_roll",
-        "gripper"
+        "joint_1",
+        "joint_2",
+        "joint_3",
+        "joint_4",
+        "joint_5",
+        "joint_6"
       ],
       "joint_limits": {
-        "shoulder_pan": { "lower": -100, "upper": 100, "velocity": 45 },
-        "shoulder_lift": { "lower": -10, "upper": 190, "velocity": 45 },
-        "elbow_flex": { "lower": -170, "upper": 0, "velocity": 45 },
-        "wrist_flex": { "lower": -130, "upper": 60, "velocity": 45 },
-        "wrist_roll": { "lower": -170, "upper": 170, "velocity": 45 },
-        "gripper": { "lower": -10, "upper": 100, "velocity": 45 }
+        "joint_1": { "lower": -180, "upper": 180, "velocity": 57.3 },
+        "joint_2": { "lower": -180, "upper": 180, "velocity": 57.3 },
+        "joint_3": { "lower": -180, "upper": 180, "velocity": 57.3 },
+        "joint_4": { "lower": -180, "upper": 180, "velocity": 57.3 },
+        "joint_5": { "lower": -180, "upper": 180, "velocity": 57.3 },
+        "joint_6": { "lower": -140.4, "upper": 1.83, "velocity": 57.3 }
       },
       "urdf": {
-        "preview": "./models/so100_colored/so100_cur.urdf",
-        "cur": "./models/so100_colored/so100_cur.urdf",
-        "gt": "./models/so100_colored/so100_gt.urdf",
-        "pred": "./models/so100_colored/so100_pred.urdf"
+        "preview": "./models/koch/koch.urdf?v=1",
+        "cur": "./models/koch/koch.urdf?v=1",
+        "gt": "./models/koch/koch.urdf?v=1",
+        "pred": "./models/koch/koch.urdf?v=1"
       },
       "root_rotation_euler_xyz_deg": [-90, 0, 0],
       "model_scale": 1,
       "tcp": {
-        "link": "gripper",
-        "offset": [0, -0.1062, 0],
-        "calibration": { "xyz": [0, -0.002, 0.001], "rpy_deg": [0, 0, 0] }
+        "link": "link_6",
+        "offset": [0, 0, 0.02],
+        "calibration": { "xyz": [0, 0, 0], "rpy_deg": [0, 0, 0] }
       },
       "collision": {
         "method": "hull",
-        "links": ["base", "shoulder", "upper_arm", "lower_arm", "wrist", "gripper"],
+        "links": ["base_link", "link_1", "link_2", "link_3", "link_4", "link_5", "link_6"],
         "skip_adjacent": 1,
         "table_z": 0,
         "table_clearance_m": 0.008,
-        "self_min_dist_m": 0.022,
+        "self_min_dist_m": 0.018,
         "max_points_per_link": 28
       },
       "colors": {
@@ -161,7 +161,7 @@
         "gt": "#ef4444",
         "pred": "#3b82f6"
       },
-      "home_q_deg": [0, -85, 85, 0, 0, 0]
+      "home_q_deg": [0, -40, 70, 40, 0, -20]
     }
   },
   "_comment": "机型注册表。episode.meta.robot 须为 robots 中的 id。joint_limits 单位：度 / 度每秒（由 URDF rad 换算）。collision.method=hull 时评测页对 URDF collision mesh 采样凸包点云做桌面/自碰。tcp.calibration 与 meta.tcp_calibration / meta.extrinsics 参与 TCP 世界系。model_scale 仅影响 3D 显示。"

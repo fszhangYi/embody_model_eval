@@ -216,6 +216,63 @@ def simulate_episode_ec616(
     }
 
 
+def simulate_episode_koch(
+    n_frames: int,
+    seed: int,
+    *,
+    error_scale: float = 1.0,
+    fps: int = 30,
+    source: str = "simulate",
+) -> dict:
+    """Synthetic Koch v1.1 trajectories (6 joints, deg) around a desktop home pose."""
+    rng = random.Random(seed)
+    t = [2.0 * math.pi * i / max(1, n_frames - 1) for i in range(n_frames)]
+    dof = 6
+    center = [0.0, -40.0, 70.0, 40.0, 0.0, -20.0]
+
+    gt_actions: list[list[float]] = []
+    for ti in t:
+        gt_actions.append(
+            [
+                center[0] + 20.0 * math.sin(ti),
+                center[1] + 12.0 * math.sin(ti * 0.7 + 0.3),
+                center[2] + 15.0 * math.cos(ti * 0.85),
+                center[3] + 14.0 * math.sin(ti * 1.05 + 0.6),
+                center[4] + 18.0 * math.sin(ti * 0.55),
+                _clip(center[5] + 8.0 * math.sin(ti * 1.6), -120.0, 0.0),
+            ]
+        )
+
+    states: list[list[float]] = [[0.0] * dof for _ in range(n_frames)]
+    states[0] = gt_actions[0][:]
+    for i in range(1, n_frames):
+        prev, target = states[i - 1], gt_actions[i - 1]
+        states[i] = [0.85 * prev[j] + 0.15 * target[j] for j in range(dof)]
+
+    phase = [rng.uniform(0.0, 2.0 * math.pi) for _ in range(dof)]
+    amp = [a * error_scale for a in [0.6, 0.5, 0.65, 0.55, 0.4, 0.35]]
+    residual = [[0.0] * dof for _ in range(n_frames)]
+    residual[0] = [rng.gauss(0.0, 0.12 * error_scale) for _ in range(dof)]
+    for i in range(1, n_frames):
+        innov = [rng.gauss(0.0, 0.12 * error_scale) for _ in range(dof)]
+        residual[i] = [0.94 * residual[i - 1][j] + 0.06 * innov[j] for j in range(dof)]
+
+    pred_actions: list[list[float]] = []
+    for i, ti in enumerate(t):
+        bias = [amp[j] * math.sin(0.35 * ti + phase[j]) for j in range(dof)]
+        row = [gt_actions[i][j] + bias[j] + residual[i][j] for j in range(dof)]
+        row[5] = _clip(row[5], -120.0, 0.0)
+        pred_actions.append(row)
+
+    return {
+        "source": source,
+        "fps": fps,
+        "states": states,
+        "gt_actions": gt_actions,
+        "pred_actions": pred_actions,
+    }
+
+
 def simulate_episode(
     n_frames: int,
     seed: int,
@@ -227,6 +284,10 @@ def simulate_episode(
 ) -> dict:
     if robot_id == "ec616":
         return simulate_episode_ec616(
+            n_frames, seed, error_scale=error_scale, fps=fps, source=source
+        )
+    if robot_id == "koch":
+        return simulate_episode_koch(
             n_frames, seed, error_scale=error_scale, fps=fps, source=source
         )
     return simulate_episode_so100(
@@ -286,7 +347,7 @@ def build_payload(
             item["next_obs"] = next_obs[i][:]
         frames.append(item)
 
-    label = "EC616" if robot_id == "ec616" else "SO-100"
+    label = {"ec616": "EC616", "koch": "Koch v1.1"}.get(robot_id, "SO-100")
     default_goal = DEFAULT_GOAL_EC616 if robot_id == "ec616" else DEFAULT_GOAL_SO100
     meta = {
         "title": title or f"{label} 六轴：GT 下一时刻位姿 vs 模型下一时刻位姿",
@@ -495,7 +556,7 @@ def main() -> int:
             fps=args.fps,
             source=f"simulate:{suite}/episode_{ep_idx}",
         )
-        label = "EC616" if robot_id == "ec616" else "SO-100"
+        label = {"ec616": "EC616", "koch": "Koch v1.1"}.get(robot_id, "SO-100")
         payload = build_payload(
             ep,
             joint_names=joint_names,
