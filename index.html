@@ -824,7 +824,7 @@
         <div class="stats-row" id="safetyStats"></div>
         <p class="hint tip" data-tip="safety_d" style="margin-top:8px" tabindex="0">越限 / 近奇异 / 超速 · 点击跳转（抽样计算以控内存）</p>
         <ul class="adv-list" id="safetyList"></ul>
-        <p class="hint tip" id="collisionHint" data-tip="collision" style="margin-top:6px" tabindex="0">碰撞粗检…</p>
+        <p class="hint tip" id="collisionHint" data-tip="collision" style="margin-top:6px" tabindex="0">碰撞检测…</p>
       </div>
     </details>
 
@@ -878,6 +878,12 @@ import {
   buildObjectTcpDistances,
   resolveGoalAtFrame,
 } from './js/task_events.js';
+import {
+  resolveTcpCalibration,
+  resolveBaseExtrinsics,
+  applyExtrinsicsToPose,
+} from './js/kinematics_cal.js';
+import { sampleCollisionClouds, analyzeHullCollisions } from './js/collision_geom.js';
 import { mountPageNav } from './js/nav_pages.js?v=4';
 import { mountViewTools } from './js/view_tools.js';
 
@@ -892,8 +898,13 @@ const TCP_MAX = TCP_WINDOW * 2 + 1;
 
 /** Active robot profile for this page load (from robots.json + episode meta.robot). */
 let ACTIVE_ROBOT = null;
+/** Episode meta (extrinsics / tcp_calibration). */
+let ACTIVE_META = {};
 let JOINTS = [];
 const TCP_OFFSET = new THREE.Vector3(0, -0.1062, 0);
+const TCP_CAL_RPY = new THREE.Euler(0, 0, 0, 'XYZ');
+const _tcpCalQuat = new THREE.Quaternion();
+const _tcpLinkQuat = new THREE.Quaternion();
 let TCP_LINK = 'gripper';
 /** Visual-only uniform scale (EC616 shrinks to SO-100 size). Metrics use unscaled meters. */
 let MODEL_SCALE = 1;
@@ -905,12 +916,19 @@ function hexToInt(hex, fallback) {
   return Number.isFinite(n) ? n : fallback;
 }
 
-function applyActiveRobot(robot) {
+function applyActiveRobot(robot, meta = {}) {
   ACTIVE_ROBOT = robot;
+  ACTIVE_META = meta && typeof meta === 'object' ? meta : {};
   JOINTS = robot.joint_names.slice();
   TCP_LINK = robot.tcp.link || 'gripper';
-  const o = robot.tcp.offset || [0, 0, 0];
-  TCP_OFFSET.set(Number(o[0]) || 0, Number(o[1]) || 0, Number(o[2]) || 0);
+  const cal = resolveTcpCalibration(robot.tcp || {}, ACTIVE_META);
+  TCP_OFFSET.set(cal.xyz[0], cal.xyz[1], cal.xyz[2]);
+  TCP_CAL_RPY.set(
+    (cal.rpy_deg[0] || 0) * DEG2RAD,
+    (cal.rpy_deg[1] || 0) * DEG2RAD,
+    (cal.rpy_deg[2] || 0) * DEG2RAD,
+    'XYZ',
+  );
   const sc = Number(robot.model_scale);
   MODEL_SCALE = Number.isFinite(sc) && sc > 0 ? sc : 1;
 }
@@ -1259,7 +1277,7 @@ const TERM_GLOSSARY = {
   },
   safety_d: {
     title: '安全 / 可执行 (D)',
-    body: '关节限位、近奇异、超速/跳变、桌面与自碰粗检。偏部署前风险筛查，抽样计算以控内存。',
+    body: '关节限位、近奇异、超速/跳变、桌面与自碰（URDF collision 点云）。偏部署前风险筛查，抽样计算以控内存。',
   },
   limit_over: { title: '越限', body: '关节角超出 URDF/配置限位的帧次数。真机上可能导致力矩饱和或保护停机。' },
   limit_near: { title: '近限位', body: '接近限位但尚未越界的帧数，提示工作空间余量不足。' },
@@ -1268,11 +1286,11 @@ const TERM_GLOSSARY = {
     body: '可操作度过低的姿态附近。此时小关节变化会引起大 TCP 跳动，控制变脆。',
   },
   overspeed: { title: '超速事件', body: '关节角速度超过阈值的次数，反映指令是否过于激进、难跟踪。' },
-  table_hit: { title: '桌面碰', body: '链路近似球心距桌面过近/穿透的粗检命中次数（非精确物理仿真）。' },
-  self_hit: { title: '自碰', body: '臂体 link 之间球心距过近的粗检命中次数，用于发现明显自干涉。' },
+  table_hit: { title: '桌面碰', body: 'URDF collision 点云相对桌面平面过近/穿透的命中次数（抽样，非完整物理仿真）。' },
+  self_hit: { title: '自碰', body: '臂体 link 之间 collision 点云最小距离过近的命中次数，用于发现明显自干涉。' },
   collision: {
-    title: '碰撞粗检',
-    body: '用简化几何（球/平面）估计桌面碰撞与自碰，便于快速筛问题帧；精确碰撞需 URDF collision/凸包。',
+    title: '碰撞检测',
+    body: '优先对 URDF collision mesh 采样点云（凸包式）估计桌面碰撞与自碰；无 collision 时回退 visual。阈值见 robots.json collision。',
   },
   pass_ep: {
     title: 'e_p 阈值达标率',
@@ -1469,8 +1487,22 @@ function getTcpPose(robot, pos = _tcpPos, quat = _tcpQuat) {
     return { pos, quat };
   }
   link.updateWorldMatrix(true, false);
+  // Link frame → TCP: offset (+ meta/profile calibration translation already folded into TCP_OFFSET)
   pos.copy(TCP_OFFSET).applyMatrix4(link.matrixWorld);
-  link.getWorldQuaternion(quat);
+  link.getWorldQuaternion(_tcpLinkQuat);
+  _tcpCalQuat.setFromEuler(TCP_CAL_RPY);
+  quat.copy(_tcpLinkQuat).multiply(_tcpCalQuat);
+
+  const ex = resolveBaseExtrinsics(ACTIVE_META);
+  if (ex) {
+    const applied = applyExtrinsicsToPose(
+      { x: pos.x, y: pos.y, z: pos.z },
+      { x: quat.x, y: quat.y, z: quat.z, w: quat.w },
+      ex,
+    );
+    pos.set(applied.pos.x, applied.pos.y, applied.pos.z);
+    quat.set(applied.quat.x, applied.quat.y, applied.quat.z, applied.quat.w);
+  }
   return { pos, quat };
 }
 
@@ -1756,7 +1788,7 @@ function computeTcpPaths(probe, frames) {
 }
 
 async function initScene(container, frames, robotCfg) {
-  applyActiveRobot(robotCfg);
+  applyActiveRobot(robotCfg, ACTIVE_META || {});
   const colorCur = hexToInt(robotCfg.colors?.cur, COLOR_CUR);
   const colorGt = hexToInt(robotCfg.colors?.gt, COLOR_GT);
   const colorPred = hexToInt(robotCfg.colors?.pred, COLOR_PRED);
@@ -2720,7 +2752,7 @@ try {
     throw new Error(`机型防呆校验失败：${guard.errors.join('；')}`);
   }
   const robotCfg = guard.robot || resolveRobot(robotRegistry, meta, { allowDefault: false });
-  applyActiveRobot(robotCfg);
+  applyActiveRobot(robotCfg, meta);
   const mismatch = jointNamesMismatch(meta, robotCfg);
   const guardEl = document.getElementById('robotGuard');
   if (guard.warnings.length && guardEl) {
@@ -3135,30 +3167,42 @@ try {
 
   const qPredSeries = DATA.frames.map((f) => f.next_pred);
   const probeQ = DATA.frames[0].next_pred.slice();
-  const _tmp = new THREE.Vector3();
   const fkPos = (qDeg) => {
     setPose(world.armGT, qDeg);
     const { pos } = getTcpPose(world.armGT);
-    return { x: pos.x, y: pos.y, z: pos.z };
+    // getTcpPose reads scaled matrixWorld; convert to meters for singularity / gates
+    const inv = MODEL_SCALE !== 1 ? 1 / MODEL_SCALE : 1;
+    return { x: pos.x * inv, y: pos.y * inv, z: pos.z * inv };
   };
-  const LINK_SAMPLE = ['base', 'shoulder', 'upper_arm', 'lower_arm', 'wrist', 'gripper'];
+  const colCfg = ACTIVE_ROBOT?.collision || {};
+  const LINK_SAMPLE = (colCfg.links && colCfg.links.length)
+    ? colCfg.links
+    : ['base', 'shoulder', 'upper_arm', 'lower_arm', 'wrist', 'gripper'];
   const stride = Math.max(1, Math.ceil(DATA.frames.length / 60));
   const linkSeries = [];
+  const hullSeries = [];
+  const invScale = MODEL_SCALE !== 1 ? 1 / MODEL_SCALE : 1;
   for (let i = 0; i < DATA.frames.length; i += stride) {
     setPose(world.armPred, DATA.frames[i].next_pred);
     world.armPred.updateMatrixWorld(true);
-    const links = [];
-    for (const name of LINK_SAMPLE) {
-      const link = world.armPred.links?.[name];
-      if (!link) continue;
-      link.getWorldPosition(_tmp);
-      links.push({ name, pos: { x: _tmp.x, y: _tmp.y, z: _tmp.z } });
-    }
+    const clouds = sampleCollisionClouds(world.armPred, THREE, {
+      links: LINK_SAMPLE,
+      maxPointsPerLink: colCfg.max_points_per_link || 28,
+      invScale,
+    });
+    hullSeries.push(clouds);
+    if (clouds.length) clouds._frame = i;
+    // legacy center samples (fallback / UI)
+    const links = clouds.map((c) => {
+      const pts = c.points;
+      let sx = 0; let sy = 0; let sz = 0;
+      for (const p of pts) { sx += p.x; sy += p.y; sz += p.z; }
+      const n = Math.max(1, pts.length);
+      return { name: c.name, pos: { x: sx / n, y: sy / n, z: sz / n } };
+    });
     linkSeries.push(links);
-    // map collision frame index: store actual i on first link marker via parallel array
     if (links.length) links._frame = i;
   }
-  // Remap collision hits: analyzeCollisions uses linkSeries index; convert via stride
   const safety = buildSafetyReport({
     qPredSeries,
     names,
@@ -3166,15 +3210,20 @@ try {
     fps: meta.fps || 30,
     fkPos,
     linkSeries,
+    hullSeries,
+    collisionCfg: colCfg,
+    robotProfile: ACTIVE_ROBOT,
     stride,
+    analyzeHullCollisions,
   });
   // restore poses for current frame later via showFrame(0)
   setPose(world.armGT, probeQ);
 
   // rewrite collision frame indices from subsampled → real
   const mapHit = (hits) => hits.map((h) => {
-    const real = (linkSeries[h.i] && linkSeries[h.i]._frame != null)
-      ? linkSeries[h.i]._frame
+    const series = hullSeries.length ? hullSeries : linkSeries;
+    const real = (series[h.i] && series[h.i]._frame != null)
+      ? series[h.i]._frame
       : h.i * stride;
     return { ...h, i: real };
   });
@@ -3222,12 +3271,13 @@ try {
   if (colHint) {
     const th = safety.collision.table_hits[0];
     const sh = safety.collision.self_hits[0];
+    const method = safety.collision.method || 'hull';
     colHint.textContent =
-      `碰撞粗检 stride=${stride} · 桌面命中 ${safety.collision.n_table}`
+      `碰撞(${method}) stride=${stride} · 桌面命中 ${safety.collision.n_table}`
       + (th ? `（例 t=${th.i} ${th.link} z=${th.z.toFixed(3)}）` : '')
       + ` · 自碰 ${safety.collision.n_self}`
       + (sh ? `（例 t=${sh.i} ${sh.a}/${sh.b} ${sh.dist_mm.toFixed(1)}mm）` : '')
-      + ' · 简化球体，仅供参考';
+      + ' · URDF collision 点云采样';
   }
 
   // enrich export provenance into gates summary path already uses meta

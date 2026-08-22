@@ -277,8 +277,16 @@ export function classifyFailureFrames(tcp, { epMm = 15, eRDeg = 15, vErr = 0.15 
   return out.sort((a, b) => b.ep_mm - a.ep_mm);
 }
 
-function resolveLimits(meta = {}) {
-  const base = { ...SO100_LIMITS_DEG };
+function resolveLimits(meta = {}, robotProfile = null) {
+  const base = {};
+  const fromRobot = robotProfile?.joint_limits;
+  if (fromRobot && typeof fromRobot === 'object' && Object.keys(fromRobot).length) {
+    for (const [k, v] of Object.entries(fromRobot)) {
+      base[k] = { ...v };
+    }
+  } else {
+    Object.assign(base, SO100_LIMITS_DEG);
+  }
   const custom = meta.joint_limits || {};
   for (const [k, v] of Object.entries(custom)) {
     base[k] = { ...base[k], ...v };
@@ -292,8 +300,8 @@ function resolveLimits(meta = {}) {
  * @param {object} opts
  * @param {function(number[]): {x,y,z}} opts.fkPos maps q(deg) → TCP pos (m)
  */
-export function analyzeLimitsAndSingularity(qSeries, names, meta, { fkPos, marginDeg = 8, singThresh = 1e-4, stride = 1 } = {}) {
-  const limits = resolveLimits(meta);
+export function analyzeLimitsAndSingularity(qSeries, names, meta, { fkPos, marginDeg = 8, singThresh = 1e-4, stride = 1, robotProfile = null } = {}) {
+  const limits = resolveLimits(meta, robotProfile);
   const n = qSeries.length;
   const dof = names.length;
   const nearLimit = [];
@@ -363,10 +371,15 @@ export function analyzeLimitsAndSingularity(qSeries, names, meta, { fkPos, margi
 }
 
 /**
- * D19 — Coarse self-collision + table plane check using link sample points (meters).
- * @param { {name:string, pos:{x,y,z}}[][] } linkSeries per-frame link centers
+ * D19 — Self-collision + table plane.
+ * Prefer hullSeries (URDF collision / convex samples); fall back to link center spheres.
  */
-export function analyzeCollisions(linkSeries, {
+export function analyzeCollisions(linkSeries, opts = {}) {
+  // Back-compat: second arg used to be plain options for sphere mode.
+  return analyzeCollisionsLegacy(linkSeries, opts);
+}
+
+function analyzeCollisionsLegacy(linkSeries, {
   tableZ = 0.0,
   tableClearance = 0.01,
   selfMinDist = 0.035,
@@ -380,7 +393,7 @@ export function analyzeCollisions(linkSeries, {
     if (!links?.length) continue;
     for (let a = 0; a < links.length; a++) {
       if (links[a].pos.z < tableZ + tableClearance) {
-        tableHits.push({ i, link: links[a].name, z: links[a].pos.z });
+        tableHits.push({ i, link: links[a].name, z: links[a].pos.z, method: 'sphere' });
       }
       for (let b = a + 1 + skipAdjacent; b < links.length; b++) {
         const pa = links[a].pos;
@@ -392,6 +405,7 @@ export function analyzeCollisions(linkSeries, {
             a: links[a].name,
             b: links[b].name,
             dist_mm: d * 1000,
+            method: 'sphere',
           });
         }
       }
@@ -403,6 +417,7 @@ export function analyzeCollisions(linkSeries, {
     self_hits: cap(selfHits),
     n_table: tableHits.length,
     n_self: selfHits.length,
+    method: 'sphere',
   };
 }
 
@@ -410,8 +425,8 @@ export function analyzeCollisions(linkSeries, {
  * D20 — Smoothness / executability vs velocity limits.
  * qSeries in deg, fps Hz.
  */
-export function analyzeSmoothness(qSeries, names, meta, fps = 30) {
-  const limits = resolveLimits(meta);
+export function analyzeSmoothness(qSeries, names, meta, fps = 30, robotProfile = null) {
+  const limits = resolveLimits(meta, robotProfile);
   const dt = 1 / Math.max(1e-6, fps);
   const n = qSeries.length;
   const dof = names.length;
@@ -466,12 +481,29 @@ export function buildSafetyReport({
   fps,
   fkPos,
   linkSeries = null,
+  hullSeries = null,
+  collisionCfg = null,
+  robotProfile = null,
   stride = 1,
+  analyzeHullCollisions = null,
 }) {
-  const limits = analyzeLimitsAndSingularity(qPredSeries, names, meta, { fkPos, stride });
-  const smooth = analyzeSmoothness(qPredSeries, names, meta, fps);
-  const collision = linkSeries
-    ? analyzeCollisions(linkSeries)
-    : { table_hits: [], self_hits: [], n_table: 0, n_self: 0, skipped: true };
+  const limits = analyzeLimitsAndSingularity(qPredSeries, names, meta, {
+    fkPos, stride, robotProfile,
+  });
+  const smooth = analyzeSmoothness(qPredSeries, names, meta, fps, robotProfile);
+  let collision;
+  const cfg = collisionCfg || robotProfile?.collision || {};
+  if (hullSeries && typeof analyzeHullCollisions === 'function') {
+    collision = analyzeHullCollisions(hullSeries, cfg);
+  } else if (linkSeries) {
+    collision = analyzeCollisions(linkSeries, {
+      tableZ: cfg.table_z ?? 0,
+      tableClearance: cfg.table_clearance_m ?? 0.01,
+      selfMinDist: cfg.self_min_dist_m ?? 0.035,
+      skipAdjacent: cfg.skip_adjacent ?? 1,
+    });
+  } else {
+    collision = { table_hits: [], self_hits: [], n_table: 0, n_self: 0, skipped: true };
+  }
   return { limits, smooth, collision };
 }

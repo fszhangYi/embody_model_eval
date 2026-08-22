@@ -4,7 +4,7 @@
     "so100": {
       "id": "so100",
       "label": "SO-100",
-      "description": "SO-ARM100 六轴桌面臂（默认可视化机型）",
+      "description": "SO-ARM100 六轴桌面臂（默认可视化机型）；限位取自 URDF，TCP 含标定槽位",
       "joint_names": [
         "shoulder_pan",
         "shoulder_lift",
@@ -13,6 +13,14 @@
         "wrist_roll",
         "gripper"
       ],
+      "joint_limits": {
+        "shoulder_pan": { "lower": -114.59, "upper": 114.59, "velocity": 57.3 },
+        "shoulder_lift": { "lower": 0, "upper": 200.54, "velocity": 57.3 },
+        "elbow_flex": { "lower": -180, "upper": 0, "velocity": 57.3 },
+        "wrist_flex": { "lower": -143.24, "upper": 68.75, "velocity": 57.3 },
+        "wrist_roll": { "lower": -180, "upper": 180, "velocity": 57.3 },
+        "gripper": { "lower": -11.46, "upper": 114.59, "velocity": 57.3 }
+      },
       "urdf": {
         "preview": "./models/so100_colored/so100_cur.urdf",
         "cur": "./models/so100_colored/so100_cur.urdf",
@@ -23,7 +31,17 @@
       "model_scale": 1,
       "tcp": {
         "link": "gripper",
-        "offset": [0, -0.1062, 0]
+        "offset": [0, -0.1062, 0],
+        "calibration": { "xyz": [0, 0, 0], "rpy_deg": [0, 0, 0] }
+      },
+      "collision": {
+        "method": "hull",
+        "links": ["base", "shoulder", "upper_arm", "lower_arm", "wrist", "gripper"],
+        "skip_adjacent": 1,
+        "table_z": 0,
+        "table_clearance_m": 0.008,
+        "self_min_dist_m": 0.02,
+        "max_points_per_link": 28
       },
       "colors": {
         "cur": "#9ca3af",
@@ -35,7 +53,7 @@
     "ec616": {
       "id": "ec616",
       "label": "EC616",
-      "description": "EC616 六轴工业臂 + 平行夹爪末端（可视化缩放到与 SO-100 同量级）",
+      "description": "EC616 六轴工业臂 + 平行夹爪；限位取自 URDF；显示 model_scale 仅影响可视化",
       "joint_names": [
         "Joint1",
         "Joint2",
@@ -46,17 +64,48 @@
         "gripper_1_joint",
         "gripper_2_joint"
       ],
+      "joint_limits": {
+        "Joint1": { "lower": -239.96, "upper": 239.96, "velocity": 20.05 },
+        "Joint2": { "lower": -239.96, "upper": 119.98, "velocity": 20.05 },
+        "Joint3": { "lower": -239.96, "upper": 119.98, "velocity": 20.05 },
+        "Joint4": { "lower": -239.96, "upper": 119.98, "velocity": 20.05 },
+        "Joint5": { "lower": -239.96, "upper": 119.98, "velocity": 20.05 },
+        "Joint6": { "lower": -239.96, "upper": 119.98, "velocity": 20.05 },
+        "gripper_1_joint": { "lower": 0, "upper": 40.11, "velocity": 20.05 },
+        "gripper_2_joint": { "lower": -40.11, "upper": 40.11, "velocity": 20.05 }
+      },
       "urdf": {
-        "preview": "./models/ec616/ec616.urdf?v=14",
-        "cur": "./models/ec616/ec616.urdf?v=14",
-        "gt": "./models/ec616/ec616.urdf?v=14",
-        "pred": "./models/ec616/ec616.urdf?v=14"
+        "preview": "./models/ec616/ec616.urdf?v=15",
+        "cur": "./models/ec616/ec616.urdf?v=15",
+        "gt": "./models/ec616/ec616.urdf?v=15",
+        "pred": "./models/ec616/ec616.urdf?v=15"
       },
       "root_rotation_euler_xyz_deg": [-90, 0, 0],
       "model_scale": 0.38,
       "tcp": {
         "link": "gripper_centor_link",
-        "offset": [0, 0, 0.03]
+        "offset": [0, 0, 0.03],
+        "calibration": { "xyz": [0, 0, 0], "rpy_deg": [0, 0, 0] }
+      },
+      "collision": {
+        "method": "hull",
+        "links": [
+          "base_link",
+          "Link1",
+          "Link2",
+          "Link3",
+          "Link4",
+          "Link5",
+          "Link6",
+          "gripper_centor_link",
+          "gripper_1_link",
+          "gripper_2_link"
+        ],
+        "skip_adjacent": 1,
+        "table_z": 0,
+        "table_clearance_m": 0.01,
+        "self_min_dist_m": 0.025,
+        "max_points_per_link": 24
       },
       "colors": {
         "cur": "#9ca3af",
@@ -64,7 +113,56 @@
         "pred": "#3b82f6"
       },
       "home_q_deg": [0, -45, 60, 0, 30, 0, 20, 20]
+    },
+    "koch": {
+      "id": "koch",
+      "label": "Koch v1.1",
+      "description": "与 SO-100 同构桌面臂（共享 mesh）；独立限位带与 TCP 标定，用于多机型门禁对照",
+      "joint_names": [
+        "shoulder_pan",
+        "shoulder_lift",
+        "elbow_flex",
+        "wrist_flex",
+        "wrist_roll",
+        "gripper"
+      ],
+      "joint_limits": {
+        "shoulder_pan": { "lower": -100, "upper": 100, "velocity": 45 },
+        "shoulder_lift": { "lower": -10, "upper": 190, "velocity": 45 },
+        "elbow_flex": { "lower": -170, "upper": 0, "velocity": 45 },
+        "wrist_flex": { "lower": -130, "upper": 60, "velocity": 45 },
+        "wrist_roll": { "lower": -170, "upper": 170, "velocity": 45 },
+        "gripper": { "lower": -10, "upper": 100, "velocity": 45 }
+      },
+      "urdf": {
+        "preview": "./models/so100_colored/so100_cur.urdf",
+        "cur": "./models/so100_colored/so100_cur.urdf",
+        "gt": "./models/so100_colored/so100_gt.urdf",
+        "pred": "./models/so100_colored/so100_pred.urdf"
+      },
+      "root_rotation_euler_xyz_deg": [-90, 0, 0],
+      "model_scale": 1,
+      "tcp": {
+        "link": "gripper",
+        "offset": [0, -0.1062, 0],
+        "calibration": { "xyz": [0, -0.002, 0.001], "rpy_deg": [0, 0, 0] }
+      },
+      "collision": {
+        "method": "hull",
+        "links": ["base", "shoulder", "upper_arm", "lower_arm", "wrist", "gripper"],
+        "skip_adjacent": 1,
+        "table_z": 0,
+        "table_clearance_m": 0.008,
+        "self_min_dist_m": 0.022,
+        "max_points_per_link": 28
+      },
+      "colors": {
+        "cur": "#9ca3af",
+        "gt": "#ef4444",
+        "pred": "#3b82f6"
+      },
+      "home_q_deg": [0, -85, 85, 0, 0, 0]
     }
   },
-  "_comment": "声明本仓库当前可用的机械臂型号。episode JSON 须在 meta.robot 填写此处 id；页面加载时按该字段选用 URDF / 关节名 / TCP。model_scale 仅影响 3D 显示尺度（EC616 缩到与 SO-100 同量级）；物理米制指标仍按未缩放 FK 换算。preview 供机型 3D 浏览页使用。"
+  "_comment": "机型注册表。episode.meta.robot 须为 robots 中的 id。joint_limits 单位：度 / 度每秒（由 URDF rad 换算）。collision.method=hull 时评测页对 URDF collision mesh 采样凸包点云做桌面/自碰。tcp.calibration 与 meta.tcp_calibration / meta.extrinsics 参与 TCP 世界系。model_scale 仅影响 3D 显示。"
 }

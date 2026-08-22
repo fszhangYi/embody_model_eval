@@ -252,6 +252,9 @@ function renderMeta(profile) {
     ['显示缩放', String(profile.model_scale ?? 1)],
     ['TCP link', profile.tcp.link],
     ['TCP offset', profile.tcp.offset.map((x) => Number(x).toFixed(4)).join(', ')],
+    ['TCP 标定', (profile.tcp.calibration?.xyz || [0, 0, 0]).map((x) => Number(x).toFixed(4)).join(', ')],
+    ['碰撞', profile.collision?.method || 'hull'],
+    ['限位条目', String(Object.keys(profile.joint_limits || {}).length)],
   ];
   els.meta.innerHTML = rows.map(([k, v]) =>
     `<div class="meta-item"><div class="k">${k}</div><div class="v">${v}</div></div>`,
@@ -268,7 +271,12 @@ function renderJointSliders(profile, jointNames) {
     const joint = arm?.joints?.[name];
     let min = -180;
     let max = 180;
-    if (name === 'gripper_1_joint' || name === 'gripper_2_joint') {
+    const lim = profile.joint_limits?.[name];
+    if (lim && Number.isFinite(lim.lower) && Number.isFinite(lim.upper)) {
+      min = lim.lower;
+      max = lim.upper;
+      if (min > max) [min, max] = [max, min];
+    } else if (name === 'gripper_1_joint' || name === 'gripper_2_joint') {
       // UI shows open command in degrees (0 = closed).
       min = 0;
       max = 0.7 * RAD2DEG;

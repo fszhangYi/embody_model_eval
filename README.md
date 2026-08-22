@@ -7,7 +7,7 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 - 左侧：播放 / 显隐 / 观测相机同步 (F) / 画布录制（WebM）
 - 右侧：概览、误差、关节轨迹、任务/接触 (G)、数值（可折叠）
 - Hub：多 episode 汇总，含 obs / 任务列与机型防呆；顶栏「页面」菜单可扩展更多 tab
-- 机械臂 3D：`robots.html` 下拉选择 `config/robots.json` 中的机型并浏览 URDF（当前含 SO-100 / EC616）
+- 机械臂 3D：`robots.html` 下拉选择 `config/robots.json` 中的机型并浏览 URDF（当前含 SO-100 / EC616 / Koch）
 - 数据流：`pipeline.html` ComfyUI 风格画布，演示 ACT/SAM2 训练与推理张量流向
 - AI Chat：`chat.html` 选择托管 Skill、配置 Agent 链接，将诉求与 skill 一并发送并显示回执
 
@@ -114,7 +114,7 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 
 ## 机械臂型号（多机型扩展）
 
-可用机型集中登记在 **`config/robots.json`**。每条 episode 必须声明：
+可用机型集中登记在 **`config/robots.json`**（当前：**so100** / **ec616** / **koch**）。每条 episode 必须声明：
 
 ```json
 "meta": { "robot": "so100", ... }
@@ -123,13 +123,23 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
 页面启动时：
 
 1. 读取 `config/robots.json`
-2. 用 `meta.robot` 解析机型配置（URDF 三色路径、`joint_names`、root 旋转、TCP link/offset）
+2. 用 `meta.robot` 解析机型（URDF、`joint_names`、`joint_limits`、collision、TCP link/offset/标定、root 旋转）
 3. 自动加载对应模型；若 id 未登记或缺失则报错
+
+可选标定（参与 TCP 世界系，I36）：
+
+```json
+"meta": {
+  "robot": "so100",
+  "tcp_calibration": { "xyz": [0, -0.002, 0], "rpy_deg": [0, 0, 0] },
+  "extrinsics": { "base_in_world": { "xyz": [0, 0, 0], "rpy_deg": [0, 0, 0] } }
+}
+```
 
 新增机型时：
 
 1. 准备三份着色 URDF + mesh，放入 `models/` 下独立目录（参考 `models/so100_colored/`）
-2. 在 `config/robots.json` 的 `robots` 下增加一条配置（`id` / `urdf` / `joint_names` / `tcp` / `root_rotation_euler_xyz_deg`）
+2. 在 `config/robots.json` 增加条目：`joint_limits`（度）、`collision`（hull 采样 link 链）、`tcp.calibration`
 3. 生成或转换数据时写上 `"meta": { "robot": "<新id>" }`
 
 - **单轨迹页**默认加载 `./data/20260819/episode_1.json`；可用 `?data=./data/<suite>/xxx.json` 指定。
@@ -241,7 +251,7 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 | # | 项 | 状态 |
 |---|----|------|
 | D18 | 关节限位 / 奇异附近告警 | ✅ 限位越界 + 可操作度抽样 |
-| D19 | 自碰 / 桌面碰撞粗检 | ✅ link 球心距 + 桌面平面（粗检） |
+| D19 | 自碰 / 桌面碰撞（URDF collision 点云） | ✅ `collision_geom.js` hull 采样；回退球心距 |
 | D20 | 平滑性与可执行性（关节跳跃、超速占比） | ✅ |
 
 > C/D 为高级功能：逻辑在 `advanced_cd.js`，汇总页 `hub.html`。
@@ -310,7 +320,15 @@ TCP 门禁需先在页面导出 `eval_summary.json`（或同目录 sidecar），
 
 补演示：`python3 scripts/gen_task_demo.py --all`。
 
-**建议后续优先：** 用真实多 episode manifest 填满 Hub；按机型写准 `meta.joint_limits`；碰撞粗检可再换成凸包/URDF collision。
+**建议后续优先：** 用真实多 episode manifest 填满 Hub；H 类动作空间换算与控/策误差分离（见 `docs/TODOLIST.md`）。
+
+### I. 机型与运动学资产
+
+| # | 项 | 状态 |
+|---|----|------|
+| I34 | 多机型入库（URDF 限位 + collision + 标定 TCP） | ✅ so100 / ec616 / koch；`joint_limits` + `collision` + `tcp.calibration` |
+| I35 | URDF collision / 凸包点云碰撞 | ✅ 替换纯球粗检；阈值在 `robots.json` |
+| I36 | 手眼 / 基座位姿标定进 meta 并参与 TCP | ✅ `meta.tcp_calibration` + `meta.extrinsics.base_in_world` |
 
 ## 更换 / 新增机械臂
 

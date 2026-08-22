@@ -55,6 +55,13 @@ export function normalizeRobotProfile(profile, fallbackId) {
   const offset = Array.isArray(tcp.offset) && tcp.offset.length >= 3
     ? [Number(tcp.offset[0]), Number(tcp.offset[1]), Number(tcp.offset[2])]
     : [0, 0, 0];
+  const cal = tcp.calibration && typeof tcp.calibration === 'object' ? tcp.calibration : {};
+  const calXyz = Array.isArray(cal.xyz) && cal.xyz.length >= 3
+    ? [Number(cal.xyz[0]) || 0, Number(cal.xyz[1]) || 0, Number(cal.xyz[2]) || 0]
+    : [0, 0, 0];
+  const calRpy = Array.isArray(cal.rpy_deg) && cal.rpy_deg.length >= 3
+    ? cal.rpy_deg.map(Number)
+    : [0, 0, 0];
   const root = Array.isArray(profile.root_rotation_euler_xyz_deg)
     && profile.root_rotation_euler_xyz_deg.length >= 3
     ? profile.root_rotation_euler_xyz_deg.map(Number)
@@ -69,11 +76,36 @@ export function normalizeRobotProfile(profile, fallbackId) {
     : joint_names.map(() => 0);
   const scaleRaw = Number(profile.model_scale);
   const model_scale = Number.isFinite(scaleRaw) && scaleRaw > 0 ? scaleRaw : 1;
+
+  const joint_limits = {};
+  if (profile.joint_limits && typeof profile.joint_limits === 'object') {
+    for (const [k, v] of Object.entries(profile.joint_limits)) {
+      if (!v || typeof v !== 'object') continue;
+      joint_limits[k] = {
+        lower: Number(v.lower),
+        upper: Number(v.upper),
+        velocity: Number(v.velocity),
+      };
+    }
+  }
+
+  const col = profile.collision && typeof profile.collision === 'object' ? profile.collision : {};
+  const collision = {
+    method: col.method || 'hull',
+    links: Array.isArray(col.links) ? col.links.slice() : [],
+    skip_adjacent: Number.isFinite(Number(col.skip_adjacent)) ? Number(col.skip_adjacent) : 1,
+    table_z: Number(col.table_z) || 0,
+    table_clearance_m: Number(col.table_clearance_m) || 0.008,
+    self_min_dist_m: Number(col.self_min_dist_m) || 0.02,
+    max_points_per_link: Number(col.max_points_per_link) || 28,
+  };
+
   return {
     id,
     label: profile.label || id,
     description: profile.description || '',
     joint_names,
+    joint_limits,
     urdf: {
       preview: urdf.preview || urdf.cur,
       cur: urdf.cur,
@@ -85,7 +117,9 @@ export function normalizeRobotProfile(profile, fallbackId) {
     tcp: {
       link: tcp.link || 'gripper',
       offset,
+      calibration: { xyz: calXyz, rpy_deg: calRpy },
     },
+    collision,
     colors,
     home_q_deg: home,
   };

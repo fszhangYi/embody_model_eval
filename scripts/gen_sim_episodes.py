@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate simulated compare episode JSON files under data/<suite>/.
 
-Supports robots registered in robots.json (so100 / ec616). Schema matches
+Supports robots registered in robots.json (so100 / ec616 / koch). Schema matches
 existing viewer payloads (meta / series / frames), including optional
 meta.goal_pose for TCP task metrics.
 

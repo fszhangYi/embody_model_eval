@@ -1,7 +1,7 @@
 # Embody Model Eval · 未完成功能清单（TODO）
 
-更新：2026-08-21  
-范围：架构必做项 **H–L**（A–G 已落地，详见 `README.md`）  
+更新：2026-08-22  
+范围：架构必做项 **H–L**（A–G / **I** 已落地，详见 `README.md`）  
 状态约定：❌ 未做 · 🔶 部分 · ✅ 已完成
 
 ---
@@ -9,10 +9,10 @@
 ## 建议落地优先级
 
 ```
-L43 → H31 / H32 → J37 → I35 → K41
+L43 → H31 / H32 → J37 → K41
 ```
 
-一句话：A–G 已覆盖「离线回放 + 感知/任务」；H 起要把评测接到**控制语义、多机型、闭环执行、可发布统计与协议合同化**。
+一句话：A–G / I 已覆盖「离线回放 + 感知/任务 + 多机型运动学」；H 起要把评测接到**控制语义、闭环执行、可发布统计与协议合同化**。
 
 ---
 
@@ -36,19 +36,19 @@ L43 → H31 / H32 → J37 → I35 → K41
 
 ## I. 机型与运动学资产
 
-现状：`robots.json` + 防呆已就位，但有效机型基本只有 **so100**；碰撞仍为球/平面粗检。
+现状：`robots.json` 登记 **so100 / ec616 / koch**；限位取自 URDF；碰撞为 collision mesh 点云；TCP 支持标定与基座外参。
 
 | # | 项 | 为何必须 | 状态 |
 |---|----|----------|------|
-| I34 | 第二、第三机型真实入库（URDF collision + 真限位 + 标定 TCP） | 没有第二机型谈不上多机型平台 | ❌ |
-| I35 | 基于 URDF collision / 凸包的碰撞（替换球粗检） | 安全门禁否则不能上线 | ❌ |
-| I36 | 手眼 / 基座位姿标定结果进 meta 并参与 TCP | 无标定则跨相机、跨安装无法复现 | ❌ |
+| I34 | 第二、第三机型真实入库（URDF collision + 真限位 + 标定 TCP） | 没有第二机型谈不上多机型平台 | ✅ |
+| I35 | 基于 URDF collision / 凸包的碰撞（替换球粗检） | 安全门禁否则不能上线 | ✅ |
+| I36 | 手眼 / 基座位姿标定结果进 meta 并参与 TCP | 无标定则跨相机、跨安装无法复现 | ✅ |
 
-**落地线索**
+**落地线索（已实现）**
 
-- 新增机型目录 + `robots.json` 条目（含 `joint_limits`、collision meshes）
-- `advanced_cd.js` 碰撞从球距升级为 mesh/凸包抽样
-- `meta.extrinsics` / `meta.tcp_calibration` 参与 TCP 世界系换算
+- `config/robots.json`：`joint_limits`、`collision`、`tcp.calibration`
+- `js/collision_geom.js`：URDF collision 点云采样 + hull 桌面/自碰
+- `js/kinematics_cal.js`：`meta.extrinsics` / `meta.tcp_calibration` 参与 TCP
 
 ---
 
@@ -110,9 +110,10 @@ L43 → H31 / H32 → J37 → I35 → K41
 
 | 组 | 范围 | 说明 |
 |----|------|------|
-| A–E | 指标 / 可视化 / 协议 / 安全粗检 / 工程流 | 见 README「评测能力提升清单」 |
+| A–E | 指标 / 可视化 / 协议 / 安全 / 工程流 | 见 README「评测能力提升清单」 |
 | F25–F27 | 观测同步、对齐协议、关键帧叠加 | `obs_align.js` + `media/` |
 | G28–G30 | 任务成功、接触事件、物体位姿序列 | `task_events.js` + 演示数据 |
+| I34–I36 | 多机型限位/碰撞/TCP 标定 | `robots.json` + `collision_geom.js` + `kinematics_cal.js` |
 
 工程侧近期已落地、**不列入 H–L 必做**但仍可增强的项：
 
