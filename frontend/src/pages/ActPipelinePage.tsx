@@ -157,6 +157,12 @@ function rootBrowseAnchor(root: BrowseRoot, current: string, spec: PipelineSpec 
   return '/root/autodl-tmp'
 }
 
+function truncatePath(path: string, max = 42): string {
+  const p = path.trim()
+  if (p.length <= max) return p
+  return `…${p.slice(-(max - 1))}`
+}
+
 function statusClass(status: string): string {
   if (status === 'succeeded') return 'ok'
   if (status === 'failed') return 'err'
@@ -359,6 +365,7 @@ export function ActPipelinePage() {
         </div>
       </header>
 
+      <div className="act-body">
       <div className="act-project-roots">
         <label className={`act-root-field act-root-step${embodyReady ? ' done' : ''}`}>
           <span className="act-root-step-label">1. 评测根目录</span>
@@ -520,6 +527,41 @@ export function ActPipelinePage() {
           </ul>
         </aside>
       </div>
+      </div>
+
+      <footer className="act-footer">
+        <div className="act-footer-brand">
+          <span className="act-footer-mark" aria-hidden="true" />
+          <span>ACT Pipeline</span>
+          <span className="act-footer-sep">·</span>
+          <span className="act-footer-muted">embody_model_eval</span>
+        </div>
+        <div className="act-footer-paths">
+          {embodyReady ? (
+            <span className="act-footer-path" title={embodyRoot}>
+              评测 {truncatePath(embodyRoot)}
+            </span>
+          ) : (
+            <span className="act-footer-path idle">未选择评测根目录</span>
+          )}
+          {actRoot.trim() ? (
+            <span className="act-footer-path" title={actRoot}>
+              训练 {truncatePath(actRoot)}
+            </span>
+          ) : embodyReady ? (
+            <span className="act-footer-path idle">未选择训练根目录</span>
+          ) : null}
+        </div>
+        <div className="act-footer-meta">
+          {step ? <span className="act-footer-step">{step.title}</span> : null}
+          {jobs.length > 0 ? <span>{jobs.length} 个历史任务</span> : null}
+          {linkReady ? (
+            <span className="act-footer-link ok">软链就绪</span>
+          ) : embodyReady && actRoot.trim() ? (
+            <span className="act-footer-link warn">软链待建</span>
+          ) : null}
+        </div>
+      </footer>
 
       {picker ? (
         <PathPickerModal

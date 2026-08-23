@@ -113,6 +113,98 @@
   align-items: center;
 }
 
+.act-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.act-footer {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  align-items: center;
+  gap: 12px 16px;
+  padding: 10px 20px;
+  border-top: 1px solid rgba(58, 77, 102, 0.55);
+  background: linear-gradient(180deg, rgba(11, 16, 24, 0.78), rgba(11, 16, 24, 0.96));
+  font-size: 0.68rem;
+  color: var(--muted, #8b9bb4);
+}
+
+.act-footer-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--text, #e7ecf3);
+}
+
+.act-footer-mark {
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent, #3dd6c6);
+  box-shadow: 0 0 10px rgba(61, 214, 198, 0.4);
+}
+
+.act-footer-sep {
+  opacity: 0.45;
+}
+
+.act-footer-muted {
+  color: var(--muted, #8b9bb4);
+}
+
+.act-footer-paths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
+}
+
+.act-footer-path {
+  max-width: min(100%, 280px);
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(58, 77, 102, 0.45);
+  background: rgba(36, 50, 71, 0.55);
+  font-family: ui-monospace, monospace;
+  font-size: 0.64rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.act-footer-path.idle {
+  border-style: dashed;
+  opacity: 0.65;
+}
+
+.act-footer-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.act-footer-step {
+  color: var(--accent, #3dd6c6);
+}
+
+.act-footer-link.ok {
+  color: #9ee8df;
+}
+
+.act-footer-link.warn {
+  color: #e8c878;
+}
+
 .act-header h1 {
   margin: 0;
   font-size: 1.1rem;
@@ -880,6 +972,16 @@
   .act-pipeline-page {
     height: 100vh;
     max-height: 100vh;
+  }
+
+  .act-footer {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 10px 16px 12px;
+  }
+
+  .act-footer-meta {
+    justify-content: flex-start;
   }
 
   .act-layout {
