@@ -1,0 +1,31 @@
+/**
+ * React page wrappers: legacy shells need a flex column with explicit height.
+ */
+
+.pipeline-page,
+.chat-page,
+.robots-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.pipeline-page > .legacy-shell,
+.chat-page > .legacy-shell,
+.robots-page > .legacy-shell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+}
+
+.pipeline-page .layout,
+.chat-page .layout,
+.robots-page .layout {
+  flex: 1;
+  min-height: 0;
+  height: auto !important;
+}

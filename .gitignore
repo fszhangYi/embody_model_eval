@@ -34,3 +34,7 @@ compare_result.local.json
 # Agent chat secrets / temp staged skills
 agent_skills/.agent_config.json
 agent_skills/.run/
+
+# React frontend
+frontend/node_modules/
+dist/

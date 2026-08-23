@@ -1,0 +1,36 @@
+<header>
+  <div>
+    <h1>机械臂 3D</h1>
+    <p class="header-blurb">从 robots.json 选择机型，浏览 URDF 与关节</p>
+  </div>
+  <div class="toolbar">
+    <label for="robotSelect">机型</label>
+    <select id="robotSelect" class="robot-select" aria-label="选择机械臂型号"></select>
+    <span class="pill" id="robotCount">—</span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="side" aria-label="机型信息">
+    <h2 id="robotTitle">—</h2>
+    <p class="desc" id="robotDesc">加载 robots.json…</p>
+    <div class="meta-grid" id="metaGrid"></div>
+    <h2 style="margin-top:4px">关节</h2>
+    <div class="joint-list" id="jointList"></div>
+    <div class="btn-row">
+      <button type="button" id="btnHome">回 home</button>
+      <button type="button" id="btnZero">回零</button>
+      <button type="button" id="btnFit">适配相机</button>
+    </div>
+    <p id="statusErr" hidden></p>
+  </aside>
+    <div id="viewer" aria-label="3D 视图">
+    <div class="loading" id="loading">
+      <div class="loading-card">
+        <div class="loading-text" id="loadText">准备加载…</div>
+        <div class="loading-bar"><div class="loading-bar-fill" id="loadBar"></div></div>
+        <div class="loading-meta" id="loadMeta"></div>
+      </div>
+    </div>
+  </div>
+</div>

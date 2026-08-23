@@ -1,0 +1,887 @@
+{
+  "version": 1,
+  "updated_at": "2026-08-23T05:18:19Z",
+  "graphs": {
+    "sam2grasp_train": {
+      "id": "sam2grasp_train",
+      "label": "SAM2Grasp · 训练",
+      "blurb": "冻结 SAM2 离线抽特征 → 只训 ACT 头（chunk L2）",
+      "nodes": [
+        {
+          "id": "raw",
+          "title": "演示 / Episode",
+          "kind": "data",
+          "x": 40,
+          "y": 80,
+          "outputs": [
+            "RGB",
+            "bbox",
+            "qpos",
+            "action"
+          ],
+          "detail": "原始示教：相机帧、目标框、关节/末端状态与专家动作。",
+          "file": "convert_episodes.py"
+        },
+        {
+          "id": "sam2",
+          "title": "SAM2（冻结）",
+          "kind": "vision",
+          "x": 320,
+          "y": 40,
+          "inputs": [
+            "RGB",
+            "bbox"
+          ],
+          "outputs": [
+            "F_t"
+          ],
+          "detail": "提示驱动感知：bbox 引导冻结 SAM2，输出物体中心特征图。",
+          "file": "sam2_features.py / extract_sam2_features.py"
+        },
+        {
+          "id": "cache",
+          "title": "特征缓存 F_t",
+          "kind": "cache",
+          "x": 600,
+          "y": 40,
+          "inputs": [
+            "F_t"
+          ],
+          "outputs": [
+            "F_t"
+          ],
+          "detail": "离线缓存 [B,256,64,64]，训练不再跑 SAM2 前向。",
+          "file": "HDF5 obs/sam2_feat"
+        },
+        {
+          "id": "ds",
+          "title": "SAM2EpisodicDataset",
+          "kind": "data",
+          "x": 600,
+          "y": 260,
+          "inputs": [
+            "F_t",
+            "qpos",
+            "action"
+          ],
+          "outputs": [
+            "batch"
+          ],
+          "detail": "归一化 qpos/action，pad 到 chunk_size，产出训练 batch。",
+          "file": "dataset.py"
+        },
+        {
+          "id": "act",
+          "title": "ACTSAM2 Head",
+          "kind": "model",
+          "x": 900,
+          "y": 140,
+          "inputs": [
+            "batch"
+          ],
+          "outputs": [
+            "chunk"
+          ],
+          "detail": "SpatialPool → Transformer Enc/Dec → action_head；输出 [B,K,action_dim]。",
+          "file": "detr/models/act_sam2.py"
+        },
+        {
+          "id": "loss",
+          "title": "L2 Loss",
+          "kind": "loss",
+          "x": 1180,
+          "y": 140,
+          "inputs": [
+            "chunk",
+            "action"
+          ],
+          "outputs": [
+            "grad"
+          ],
+          "detail": "对非 pad 位置的动作 chunk 做 L2（默认确定性头，非 CVAE）。",
+          "file": "policy.py · ACTSAM2Policy"
+        },
+        {
+          "id": "opt",
+          "title": "AdamW / ckpt",
+          "kind": "ctrl",
+          "x": 1460,
+          "y": 140,
+          "inputs": [
+            "grad"
+          ],
+          "outputs": [
+            "weights"
+          ],
+          "detail": "只更新 ACT 头参数；写出 policy_best.ckpt + policy_config。",
+          "file": "train.py"
+        },
+        {
+          "id": "qpos_t",
+          "title": "本体感觉 qpos",
+          "kind": "robot",
+          "x": 320,
+          "y": 280,
+          "outputs": [
+            "qpos"
+          ],
+          "detail": "Proprio Prop_t，维数通常 7（含夹爪）。",
+          "file": "dataset 字段 qpos"
+        },
+        {
+          "id": "act_gt",
+          "title": "专家动作 chunk",
+          "kind": "robot",
+          "x": 320,
+          "y": 420,
+          "outputs": [
+            "action"
+          ],
+          "detail": "未来 K 步动作标签（joint / cartesian / SE(3) 相对等）。",
+          "file": "convert_episodes.py"
+        }
+      ],
+      "edges": [
+        {
+          "from": "raw",
+          "fromPort": "RGB",
+          "to": "sam2",
+          "toPort": "RGB",
+          "label": "I_t"
+        },
+        {
+          "from": "raw",
+          "fromPort": "bbox",
+          "to": "sam2",
+          "toPort": "bbox",
+          "label": "prompt"
+        },
+        {
+          "from": "sam2",
+          "fromPort": "F_t",
+          "to": "cache",
+          "toPort": "F_t"
+        },
+        {
+          "from": "cache",
+          "fromPort": "F_t",
+          "to": "ds",
+          "toPort": "F_t"
+        },
+        {
+          "from": "qpos_t",
+          "fromPort": "qpos",
+          "to": "ds",
+          "toPort": "qpos"
+        },
+        {
+          "from": "act_gt",
+          "fromPort": "action",
+          "to": "ds",
+          "toPort": "action"
+        },
+        {
+          "from": "raw",
+          "fromPort": "qpos",
+          "to": "qpos_t",
+          "toPort": "qpos"
+        },
+        {
+          "from": "raw",
+          "fromPort": "action",
+          "to": "act_gt",
+          "toPort": "action"
+        },
+        {
+          "from": "ds",
+          "fromPort": "batch",
+          "to": "act",
+          "toPort": "batch"
+        },
+        {
+          "from": "act",
+          "fromPort": "chunk",
+          "to": "loss",
+          "toPort": "chunk",
+          "label": "pred"
+        },
+        {
+          "from": "act_gt",
+          "fromPort": "action",
+          "to": "loss",
+          "toPort": "action",
+          "label": "GT"
+        },
+        {
+          "from": "loss",
+          "fromPort": "grad",
+          "to": "opt",
+          "toPort": "grad"
+        }
+      ]
+    },
+    "sam2grasp_infer": {
+      "id": "sam2grasp_infer",
+      "label": "SAM2Grasp · 推理",
+      "blurb": "在线 SAM2 特征 + ACT chunk → 缓冲回放 / 下发控制",
+      "nodes": [
+        {
+          "id": "cam",
+          "title": "相机 RGB",
+          "kind": "data",
+          "x": 40,
+          "y": 120,
+          "outputs": [
+            "RGB"
+          ],
+          "detail": "实时观测 I_t。",
+          "file": "serve 客户端上报"
+        },
+        {
+          "id": "bbox",
+          "title": "目标 bbox",
+          "kind": "data",
+          "x": 40,
+          "y": 280,
+          "outputs": [
+            "bbox"
+          ],
+          "detail": "点击 / 追踪得到的提示框，引导 SAM2。",
+          "file": "serve 协议"
+        },
+        {
+          "id": "sam2s",
+          "title": "SAM2 Streaming",
+          "kind": "vision",
+          "x": 320,
+          "y": 160,
+          "inputs": [
+            "RGB",
+            "bbox"
+          ],
+          "outputs": [
+            "F_t"
+          ],
+          "detail": "在线提取与训练同维的 F_t。",
+          "file": "SAM2StreamingFeatureExtractor"
+        },
+        {
+          "id": "prop",
+          "title": "机器人状态",
+          "kind": "robot",
+          "x": 320,
+          "y": 360,
+          "outputs": [
+            "qpos"
+          ],
+          "detail": "当前 Prop_t / qpos。",
+          "file": "robot_state"
+        },
+        {
+          "id": "ckpt",
+          "title": "policy ckpt",
+          "kind": "cache",
+          "x": 600,
+          "y": 40,
+          "outputs": [
+            "weights"
+          ],
+          "detail": "训练得到的 ACT 头权重。",
+          "file": "policy_best.ckpt"
+        },
+        {
+          "id": "policy",
+          "title": "ACTSAM2Policy",
+          "kind": "model",
+          "x": 600,
+          "y": 200,
+          "inputs": [
+            "F_t",
+            "qpos",
+            "weights"
+          ],
+          "outputs": [
+            "chunk"
+          ],
+          "detail": "推理得到未来 K 步动作块 A_t。",
+          "file": "policy.py / serve.py"
+        },
+        {
+          "id": "buf",
+          "title": "ClientState 缓冲",
+          "kind": "ctrl",
+          "x": 900,
+          "y": 200,
+          "inputs": [
+            "chunk"
+          ],
+          "outputs": [
+            "cmd"
+          ],
+          "detail": "默认 chunk_replay；可选 temporal_agg 时序集成。",
+          "file": "serve.py · ClientState"
+        },
+        {
+          "id": "ctrl",
+          "title": "底层控制器",
+          "kind": "robot",
+          "x": 1180,
+          "y": 200,
+          "inputs": [
+            "cmd"
+          ],
+          "outputs": [
+            "exec"
+          ],
+          "detail": "下发关节 / 末端指令到真机或仿真。",
+          "file": "robot runtime"
+        },
+        {
+          "id": "eval",
+          "title": "Embody 评测页",
+          "kind": "data",
+          "x": 1460,
+          "y": 200,
+          "inputs": [
+            "exec"
+          ],
+          "outputs": [],
+          "detail": "落盘 episode 后可在本仓库 index/hub 回放与打分。",
+          "file": "embody_model_eval"
+        }
+      ],
+      "edges": [
+        {
+          "from": "cam",
+          "fromPort": "RGB",
+          "to": "sam2s",
+          "toPort": "RGB"
+        },
+        {
+          "from": "bbox",
+          "fromPort": "bbox",
+          "to": "sam2s",
+          "toPort": "bbox"
+        },
+        {
+          "from": "sam2s",
+          "fromPort": "F_t",
+          "to": "policy",
+          "toPort": "F_t"
+        },
+        {
+          "from": "prop",
+          "fromPort": "qpos",
+          "to": "policy",
+          "toPort": "qpos"
+        },
+        {
+          "from": "ckpt",
+          "fromPort": "weights",
+          "to": "policy",
+          "toPort": "weights"
+        },
+        {
+          "from": "policy",
+          "fromPort": "chunk",
+          "to": "buf",
+          "toPort": "chunk",
+          "label": "A_t"
+        },
+        {
+          "from": "buf",
+          "fromPort": "cmd",
+          "to": "ctrl",
+          "toPort": "cmd"
+        },
+        {
+          "from": "ctrl",
+          "fromPort": "exec",
+          "to": "eval",
+          "toPort": "exec",
+          "label": "log"
+        }
+      ]
+    },
+    "act_train": {
+      "id": "act_train",
+      "label": "纯 ACT · 训练",
+      "blurb": "RGB→ResNet18 骨干 + CVAE 动作编码器 → Transformer chunk（L1+KL）",
+      "nodes": [
+        {
+          "id": "raw",
+          "title": "Episode HDF5",
+          "kind": "data",
+          "x": 40,
+          "y": 160,
+          "outputs": [
+            "RGB",
+            "qpos",
+            "action"
+          ],
+          "detail": "示教数据：多相机 RGB、qpos、未来动作序列（无 SAM2 / bbox 条件）。",
+          "file": "convert_episodes.py / dataset.py"
+        },
+        {
+          "id": "norm",
+          "title": "ImageNet Normalize",
+          "kind": "vision",
+          "x": 300,
+          "y": 40,
+          "inputs": [
+            "RGB"
+          ],
+          "outputs": [
+            "img"
+          ],
+          "detail": "mean/std 标准化后送入视觉骨干（ACTPolicy）。",
+          "file": "policy.py · ACTPolicy"
+        },
+        {
+          "id": "backbone",
+          "title": "ResNet18 Backbone",
+          "kind": "vision",
+          "x": 560,
+          "y": 40,
+          "inputs": [
+            "img"
+          ],
+          "outputs": [
+            "feat"
+          ],
+          "detail": "可训练视觉骨干，输出空间特征图（约 H/32 × W/32 tokens）。",
+          "file": "detr/models/backbone.py"
+        },
+        {
+          "id": "proj",
+          "title": "input_proj",
+          "kind": "model",
+          "x": 820,
+          "y": 40,
+          "inputs": [
+            "feat"
+          ],
+          "outputs": [
+            "vis"
+          ],
+          "detail": "1×1 Conv 将 backbone 通道投到 hidden_dim。",
+          "file": "detr/models/detr_vae.py"
+        },
+        {
+          "id": "cvae",
+          "title": "CVAE Action Encoder",
+          "kind": "model",
+          "x": 560,
+          "y": 280,
+          "inputs": [
+            "qpos",
+            "action"
+          ],
+          "outputs": [
+            "z"
+          ],
+          "detail": "训练时：CLS+qpos+a_seq → μ/logvar → 采样 latent z（dim≈32）。",
+          "file": "DETRVAE encoder"
+        },
+        {
+          "id": "tf",
+          "title": "Transformer Enc/Dec",
+          "kind": "model",
+          "x": 820,
+          "y": 200,
+          "inputs": [
+            "vis",
+            "qpos",
+            "z"
+          ],
+          "outputs": [
+            "hs"
+          ],
+          "detail": "视觉 tokens + proprio + latent 前缀；decoder queries = chunk_size。",
+          "file": "detr/models/transformer.py"
+        },
+        {
+          "id": "head",
+          "title": "action_head",
+          "kind": "model",
+          "x": 1080,
+          "y": 200,
+          "inputs": [
+            "hs"
+          ],
+          "outputs": [
+            "chunk"
+          ],
+          "detail": "Linear → [B, K, action_dim]；另有 is_pad_head。",
+          "file": "detr_vae.py · action_head"
+        },
+        {
+          "id": "loss",
+          "title": "L1 + KL",
+          "kind": "loss",
+          "x": 1340,
+          "y": 200,
+          "inputs": [
+            "chunk",
+            "action",
+            "z"
+          ],
+          "outputs": [
+            "grad"
+          ],
+          "detail": "mask 后 L1 重构 + kl_weight × KL(μ,σ)；对应原始 ACT。",
+          "file": "policy.py · ACTPolicy"
+        },
+        {
+          "id": "opt",
+          "title": "AdamW / ckpt",
+          "kind": "ctrl",
+          "x": 1600,
+          "y": 200,
+          "inputs": [
+            "grad"
+          ],
+          "outputs": [
+            "weights"
+          ],
+          "detail": "端到端更新 backbone + CVAE + Transformer。",
+          "file": "train.py（非 --sam2 路径）"
+        },
+        {
+          "id": "qpos",
+          "title": "qpos",
+          "kind": "robot",
+          "x": 300,
+          "y": 280,
+          "outputs": [
+            "qpos"
+          ],
+          "detail": "本体感觉，与 action_dim 对齐（常为 7）。",
+          "file": "dataset"
+        },
+        {
+          "id": "agt",
+          "title": "专家 action seq",
+          "kind": "robot",
+          "x": 300,
+          "y": 420,
+          "outputs": [
+            "action"
+          ],
+          "detail": "chunk 长度 = num_queries；训练时进入 CVAE 编码器。",
+          "file": "dataset"
+        }
+      ],
+      "edges": [
+        {
+          "from": "raw",
+          "fromPort": "RGB",
+          "to": "norm",
+          "toPort": "RGB",
+          "label": "I_t"
+        },
+        {
+          "from": "norm",
+          "fromPort": "img",
+          "to": "backbone",
+          "toPort": "img"
+        },
+        {
+          "from": "backbone",
+          "fromPort": "feat",
+          "to": "proj",
+          "toPort": "feat"
+        },
+        {
+          "from": "proj",
+          "fromPort": "vis",
+          "to": "tf",
+          "toPort": "vis"
+        },
+        {
+          "from": "raw",
+          "fromPort": "qpos",
+          "to": "qpos",
+          "toPort": "qpos"
+        },
+        {
+          "from": "raw",
+          "fromPort": "action",
+          "to": "agt",
+          "toPort": "action"
+        },
+        {
+          "from": "qpos",
+          "fromPort": "qpos",
+          "to": "cvae",
+          "toPort": "qpos"
+        },
+        {
+          "from": "agt",
+          "fromPort": "action",
+          "to": "cvae",
+          "toPort": "action"
+        },
+        {
+          "from": "cvae",
+          "fromPort": "z",
+          "to": "tf",
+          "toPort": "z",
+          "label": "latent"
+        },
+        {
+          "from": "qpos",
+          "fromPort": "qpos",
+          "to": "tf",
+          "toPort": "qpos"
+        },
+        {
+          "from": "tf",
+          "fromPort": "hs",
+          "to": "head",
+          "toPort": "hs"
+        },
+        {
+          "from": "head",
+          "fromPort": "chunk",
+          "to": "loss",
+          "toPort": "chunk",
+          "label": "pred"
+        },
+        {
+          "from": "agt",
+          "fromPort": "action",
+          "to": "loss",
+          "toPort": "action",
+          "label": "GT"
+        },
+        {
+          "from": "cvae",
+          "fromPort": "z",
+          "to": "loss",
+          "toPort": "z",
+          "label": "KL"
+        },
+        {
+          "from": "loss",
+          "fromPort": "grad",
+          "to": "opt",
+          "toPort": "grad"
+        }
+      ]
+    },
+    "act_infer": {
+      "id": "act_infer",
+      "label": "纯 ACT · 推理",
+      "blurb": "无动作 GT：CVAE 侧用先验采样 z，ResNet+Transformer 输出 chunk",
+      "nodes": [
+        {
+          "id": "cam",
+          "title": "相机 RGB",
+          "kind": "data",
+          "x": 40,
+          "y": 120,
+          "outputs": [
+            "RGB"
+          ],
+          "detail": "实时图像（可多相机堆叠）。",
+          "file": "serve 客户端"
+        },
+        {
+          "id": "prop",
+          "title": "机器人 qpos",
+          "kind": "robot",
+          "x": 40,
+          "y": 300,
+          "outputs": [
+            "qpos"
+          ],
+          "detail": "当前本体感觉。",
+          "file": "robot_state"
+        },
+        {
+          "id": "norm",
+          "title": "Normalize",
+          "kind": "vision",
+          "x": 300,
+          "y": 80,
+          "inputs": [
+            "RGB"
+          ],
+          "outputs": [
+            "img"
+          ],
+          "detail": "与训练相同的 ImageNet 归一化。",
+          "file": "ACTPolicy"
+        },
+        {
+          "id": "bb",
+          "title": "ResNet18",
+          "kind": "vision",
+          "x": 540,
+          "y": 80,
+          "inputs": [
+            "img"
+          ],
+          "outputs": [
+            "feat"
+          ],
+          "detail": "加载 ckpt 中的视觉骨干。",
+          "file": "backbone.py"
+        },
+        {
+          "id": "prior",
+          "title": "CVAE 先验 z",
+          "kind": "model",
+          "x": 540,
+          "y": 280,
+          "inputs": [
+            "qpos"
+          ],
+          "outputs": [
+            "z"
+          ],
+          "detail": "推理无 action GT：从标准正态 / 先验取 latent（不作 action 编码）。",
+          "file": "detr_vae.py infer path"
+        },
+        {
+          "id": "ckpt",
+          "title": "ACT ckpt",
+          "kind": "cache",
+          "x": 540,
+          "y": 420,
+          "outputs": [
+            "weights"
+          ],
+          "detail": "含 backbone + transformer + heads。",
+          "file": "policy_best.ckpt"
+        },
+        {
+          "id": "policy",
+          "title": "ACTPolicy / DETRVAE",
+          "kind": "model",
+          "x": 820,
+          "y": 180,
+          "inputs": [
+            "feat",
+            "qpos",
+            "z",
+            "weights"
+          ],
+          "outputs": [
+            "chunk"
+          ],
+          "detail": "前向得到 a_hat chunk。",
+          "file": "policy.py · ACTPolicy"
+        },
+        {
+          "id": "buf",
+          "title": "动作缓冲",
+          "kind": "ctrl",
+          "x": 1100,
+          "y": 180,
+          "inputs": [
+            "chunk"
+          ],
+          "outputs": [
+            "cmd"
+          ],
+          "detail": "chunk 回放或 temporal aggregation。",
+          "file": "serve.py"
+        },
+        {
+          "id": "ctrl",
+          "title": "底层控制",
+          "kind": "robot",
+          "x": 1360,
+          "y": 180,
+          "inputs": [
+            "cmd"
+          ],
+          "outputs": [
+            "exec"
+          ],
+          "detail": "下发到真机 / 仿真。",
+          "file": "robot runtime"
+        },
+        {
+          "id": "eval",
+          "title": "Embody 评测",
+          "kind": "data",
+          "x": 1600,
+          "y": 180,
+          "inputs": [
+            "exec"
+          ],
+          "outputs": [],
+          "detail": "日志转 episode 后回放打分。",
+          "file": "embody_model_eval"
+        }
+      ],
+      "edges": [
+        {
+          "from": "cam",
+          "fromPort": "RGB",
+          "to": "norm",
+          "toPort": "RGB"
+        },
+        {
+          "from": "norm",
+          "fromPort": "img",
+          "to": "bb",
+          "toPort": "img"
+        },
+        {
+          "from": "bb",
+          "fromPort": "feat",
+          "to": "policy",
+          "toPort": "feat"
+        },
+        {
+          "from": "prop",
+          "fromPort": "qpos",
+          "to": "prior",
+          "toPort": "qpos"
+        },
+        {
+          "from": "prop",
+          "fromPort": "qpos",
+          "to": "policy",
+          "toPort": "qpos"
+        },
+        {
+          "from": "prior",
+          "fromPort": "z",
+          "to": "policy",
+          "toPort": "z",
+          "label": "prior"
+        },
+        {
+          "from": "ckpt",
+          "fromPort": "weights",
+          "to": "policy",
+          "toPort": "weights"
+        },
+        {
+          "from": "policy",
+          "fromPort": "chunk",
+          "to": "buf",
+          "toPort": "chunk",
+          "label": "A_t"
+        },
+        {
+          "from": "buf",
+          "fromPort": "cmd",
+          "to": "ctrl",
+          "toPort": "cmd"
+        },
+        {
+          "from": "ctrl",
+          "fromPort": "exec",
+          "to": "eval",
+          "toPort": "exec"
+        }
+      ]
+    }
+  }
+}

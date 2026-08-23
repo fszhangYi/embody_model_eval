@@ -1,0 +1,59 @@
+<header>
+  <div class="header-brand">
+    <h1 id="graphTitle" title="训练数据流">训练数据流</h1>
+    <p class="header-blurb" id="graphBlurb" title="冻结 SAM2 离线抽特征 → 只训 ACT 头">冻结 SAM2 离线抽特征 → 只训 ACT 头</p>
+  </div>
+  <div class="toolbar">
+    <label class="muted" for="pipelineSelect">模型</label>
+    <select id="pipelineSelect" class="pipeline-select" aria-label="选择模型管线"></select>
+    <div class="seg" role="group" aria-label="阶段">
+      <button type="button" id="btnTrain" class="active">训练</button>
+      <button type="button" id="btnInfer">推理</button>
+    </div>
+    <button type="button" id="btnAnim">流动演示</button>
+    <button type="button" id="btnFit">适配视图</button>
+    <button type="button" id="btnSaveGraph" title="将当前四套图（含节点文案与位置）保存到服务器 config/pipeline_graphs.json">保存图</button>
+    <span class="save-status" id="saveStatus"></span>
+    <span class="rec-pill" id="recPill"><i class="blink"></i>REC <span id="recTimer">00:00</span></span>
+    <div class="rec-group" aria-label="录像">
+      <button type="button" id="btnRecStart" title="快捷键 R：开始录制画布">录像</button>
+      <button type="button" id="btnRecStop" class="danger" disabled title="快捷键 T：停止">停止</button>
+      <button type="button" id="btnRecSave" disabled title="快捷键 S：保存 WebM">保存</button>
+      <span class="rec-status" id="recStatus">未录制 · WebM · R/T/S</span>
+    </div>
+  </div>
+</header>
+
+<div class="layout" id="pipelineLayout">
+  <div class="stage-wrap">
+    <div id="flowStage">
+      <canvas id="flowCanvas"></canvas>
+    </div>
+    <button type="button" class="side-open-fab" id="btnShowSide" title="显示节点说明">节点说明</button>
+  </div>
+  <aside class="side" id="nodeSide" aria-label="节点说明">
+    <div class="side-head">
+      <h2>节点说明</h2>
+      <button type="button" class="side-toggle" id="btnHideSide" title="隐藏说明面板">隐藏</button>
+    </div>
+    <div id="nodeDetail">
+      <p class="muted">点击节点查看说明；拖动画布空白处平移，滚轮缩放。</p>
+    </div>
+    <div class="legend">
+      <span><i style="background:#3b82f6"></i>data</span>
+      <span><i style="background:#a855f7"></i>vision</span>
+      <span><i style="background:#f59e0b"></i>model</span>
+      <span><i style="background:#ef4444"></i>loss</span>
+      <span><i style="background:#22c55e"></i>robot</span>
+      <span><i style="background:#14b8a6"></i>cache</span>
+      <span><i style="background:#64748b"></i>ctrl</span>
+    </div>
+    <ul class="hint-list">
+      <li>下拉切换 <strong>SAM2Grasp</strong> 与 <strong>纯 ACT (CVAE)</strong>；再选训练 / 推理。</li>
+      <li><strong>双击节点</strong>可编辑标题 / 类型 / 说明 / 文件；拖动可改位置。</li>
+      <li>顶栏 <strong>保存图</strong> 将改动写入服务器 <code>config/pipeline_graphs.json</code>。</li>
+      <li>连线表示张量 / 控制流，结构对齐 <code>act_robot</code> 源码路径。</li>
+      <li>顶栏 <strong>录像</strong> 可录制当前画布为 WebM（快捷键 R 开始 / T 停止 / S 保存）。</li>
+    </ul>
+  </aside>
+</div>

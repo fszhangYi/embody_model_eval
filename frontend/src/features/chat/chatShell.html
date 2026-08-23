@@ -1,0 +1,83 @@
+<header>
+  <div>
+    <h1>AI Chat</h1>
+    <p class="header-blurb">选择托管 Skill → 配置 Agent 链接 → 发送诉求并查看回执</p>
+  </div>
+  <div class="header-status" id="apiStatus">检测 API…</div>
+</header>
+
+<div class="layout">
+  <aside class="panel" aria-label="托管 Skills">
+    <h2>
+      托管 Skills
+      <button type="button" class="btn-sm" id="btnRefresh" title="刷新列表与配置">刷新</button>
+    </h2>
+    <p class="muted" id="selectedHint">未选择 skill</p>
+    <div id="managedSkills"></div>
+    <div class="preview-box" id="skillPreview" hidden>
+      <div class="preview-head">
+        <span id="previewTitle">Skill 预览</span>
+        <button type="button" class="btn-sm" id="btnClosePreview">收起</button>
+      </div>
+      <pre class="preview-body" id="previewBody"></pre>
+    </div>
+    <h3 id="sourceHeading">可导入</h3>
+    <div id="sourceSkills"></div>
+  </aside>
+
+  <main class="chat-main" aria-label="对话">
+    <div class="chat-toolbar">
+      <span class="muted" id="turnHint">新会话</span>
+      <span class="grow"></span>
+      <button type="button" class="btn-sm" id="btnClearChat" title="清空本页对话历史">清空对话</button>
+      <button type="button" class="btn-sm" id="btnExportChat" title="导出本页对话为 Markdown">导出 MD</button>
+    </div>
+    <div id="chatLog"></div>
+    <div class="composer">
+      <textarea id="chatInput" placeholder="输入诉求…（Ctrl/⌘ + Enter 发送）"></textarea>
+      <div class="composer-row">
+        <span class="muted"></span>
+        <button type="button" class="btn-primary" id="btnSend">发送</button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="panel" aria-label="Agent 链接">
+    <h2>Agent 链接</h2>
+    <div class="field">
+      <label for="cfgMode">模式</label>
+      <select id="cfgMode">
+        <option value="dry_run">dry_run（本地回执，不调外部）</option>
+        <option value="openai">openai（兼容 /chat/completions）</option>
+        <option value="webhook">webhook（POST 诉求+skills JSON）</option>
+        <option value="cursor_sdk">cursor_sdk（可选 pip：cursor-sdk）</option>
+      </select>
+    </div>
+    <div id="linkFields" hidden>
+      <div class="field">
+        <label for="cfgBaseUrl">Base URL</label>
+        <input id="cfgBaseUrl" placeholder="https://api.openai.com/v1 或自建网关" />
+      </div>
+      <div class="field">
+        <label for="cfgPath">Path</label>
+        <input id="cfgPath" placeholder="/chat/completions 或 webhook 路径" />
+      </div>
+    </div>
+    <div class="field">
+      <label for="cfgModel">Model</label>
+      <input id="cfgModel" placeholder="composer-2.5 / gpt-4o-mini …" />
+    </div>
+    <div class="field">
+      <label for="cfgApiKey">API Key</label>
+      <input id="cfgApiKey" type="password" autocomplete="off" />
+    </div>
+    <div class="field">
+      <label for="cfgSystem">System 前缀</label>
+      <textarea id="cfgSystem"></textarea>
+    </div>
+    <button type="button" id="btnSaveConfig">保存到服务端</button>
+    <p class="muted" style="margin-top:10px">配置写入 <code>agent_skills/.agent_config.json</code>（勿提交密钥）。也可用环境变量 <code>CURSOR_API_KEY</code> / <code>AGENT_API_KEY</code>。</p>
+  </aside>
+</div>
+
+<div id="toast" hidden></div>

@@ -1,0 +1,67 @@
+<header>
+  <h1>Embody Eval Hub</h1>
+  <span class="muted">C13 多 episode 汇总 · C14 多模型对比 · 数据目录 <code>data/&lt;suite&gt;/</code></span>
+  <span class="header-spacer"></span>
+</header>
+<main>
+  <div class="card">
+    <div class="muted">选择 <code>data/</code> 下的子目录；自动加载合法比对 JSON（须含已登记的 <code>meta.robot</code>）。可用机型见 <code>robots.json</code>。</div>
+    <div class="row" style="margin-top:10px">
+      <label class="muted" for="suiteSelect">数据套件</label>
+      <select id="suiteSelect" disabled>
+        <option value="">扫描 data/ …</option>
+      </select>
+      <button id="btnReloadSuites" type="button">刷新列表</button>
+      <button id="btnLoadSuite" type="button">加载</button>
+    </div>
+    <p class="muted" id="status">尚未加载</p>
+
+    <details class="adv">
+      <summary>高级：手动 manifest / 追加路径</summary>
+      <div class="row">
+        <input id="manifestPath" style="flex:1;min-width:220px" value="./episodes.manifest.example.json"/>
+        <button id="btnLoad" type="button">加载 manifest</button>
+      </div>
+      <div class="row">
+        <input id="extraPaths" style="flex:1;min-width:220px" placeholder="额外 episode JSON，逗号分隔，如 ./data/20260819/episode_1.json"/>
+        <button id="btnAdd" type="button">加入对比</button>
+      </div>
+    </details>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px;font-size:0.95rem">汇总（C13）</h3>
+    <div class="stats" id="aggStats"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px;font-size:0.95rem">Episode 表</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th><th>标题</th><th>机型</th><th>模型</th><th>n</th>
+            <th>mean L2</th><th>TCP e_p μ</th><th>双阈值达标</th>
+            <th>任务</th><th>单位</th><th>action</th><th>obs</th><th>打开</th>
+          </tr>
+        </thead>
+        <tbody id="epBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin:0 0 10px;font-size:0.95rem">模型对比（C14）</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>模型</th><th>episodes</th><th>mean L2</th>
+            <th>TCP e_p μ</th><th>双阈值达标</th><th>ckpt / policy</th>
+          </tr>
+        </thead>
+        <tbody id="modelBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>

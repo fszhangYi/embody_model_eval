@@ -34,6 +34,7 @@ from typing import Any
 from urllib.parse import unquote, urlparse
 
 ROOT = Path(__file__).resolve().parent.parent
+DIST = ROOT / "dist"
 SKILLS_DIR = ROOT / "agent_skills"
 CONFIG_PATH = SKILLS_DIR / ".agent_config.json"
 PIPELINE_GRAPHS_PATH = ROOT / "config" / "pipeline_graphs.json"
@@ -46,6 +47,19 @@ SOURCE_ROOTS = {
 }
 CURSOR_HOME = Path.home() / ".cursor"
 CURSOR_SCAN_SKIP = {".run", "chats", "projects", "ai-tracking", "sandbox-policies"}
+
+# Served from repo root (not Vite dist). /assets/ is special: Vite bundles
+# live in dist/assets/; repo assets/ holds favicons only.
+STATIC_ROOT_PREFIXES = (
+    "/data/",
+    "/config/",
+    "/models/",
+    "/vendor/",
+    "/agent_skills/",
+    "/css/",
+    "/js/",
+    "/legacy/",
+)
 
 
 def _json_bytes(obj: Any, status: int = 200) -> tuple[int, bytes, str]:
@@ -571,6 +585,35 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
+    def translate_path(self, path: str) -> str:
+        """Serve repo-root static assets; SPA from dist/ when built."""
+        rel = unquote(urlparse(path).path)
+        if rel == "/":
+            rel = "/index.html"
+
+        for prefix in STATIC_ROOT_PREFIXES:
+            if rel == prefix.rstrip("/") or rel.startswith(prefix):
+                return str(ROOT / rel.lstrip("/"))
+
+        if DIST.is_dir() and (DIST / "index.html").is_file():
+            candidate = DIST / rel.lstrip("/")
+            if candidate.is_file():
+                return str(candidate)
+
+        # Favicons etc. in repo assets/ (Vite hashed chunks are in dist/assets/)
+        if rel.startswith("/assets/"):
+            root_asset = ROOT / rel.lstrip("/")
+            if root_asset.is_file():
+                return str(root_asset)
+
+        if DIST.is_dir() and (DIST / "index.html").is_file():
+            suffix = Path(rel).suffix.lower()
+            if suffix in ("", ".html"):
+                return str(DIST / "index.html")
+            return str(DIST / rel.lstrip("/"))
+
+        return str(ROOT / rel.lstrip("/"))
+
     def log_message(self, fmt: str, *args: Any) -> None:
         print("[%s] %s" % (self.log_date_time_string(), fmt % args), file=sys.stderr)
 
@@ -780,6 +823,10 @@ def main() -> None:
         subprocess.run([sys.executable, str(refresh)], check=False)
     httpd = ThreadingHTTPServer((args.bind, args.port), Handler)
     print(f"Serving {ROOT} on http://{args.bind}:{args.port}/ (agent API enabled)", flush=True)
+    if (DIST / "index.html").is_file():
+        print(f"React SPA: {DIST}", flush=True)
+    else:
+        print(f"React SPA: not built (run: cd frontend && npm run build)", flush=True)
     print(f"Skills dir: {SKILLS_DIR}", flush=True)
     try:
         httpd.serve_forever()

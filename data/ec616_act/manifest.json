@@ -1,0 +1,9 @@
+{
+  "suite": "ec616_act",
+  "infer_dir": "/root/autodl-tmp/act_robot/data/infer_cam100_15_cart_abs_v1",
+  "output_dir": "/root/autodl-tmp/embody_model_eval/data/ec616_act",
+  "num_converted": 99,
+  "num_failed": 0,
+  "elapsed_sec": 58.79739964008331,
+  "errors": []
+}
