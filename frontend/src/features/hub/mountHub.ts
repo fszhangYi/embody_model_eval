@@ -10,6 +10,11 @@ import {
 } from '../../lib/legacy/robots_registry.js';
 import { hasObservation, getCameras } from '../../lib/legacy/obs_align.js';
 import { analyzeTaskEpisode, outcomeTagClass } from '../../lib/legacy/task_events.js';
+import {
+  createLoader,
+  withLoader,
+  hideLoader,
+} from '../../lib/legacy/loading.js';
 
 export function mountHub(): void {
 const DATA_ROOT = '/data';
@@ -18,6 +23,8 @@ const SKIP_JSON = new Set(['index.json', 'catalog.json', 'manifest.json']);
 const $ = (id) => document.getElementById(id);
 const rows = []; // { id, label, model, path, summary }
 let robotRegistry = null;
+const pageLoader = createLoader(document.querySelector('.hub-page'), { mode: 'page', id: 'hubPageLoader' });
+hideLoader(pageLoader);
 
 function fmt(x, d = 2) {
   return Number.isFinite(x) ? x.toFixed(d) : '—';
@@ -205,44 +212,50 @@ async function ingest(path, { id, label, model } = {}) {
 
 async function loadSuite(suiteId) {
   if (!suiteId) throw new Error('请选择数据套件');
-  const registry = await ensureRobotRegistry();
-  rows.length = 0;
-  $('status').textContent = `扫描 ${DATA_ROOT}/${suiteId}/ …`;
-  const files = await listEpisodeFiles(suiteId);
-  const skipped = [];
-  for (const name of files) {
-    const path = `${DATA_ROOT}/${suiteId}/${name}`;
-    try {
-      const data = await fetchJson(path);
-      const check = validateEpisodeAgainstRegistry(data, registry);
-      if (!check.ok) {
-        skipped.push(`${name}（${check.errors[0] || '校验失败'}）`);
-        continue;
+  await withLoader(pageLoader, async (progress) => {
+    const registry = await ensureRobotRegistry();
+    rows.length = 0;
+    progress(0.06, `扫描 ${DATA_ROOT}/${suiteId}/`, '列出 episode 文件');
+    const files = await listEpisodeFiles(suiteId);
+    const skipped = [];
+    const total = Math.max(files.length, 1);
+    for (let i = 0; i < files.length; i++) {
+      const name = files[i];
+      progress(0.1 + 0.82 * ((i + 1) / total), `加载 ${name}`, `${i + 1} / ${files.length}`);
+      const path = `${DATA_ROOT}/${suiteId}/${name}`;
+      try {
+        const data = await fetchJson(path);
+        const check = validateEpisodeAgainstRegistry(data, registry);
+        if (!check.ok) {
+          skipped.push(`${name}（${check.errors[0] || '校验失败'}）`);
+          continue;
+        }
+        const summary = summarizeEpisode(data, null);
+        await enrichFromSidecar(path, summary);
+        const epId = name.replace(/\.json$/i, '');
+        const task = analyzeTaskEpisode(data);
+        rows.push({
+          id: epId,
+          label: data.meta?.title || epId,
+          model: data.meta?.policy || data.meta?.model || 'default',
+          path,
+          summary,
+          has_obs: hasObservation(data),
+          obs_cams: getCameras(data.meta).map((c) => c.id),
+          task,
+        });
+      } catch (e) {
+        skipped.push(`${name}（${e.message}）`);
       }
-      const summary = summarizeEpisode(data, null);
-      await enrichFromSidecar(path, summary);
-      const epId = name.replace(/\.json$/i, '');
-      const task = analyzeTaskEpisode(data);
-      rows.push({
-        id: epId,
-        label: data.meta?.title || epId,
-        model: data.meta?.policy || data.meta?.model || 'default',
-        path,
-        summary,
-        has_obs: hasObservation(data),
-        obs_cams: getCameras(data.meta).map((c) => c.id),
-        task,
-      });
-    } catch (e) {
-      skipped.push(`${name}（${e.message}）`);
     }
-  }
-  const known = listRobots(registry).map((r) => r.id).join(', ');
-  let msg = `套件 ${suiteId} · 已加载 ${rows.length} episode · 可用机型 [${known}]`;
-  if (files.length === 0) msg += ' · 目录下无 .json';
-  if (skipped.length) msg += ` · 跳过 ${skipped.length}：${skipped.join('；')}`;
-  $('status').textContent = msg;
-  render();
+    const known = listRobots(registry).map((r) => r.id).join(', ');
+    let msg = `套件 ${suiteId} · 已加载 ${rows.length} episode · 可用机型 [${known}]`;
+    if (files.length === 0) msg += ' · 目录下无 .json';
+    if (skipped.length) msg += ` · 跳过 ${skipped.length}：${skipped.join('；')}`;
+    progress(0.96, '渲染表格…', msg);
+    $('status').textContent = msg;
+    render();
+  }, { text: `加载套件 ${suiteId}`, detail: '读取 episode JSON' });
 }
 
 async function refreshSuiteSelect(preferred) {
@@ -250,15 +263,19 @@ async function refreshSuiteSelect(preferred) {
   sel.disabled = true;
   sel.innerHTML = '<option value="">扫描中…</option>';
   try {
-    const suites = await discoverSuites();
-    sel.innerHTML = suites.map((id) => `<option value="${id}">${id}</option>`).join('')
-      || '<option value="">（无子目录）</option>';
-    sel.disabled = !suites.length;
-    const pick = preferred && suites.includes(preferred)
-      ? preferred
-      : (suites.includes('20260819') ? '20260819' : suites[0]);
-    if (pick) sel.value = pick;
-    return pick || '';
+    return await withLoader(pageLoader, async (progress) => {
+      progress(0.2, '扫描 data/ 套件…', '读取 index.json');
+      const suites = await discoverSuites();
+      sel.innerHTML = suites.map((id) => `<option value="${id}">${id}</option>`).join('')
+        || '<option value="">（无子目录）</option>';
+      sel.disabled = !suites.length;
+      const pick = preferred && suites.includes(preferred)
+        ? preferred
+        : (suites.includes('20260819') ? '20260819' : suites[0]);
+      if (pick) sel.value = pick;
+      progress(0.9, '套件列表就绪', pick || '无可用套件');
+      return pick || '';
+    }, { text: '扫描数据套件', detail: 'data/' });
   } catch (e) {
     sel.innerHTML = '<option value="">扫描失败</option>';
     throw e;
@@ -266,32 +283,38 @@ async function refreshSuiteSelect(preferred) {
 }
 
 async function loadManifest(path) {
-  rows.length = 0;
-  const registry = await ensureRobotRegistry();
-  $('status').textContent = `加载 ${path} …`;
-  const man = await fetchJson(path);
-  const thr = man.thresholds || {};
-  const skipped = [];
-  for (const ep of man.episodes || []) {
-    const data = await fetchJson(ep.path);
-    const check = validateEpisodeAgainstRegistry(data, registry);
-    if (!check.ok) {
-      skipped.push(`${ep.id || ep.path}（${check.errors[0] || '校验失败'}）`);
-      continue;
+  await withLoader(pageLoader, async (progress) => {
+    rows.length = 0;
+    const registry = await ensureRobotRegistry();
+    progress(0.12, `加载 manifest`, path);
+    const man = await fetchJson(path);
+    const thr = man.thresholds || {};
+    const skipped = [];
+    const episodes = man.episodes || [];
+    const total = Math.max(episodes.length, 1);
+    for (let i = 0; i < episodes.length; i++) {
+      const ep = episodes[i];
+      progress(0.15 + 0.8 * ((i + 1) / total), `加载 ${ep.id || ep.path}`, `${i + 1} / ${episodes.length}`);
+      const data = await fetchJson(ep.path);
+      const check = validateEpisodeAgainstRegistry(data, registry);
+      if (!check.ok) {
+        skipped.push(`${ep.id || ep.path}（${check.errors[0] || '校验失败'}）`);
+        continue;
+      }
+      const summary = summarizeEpisode(data, null, thr);
+      rows.push({
+        id: ep.id,
+        label: ep.label || summary.title,
+        model: ep.model || summary.provenance.policy || 'default',
+        path: ep.path,
+        summary,
+      });
     }
-    const summary = summarizeEpisode(data, null, thr);
-    rows.push({
-      id: ep.id,
-      label: ep.label || summary.title,
-      model: ep.model || summary.provenance.policy || 'default',
-      path: ep.path,
-      summary,
-    });
-  }
-  let msg = `已加载 ${rows.length} episode · ${man.title || path}`;
-  if (skipped.length) msg += ` · 跳过 ${skipped.length}：${skipped.join('；')}`;
-  $('status').textContent = msg;
-  render();
+    let msg = `已加载 ${rows.length} episode · ${man.title || path}`;
+    if (skipped.length) msg += ` · 跳过 ${skipped.length}：${skipped.join('；')}`;
+    $('status').textContent = msg;
+    render();
+  }, { text: '加载 manifest', detail: path });
 }
 
 $('btnReloadSuites').onclick = () => {

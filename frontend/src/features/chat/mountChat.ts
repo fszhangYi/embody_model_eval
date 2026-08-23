@@ -2,11 +2,18 @@
 
 /** Auto-ported */
 
-
+import {
+  createLoader,
+  withLoader,
+  hideLoader,
+  inlineLoadingHtml,
+} from '../../lib/legacy/loading.js';
 
 export function mountChat(): void {
 const $ = (sel) => document.querySelector(sel);
 const STORAGE_KEY = 'embody_chat_v1';
+const pageLoader = createLoader(document.querySelector('.chat-page'), { mode: 'page', id: 'chatPageLoader' });
+hideLoader(pageLoader);
 
 
 
@@ -257,7 +264,7 @@ async function showSkillPreview(id) {
   const body = $('#previewBody');
   box.hidden = false;
   title.textContent = `预览 · ${id}`;
-  body.textContent = '加载中…';
+  body.innerHTML = inlineLoadingHtml('加载 Skill 内容…');
   const out = await api(`/api/skills/${encodeURIComponent(id)}`);
   if (state.previewId !== id) return;
   if (!out.ok) {
@@ -532,7 +539,12 @@ $('#cfgMode').addEventListener('change', toggleLinkFields);
 $('#btnSaveConfig').addEventListener('click', () => saveConfig());
 $('#btnRefresh').addEventListener('click', async () => {
   try {
-    await Promise.all([refreshSkills(), refreshConfig()]);
+    await withLoader(pageLoader, async (progress) => {
+      progress(0.25, '刷新 Skills…', 'agent_skills/');
+      await refreshSkills();
+      progress(0.75, '刷新配置…', 'agent 链接');
+      await refreshConfig();
+    }, { text: '刷新 Chat 数据', detail: 'Skills · 配置' });
   } catch (e) {
     toast(String(e.message || e), 'err');
   }
@@ -554,12 +566,18 @@ $('#chatInput').addEventListener('keydown', (e) => {
 (async function boot() {
   restoreTurns();
   try {
-    const health = await api('/api/health');
-    if (!health.ok) throw new Error('API 不可用');
-    $('#apiStatus').textContent = 'API 已连接';
-    $('#apiStatus').dataset.ok = '1';
-    await refreshSkills();
-    await refreshConfig();
+    await withLoader(pageLoader, async (progress) => {
+      progress(0.15, '连接 API…', '/api/health');
+      const health = await api('/api/health');
+      if (!health.ok) throw new Error('API 不可用');
+      $('#apiStatus').textContent = 'API 已连接';
+      $('#apiStatus').dataset.ok = '1';
+      progress(0.45, '加载 Skills…', 'agent_skills/');
+      await refreshSkills();
+      progress(0.8, '加载配置…', 'Agent 链接');
+      await refreshConfig();
+      progress(1, '就绪', '可以开始对话');
+    }, { text: '初始化 AI Chat', detail: '连接后端服务' });
     renderChatFromState();
   } catch (e) {
     $('#apiStatus').textContent = 'API 未连接 — 请用 ./serve.sh 启动';

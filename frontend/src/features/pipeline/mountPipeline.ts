@@ -9,9 +9,18 @@ import {
   applyServerGraphs,
   exportCanonicalGraphs,
 } from '../../lib/legacy/pipeline_flow.js';
+import {
+  createLoader,
+  withLoader,
+  hideLoader,
+} from '../../lib/legacy/loading.js';
 
 export async function mountPipeline(): Promise<void> {
 
+const stageLoader = createLoader(document.querySelector('.pipeline-page .stage-wrap'), {
+  id: 'pipelineStageLoader',
+});
+hideLoader(stageLoader);
 const btnSaveGraph = document.getElementById('btnSaveGraph');
 const saveStatus = document.getElementById('saveStatus');
 
@@ -78,18 +87,24 @@ function refresh() {
 }
 
 async function loadServerGraphs() {
-  try {
-    const res = await fetch('/api/pipeline/graphs', { cache: 'no-store' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json();
-    const n = applyServerGraphs(data.graphs || {});
-    if (n > 0) {
-      saveStatus.textContent = `已加载服务器图 ×${n}`;
-      saveStatus.className = 'save-status ok';
+  await withLoader(stageLoader, async (progress) => {
+    progress(0.2, '加载数据流图…', 'pipeline_graphs.json');
+    try {
+      const res = await fetch('/api/pipeline/graphs', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      progress(0.75, '应用图配置…', `${Object.keys(data.graphs || {}).length} 套`);
+      const n = applyServerGraphs(data.graphs || {});
+      if (n > 0) {
+        saveStatus.textContent = `已加载服务器图 ×${n}`;
+        saveStatus.className = 'save-status ok';
+      }
+      progress(1, '数据流就绪', n > 0 ? `已加载 ${n} 套图` : '使用内置默认图');
+    } catch (err) {
+      console.warn('pipeline graphs load skipped', err);
+      progress(1, '使用内置默认图', String(err.message || err));
     }
-  } catch (err) {
-    console.warn('pipeline graphs load skipped', err);
-  }
+  }, { text: '加载管线配置', detail: '/api/pipeline/graphs' });
 }
 
 async function saveGraphsToServer() {

@@ -11,6 +11,11 @@ import {
   normalizeRobotProfile,
 } from '../../lib/legacy/robots_registry.js';
 import { mountViewTools } from '../../lib/legacy/view_tools.js';
+import {
+  bindLoader,
+  setLoadProgress as updateLoadProgress,
+  hideLoader,
+} from '../../lib/legacy/loading.js';
 
 export function mountRobots(): void {
 const DEG2RAD = Math.PI / 180;
@@ -70,15 +75,14 @@ scene.add(grid);
 const axes = new THREE.AxesHelper(0.18);
 scene.add(axes);
 
+const robotLoader = bindLoader(els.loading);
+
 function setLoadProgress(p, text, meta = '') {
-  els.loading.hidden = false;
-  els.loadText.textContent = text || '加载中…';
-  els.loadBar.style.width = `${Math.round(Math.max(0, Math.min(1, p)) * 100)}%`;
-  els.loadMeta.textContent = meta || '';
+  updateLoadProgress(robotLoader, p, text, meta);
 }
 
 function hideLoading() {
-  els.loading.hidden = true;
+  hideLoader(robotLoader);
 }
 
 function showError(msg) {

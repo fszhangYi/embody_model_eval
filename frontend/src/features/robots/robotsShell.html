@@ -25,11 +25,14 @@
     <p id="statusErr" hidden></p>
   </aside>
     <div id="viewer" aria-label="3D 视图">
-    <div class="loading" id="loading">
-      <div class="loading-card">
-        <div class="loading-text" id="loadText">准备加载…</div>
-        <div class="loading-bar"><div class="loading-bar-fill" id="loadBar"></div></div>
-        <div class="loading-meta" id="loadMeta"></div>
+    <div class="emb-load loading" id="loading">
+      <div class="emb-load-card loading-card">
+        <div class="emb-load-spinner" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div class="emb-load-text loading-text" id="loadText">准备加载…</div>
+        <div class="emb-load-bar loading-bar" aria-hidden="true">
+          <div class="emb-load-bar-fill loading-bar-fill" id="loadBar"></div>
+        </div>
+        <div class="emb-load-meta loading-meta" id="loadMeta"></div>
       </div>
     </div>
   </div>

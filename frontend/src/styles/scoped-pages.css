@@ -29,3 +29,9 @@
   min-height: 0;
   height: auto !important;
 }
+
+.pipeline-page .stage-wrap,
+.eval-page #arm3d,
+.robots-page #viewer {
+  position: relative;
+}

@@ -43,6 +43,12 @@ import {
 } from '../../lib/legacy/kinematics_cal.js';
 import { sampleCollisionClouds, analyzeHullCollisions, makeCollisionCloudPoints, syncCollisionCloudPoints, setRobotMeshesVisible } from '../../lib/legacy/collision_geom.js';
 import { mountViewTools } from '../../lib/legacy/view_tools.js';
+import {
+  bindLoader,
+  setLoadProgress as updateLoadProgress,
+  hideLoader,
+  failLoader,
+} from '../../lib/legacy/loading.js';
 
 export async function bootstrapEval(): Promise<void> {
 
@@ -671,16 +677,10 @@ function getTcp(robot, out = new THREE.Vector3()) {
   return getTcpPose(robot, out).pos;
 }
 
+const evalLoader = bindLoader(document.getElementById('loadHint'));
+
 function setLoadProgress(ratio, text, detail) {
-  const pct = Math.max(0, Math.min(1, Number.isFinite(ratio) ? ratio : 0));
-  const fill = document.getElementById('loadBarFill');
-  const pctEl = document.getElementById('loadPct');
-  const textEl = document.getElementById('loadText');
-  const detailEl = document.getElementById('loadDetail');
-  if (fill) fill.style.width = `${(pct * 100).toFixed(1)}%`;
-  if (pctEl) pctEl.textContent = `${Math.round(pct * 100)}%`;
-  if (text != null && textEl) textEl.textContent = text;
-  if (detail != null && detailEl) detailEl.textContent = detail;
+  updateLoadProgress(evalLoader, ratio, text, detail);
 }
 
 function loadRobot(urdfUrl, { onProgress, label, rootEulerDeg } = {}) {
@@ -1953,7 +1953,7 @@ try {
   setLoadProgress(0.12, `加载 ${robotCfg.label} 模型…`, '开始下载 URDF / STL');
 
   const world = await initScene(document.getElementById('arm3d'), DATA.frames, robotCfg);
-  document.getElementById('loadHint')?.remove();
+  hideLoader(evalLoader, { remove: true });
   world.resize();
   mountViewTools(document.getElementById('arm3d'), world.controls, {
     onFit: () => {
@@ -2680,7 +2680,7 @@ try {
   requestAnimationFrame(loop);
 } catch (err) {
   document.getElementById('subtitle').textContent = '加载失败: ' + err.message;
-  setLoadProgress(1, '加载失败', err.message);
+  failLoader(evalLoader, '加载失败', err.message);
   const fill = document.getElementById('loadBarFill');
   if (fill) fill.style.background = 'linear-gradient(90deg, #7f1d1d, #f87171)';
   console.error(err);
