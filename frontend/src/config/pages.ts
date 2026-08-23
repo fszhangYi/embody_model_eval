@@ -1,4 +1,4 @@
-export type PageId = 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots'
+export type PageId = 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline'
 
 export interface PageDef {
   id: PageId
@@ -43,6 +43,13 @@ export const PAGES: PageDef[] = [
     label: '机械臂 3D',
     short: '机型',
     desc: '下拉选择机型，Three.js 浏览 URDF',
+  },
+  {
+    id: 'actPipeline',
+    path: '/act-pipeline',
+    label: 'ACT 数据流水线',
+    short: 'ACT',
+    desc: 'raw → HDF5 → 训练 → 推理 → embody JSON',
   },
 ]
 

@@ -15,6 +15,7 @@ function resolvePageId(pathname: string): PageId {
   if (pathname.startsWith('/pipeline')) return 'pipeline'
   if (pathname.startsWith('/chat')) return 'chat'
   if (pathname.startsWith('/robots')) return 'robots'
+  if (pathname.startsWith('/act-pipeline')) return 'actPipeline'
   return 'eval'
 }
 

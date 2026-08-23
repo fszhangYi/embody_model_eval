@@ -157,6 +157,7 @@ const recStatus = document.getElementById('recStatus');
 const recPill = document.getElementById('recPill');
 const recTimerEl = document.getElementById('recTimer');
 
+if (btnRecStart && btnRecStop && btnRecSave && recStatus && recPill) {
 let mediaRecorder = null;
 let recChunks = [];
 let recBlob = null;
@@ -254,9 +255,9 @@ btnRecStart.addEventListener('click', () => {
     };
     mediaRecorder.start(200);
     recStartedAt = performance.now();
-    recTimerEl.textContent = '00:00';
+    if (recTimerEl) recTimerEl.textContent = '00:00';
     recTimerId = setInterval(() => {
-      recTimerEl.textContent = formatMMSS(performance.now() - recStartedAt);
+      if (recTimerEl) recTimerEl.textContent = formatMMSS(performance.now() - recStartedAt);
     }, 250);
     recStatus.textContent = '录制中…';
     setRecUI('recording');
@@ -312,6 +313,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 setRecUI('idle');
+}
 
 await loadServerGraphs();
 refresh();

@@ -12,6 +12,15 @@ Endpoints:
   PUT    /api/agent/config
   GET    /api/pipeline/graphs
   PUT    /api/pipeline/graphs
+  GET    /api/act-pipeline/spec
+  GET    /api/act-pipeline/link
+  POST   /api/act-pipeline/link
+  DELETE /api/act-pipeline/link
+  GET    /api/act-pipeline/jobs
+  GET    /api/act-pipeline/jobs/<id>
+  POST   /api/act-pipeline/run
+  GET    /api/fs/children?root=act|embody&path=<abs>&rootPath=<override>
+  GET    /api/fs/roots
   POST   /api/chat   (body: message, skillIds?, history?, config?)
 """
 
@@ -31,7 +40,21 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
+
+SCRIPTS_DIR = Path(__file__).resolve().parent
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+from act_pipeline_runner import (
+    create_act_link,
+    get_job,
+    link_status,
+    list_jobs,
+    pipeline_spec,
+    remove_act_link,
+    start_job,
+)
+from fs_browse import browse_roots, list_children
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
@@ -697,6 +720,51 @@ class Handler(SimpleHTTPRequestHandler):
                 }
             )
             return
+        if path == "/api/fs/roots":
+            self._send_json({"ok": True, "roots": browse_roots()})
+            return
+        if path == "/api/fs/children":
+            qs = parse_qs(parsed.query)
+            root_key = (qs.get("root") or ["act"])[0]
+            target = (qs.get("path") or [""])[0]
+            root_path = (qs.get("rootPath") or [""])[0] or None
+            try:
+                self._send_json(list_children(str(root_key), str(target), root_path))
+            except (ValueError, PermissionError, NotADirectoryError) as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/api/act-pipeline/spec":
+            qs = parse_qs(parsed.query)
+            act_root = (qs.get("actRoot") or [None])[0]
+            embody_root = (qs.get("embodyRoot") or [None])[0]
+            try:
+                self._send_json(pipeline_spec(act_root, embody_root))
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/api/act-pipeline/link":
+            qs = parse_qs(parsed.query)
+            embody_root = (qs.get("embodyRoot") or [""])[0]
+            act_root = (qs.get("actRoot") or [None])[0]
+            if not embody_root:
+                self._send_json({"ok": False, "error": "embodyRoot required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(link_status(embody_root, act_root))
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/api/act-pipeline/jobs":
+            self._send_json({"ok": True, "jobs": list_jobs()})
+            return
+        m_act_job = re.match(r"^/api/act-pipeline/jobs/([^/]+)$", path)
+        if m_act_job:
+            job = get_job(m_act_job.group(1))
+            if not job:
+                self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json({"ok": True, "job": job})
+            return
         super().do_GET()
 
     def do_PUT(self) -> None:  # noqa: N802
@@ -749,6 +817,17 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             shutil.rmtree(target)
             self._send_json({"ok": True, "deleted": sid})
+            return
+        if path == "/api/act-pipeline/link":
+            qs = parse_qs(parsed.query)
+            embody_root = (qs.get("embodyRoot") or [""])[0]
+            if not embody_root:
+                self._send_json({"ok": False, "error": "embodyRoot required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(remove_act_link(embody_root))
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
         self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
 
@@ -807,6 +886,47 @@ class Handler(SimpleHTTPRequestHandler):
             result = run_chat(body if isinstance(body, dict) else {})
             status = 200 if result.get("ok") else HTTPStatus.BAD_REQUEST
             self._send_json(result, status)
+            return
+
+        if path == "/api/act-pipeline/link":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            embody_root = body.get("embodyRoot") or body.get("embody_root") or ""
+            act_root = body.get("actRoot") or body.get("act_root") or ""
+            if not embody_root or not act_root:
+                self._send_json(
+                    {"ok": False, "error": "embodyRoot and actRoot required"},
+                    HTTPStatus.BAD_REQUEST,
+                )
+                return
+            try:
+                self._send_json(create_act_link(str(embody_root), str(act_root)))
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/act-pipeline/run":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            step_id = body.get("stepId") or body.get("step_id")
+            if not step_id:
+                self._send_json({"ok": False, "error": "stepId required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                params = body.get("params") if isinstance(body.get("params"), dict) else {}
+                act_root = body.get("actRoot") or body.get("act_root")
+                embody_root = body.get("embodyRoot") or body.get("embody_root")
+                job = start_job(
+                    str(step_id),
+                    params,
+                    act_root=str(act_root) if act_root else None,
+                    embody_root=str(embody_root) if embody_root else None,
+                )
+                self._send_json({"ok": True, "job": job})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
 
         self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)

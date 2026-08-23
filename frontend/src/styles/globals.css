@@ -34,6 +34,14 @@ body {
   min-height: 100vh;
 }
 
+html:has(.act-pipeline-page),
+body:has(.act-pipeline-page),
+#root:has(.act-pipeline-page) {
+  overflow: hidden;
+  height: 100%;
+  max-height: 100vh;
+}
+
 /* Shared page nav (ported from nav_pages.js styles) */
 .page-nav {
   position: relative;
