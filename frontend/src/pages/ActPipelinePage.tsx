@@ -192,7 +192,7 @@ export function ActPipelinePage() {
   const [embodyRoot, setEmbodyRoot] = useState('')
   const [actRoot, setActRoot] = useState('')
   const [linkReady, setLinkReady] = useState(false)
-  const [linkMsg, setLinkMsg] = useState('请先选择评测根目录，再选择训练/推理根目录')
+  const [linkMsg, setLinkMsg] = useState('')
 
   const browseRoots = useMemo(
     () => ({
@@ -236,7 +236,7 @@ export function ActPipelinePage() {
           if (cancelled) return
           if (r.linked && r.matches) {
             setLinkReady(true)
-            setLinkMsg(`软链已就绪：${r.linkPath} → ${r.target}`)
+            setLinkMsg(`${r.linkPath} → ${r.target}`)
             const s = await fetchPipelineSpec(act, embody)
             setSpec(s)
             setParams(initParamsFromSpec(s))
@@ -411,6 +411,21 @@ export function ActPipelinePage() {
   }
 
   const embodyReady = Boolean(embodyRoot.trim())
+  const actReady = Boolean(actRoot.trim())
+
+  const linkDisplay = useMemo(() => {
+    if (linkReady) return linkMsg
+    if (!embodyReady) return ''
+    if (!actReady) return ''
+    return linkMsg || '正在建立软链…'
+  }, [linkReady, embodyReady, actReady, linkMsg])
+
+  const linkPlaceholder = useMemo(() => {
+    if (!embodyReady) return '请先选择评测根目录'
+    if (!actReady) return '请先选择训练/推理根目录'
+    if (linkReady) return ''
+    return '完成前两步后自动创建 act_robot 软链'
+  }, [embodyReady, actReady, linkReady])
 
   return (
     <div className="act-pipeline-page">
@@ -420,15 +435,6 @@ export function ActPipelinePage() {
           <p className="act-sub">raw → 质量过滤 → HDF5 → 训练 → 推理 → embody 对比 JSON</p>
         </div>
         <div className="act-header-actions">
-          <div className="act-header-meta">
-            {linkReady ? (
-              <span className="pill ok">软链已就绪</span>
-            ) : embodyReady ? (
-              <span className="pill warn">等待软链</span>
-            ) : (
-              <span className="pill idle">选择根目录</span>
-            )}
-          </div>
           <PageNav />
         </div>
       </header>
@@ -475,17 +481,21 @@ export function ActPipelinePage() {
             </button>
           </div>
         </label>
-      </div>
-
-      <div className={`act-link-banner${linkReady ? ' ok' : embodyReady && actRoot.trim() ? ' pending' : ''}`}>
-        <span className="act-link-step">3. 软链</span>
-        <span className="act-link-text">
-          {linkReady
-            ? linkMsg
-            : embodyReady && actRoot.trim()
-              ? linkMsg || '正在建立软链…'
-              : '完成前两步后，将在评测根目录下创建 act_robot 软链指向训练/推理根目录'}
-        </span>
+        <div
+          className={`act-root-field act-root-step${linkReady ? ' done' : ''}${!embodyReady || !actReady ? ' disabled' : ''}`}
+        >
+          <span className="act-root-step-label">3. 软链</span>
+          <div className="act-path-field">
+            <input
+              type="text"
+              readOnly
+              tabIndex={-1}
+              value={linkDisplay}
+              placeholder={linkPlaceholder}
+              className="act-path-readonly"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="act-flow" aria-label="流程总览">
@@ -687,11 +697,6 @@ export function ActPipelinePage() {
         <div className="act-footer-meta">
           {step ? <span className="act-footer-step">{step.title}</span> : null}
           {jobs.length > 0 ? <span>{jobs.length} 个历史任务</span> : null}
-          {linkReady ? (
-            <span className="act-footer-link ok">软链就绪</span>
-          ) : embodyReady && actRoot.trim() ? (
-            <span className="act-footer-link warn">软链待建</span>
-          ) : null}
         </div>
       </footer>
 
