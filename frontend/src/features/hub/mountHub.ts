@@ -23,6 +23,8 @@ const SKIP_JSON = new Set(['index.json', 'catalog.json', 'manifest.json']);
 const $ = (id) => document.getElementById(id);
 const rows = []; // { id, label, model, path, summary }
 let robotRegistry = null;
+let epPage = 1;
+let epPageSize = 25;
 const pageLoader = createLoader(document.querySelector('.hub-page'), { mode: 'page', id: 'hubPageLoader' });
 hideLoader(pageLoader);
 
@@ -116,17 +118,16 @@ async function listEpisodeFiles(suiteId) {
   }
 }
 
-function render() {
-  const agg = aggregateEpisodes(rows.map((r) => r.summary));
-  $('aggStats').innerHTML = [
-    ['episodes', agg.n],
-    ['mean L2', fmt(agg.mean_l2, 3)],
-    ['TCP e_p μ', fmt(agg.tcp_ep_mean_mm)],
-    ['双阈值达标', pct(agg.pass_both_rate)],
-    ['高达标 episode', `${agg.success_episodes ?? 0}`],
-  ].map(([l, v]) => `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+function renderEpisodeTable() {
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / epPageSize));
+  if (epPage > totalPages) epPage = totalPages;
+  if (epPage < 1) epPage = 1;
 
-  $('epBody').innerHTML = rows.map((r) => {
+  const start = (epPage - 1) * epPageSize;
+  const pageRows = rows.slice(start, start + epPageSize);
+
+  $('epBody').innerHTML = pageRows.map((r) => {
     const u = r.summary.unit;
     const unitCls = u.ok ? 'ok' : 'bad';
     const obsLabel = r.has_obs
@@ -153,6 +154,39 @@ function render() {
       <td><a href="/?data=${encodeURIComponent(r.path)}">评测</a></td>
     </tr>`;
   }).join('') || '<tr><td colspan="13" class="muted">暂无 episode</td></tr>';
+
+  const pagination = $('epPagination');
+  const pageInfo = $('epPageInfo');
+  const prevBtn = $('epPagePrev');
+  const nextBtn = $('epPageNext');
+  const sizeSelect = $('epPageSize');
+  if (!pagination || !pageInfo || !prevBtn || !nextBtn || !sizeSelect) return;
+
+  if (total <= epPageSize) {
+    pagination.hidden = true;
+    return;
+  }
+
+  pagination.hidden = false;
+  const from = start + 1;
+  const to = Math.min(start + epPageSize, total);
+  pageInfo.textContent = `第 ${epPage} / ${totalPages} 页 · 显示 ${from}–${to} / 共 ${total} 条`;
+  prevBtn.disabled = epPage <= 1;
+  nextBtn.disabled = epPage >= totalPages;
+  if (String(epPageSize) !== sizeSelect.value) sizeSelect.value = String(epPageSize);
+}
+
+function render() {
+  const agg = aggregateEpisodes(rows.map((r) => r.summary));
+  $('aggStats').innerHTML = [
+    ['episodes', agg.n],
+    ['mean L2', fmt(agg.mean_l2, 3)],
+    ['TCP e_p μ', fmt(agg.tcp_ep_mean_mm)],
+    ['双阈值达标', pct(agg.pass_both_rate)],
+    ['高达标 episode', `${agg.success_episodes ?? 0}`],
+  ].map(([l, v]) => `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+
+  renderEpisodeTable();
 
   const byModel = new Map();
   for (const r of rows) {
@@ -215,6 +249,7 @@ async function loadSuite(suiteId) {
   await withLoader(pageLoader, async (progress) => {
     const registry = await ensureRobotRegistry();
     rows.length = 0;
+    epPage = 1;
     progress(0.06, `扫描 ${DATA_ROOT}/${suiteId}/`, '列出 episode 文件');
     const files = await listEpisodeFiles(suiteId);
     const skipped = [];
@@ -285,6 +320,7 @@ async function refreshSuiteSelect(preferred) {
 async function loadManifest(path) {
   await withLoader(pageLoader, async (progress) => {
     rows.length = 0;
+    epPage = 1;
     const registry = await ensureRobotRegistry();
     progress(0.12, `加载 manifest`, path);
     const man = await fetchJson(path);
@@ -355,6 +391,26 @@ $('btnAdd').onclick = async () => {
   } catch (e) {
     $('status').innerHTML = `<span class="bad">${e.message}</span>`;
   }
+};
+
+$('epPagePrev').onclick = () => {
+  if (epPage <= 1) return;
+  epPage -= 1;
+  renderEpisodeTable();
+};
+
+$('epPageNext').onclick = () => {
+  const totalPages = Math.max(1, Math.ceil(rows.length / epPageSize));
+  if (epPage >= totalPages) return;
+  epPage += 1;
+  renderEpisodeTable();
+};
+
+$('epPageSize').onchange = () => {
+  const next = Number($('epPageSize').value);
+  epPageSize = Number.isFinite(next) && next > 0 ? next : 25;
+  epPage = 1;
+  renderEpisodeTable();
 };
 
 (async () => {

@@ -35,7 +35,25 @@
   </div>
 
   <div class="card">
-    <h3 style="margin:0 0 10px;font-size:0.95rem">Episode 表</h3>
+    <div class="hub-ep-head">
+      <h3 style="margin:0;font-size:0.95rem">Episode 表</h3>
+      <div class="hub-ep-pagination" id="epPagination" hidden>
+        <span class="hub-ep-page-info muted" id="epPageInfo"></span>
+        <div class="hub-ep-page-actions">
+          <button id="epPagePrev" type="button">上一页</button>
+          <button id="epPageNext" type="button">下一页</button>
+          <label class="muted hub-ep-page-size" for="epPageSize">
+            每页
+            <select id="epPageSize">
+              <option value="10">10</option>
+              <option value="25" selected>25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
     <div class="table-wrap">
       <table>
         <thead>
