@@ -64,6 +64,13 @@ export function cancelJob(id: string) {
   )
 }
 
+export function deleteJob(id: string) {
+  return api<{ ok: boolean; deleted: string }>(
+    `/api/act-pipeline/jobs/${encodeURIComponent(id)}`,
+    { method: 'DELETE' },
+  )
+}
+
 export function fetchFsChildren(rootKey: string, path = '', rootPath?: string) {
   const qs = new URLSearchParams({ root: rootKey })
   if (path) qs.set('path', path)

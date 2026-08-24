@@ -19,6 +19,7 @@ Endpoints:
   GET    /api/act-pipeline/jobs
   GET    /api/act-pipeline/jobs/<id>
   POST   /api/act-pipeline/jobs/<id>/cancel
+  DELETE /api/act-pipeline/jobs/<id>
   POST   /api/act-pipeline/run
   GET    /api/fs/children?root=act|embody&path=<abs>&rootPath=<override>
   GET    /api/fs/roots
@@ -49,6 +50,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 from act_pipeline_runner import (
     cancel_job,
     create_act_link,
+    delete_job,
     get_job,
     link_status,
     list_jobs,
@@ -830,6 +832,13 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json(remove_act_link(embody_root))
             except ValueError as e:
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        m_act_job_del = re.match(r"^/api/act-pipeline/jobs/([^/]+)$", path)
+        if m_act_job_del:
+            if not delete_job(m_act_job_del.group(1)):
+                self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json({"ok": True, "deleted": m_act_job_del.group(1)})
             return
         self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
 

@@ -1168,13 +1168,20 @@
   padding: 0;
 }
 
+.act-job-item {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
 .act-job-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 6px;
   align-items: center;
-  width: 100%;
-  margin-bottom: 4px;
+  flex: 1;
+  min-width: 0;
   padding: 6px 8px;
   border: 0;
   border-radius: 8px;
@@ -1224,6 +1231,31 @@
   font-size: 0.62rem;
   color: var(--muted, #8b9bb4);
   text-transform: uppercase;
+}
+
+.act-job-delete {
+  flex: 0 0 auto;
+  width: 24px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted, #8b9bb4);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.act-job-delete:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.45);
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.act-job-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .act-banner {

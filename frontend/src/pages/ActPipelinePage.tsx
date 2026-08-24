@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PathPickerModal } from '../components/PathPickerModal'
 import { PageNav } from '../components/PageNav'
-import { cancelJob, fetchJob, fetchJobs, fetchPipelineSpec, createActLink, removeActLink, runPipelineStep } from '../features/actPipeline/api'
+import { cancelJob, deleteJob, fetchJob, fetchJobs, fetchPipelineSpec, createActLink, removeActLink, runPipelineStep } from '../features/actPipeline/api'
 import { TrainMemoryGuide } from '../features/actPipeline/TrainMemoryGuide'
 import type { BrowseRoot, PipelineJob, PipelineSpec, PipelineStep, StepField } from '../features/actPipeline/types'
 import '../styles/act-pipeline.css'
@@ -187,6 +187,7 @@ export function ActPipelinePage() {
   const [logSyncing, setLogSyncing] = useState(false)
   const [jobsSyncing, setJobsSyncing] = useState(false)
   const [canceling, setCanceling] = useState(false)
+  const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
   const [picker, setPicker] = useState<PickerTarget | null>(null)
   const [embodyRoot, setEmbodyRoot] = useState('')
   const [actRoot, setActRoot] = useState('')
@@ -319,6 +320,25 @@ export function ActPipelinePage() {
       setCanceling(false)
     }
   }, [activeJob, refreshJobs])
+
+  const onDeleteJob = useCallback(
+    async (job: PipelineJob) => {
+      if (!job.id || job.id === 'local') return
+      const label = `${job.stepId} (${job.status})`
+      if (!confirm(`确定删除历史任务「${label}」？此操作不可恢复。`)) return
+      setDeletingJobId(job.id)
+      try {
+        await deleteJob(job.id)
+        setJobs((prev) => prev.filter((j) => j.id !== job.id))
+        if (activeJob?.id === job.id) setActiveJob(null)
+      } catch {
+        /* ignore */
+      } finally {
+        setDeletingJobId(null)
+      }
+    },
+    [activeJob?.id],
+  )
 
   const onRun = useCallback(async () => {
     if (!step || !linkReady) return
@@ -609,7 +629,7 @@ export function ActPipelinePage() {
           </div>
           <ul>
             {jobs.map((j) => (
-              <li key={j.id}>
+              <li key={j.id} className="act-job-item">
                 <button
                   type="button"
                   className={`act-job-row${activeJob?.id === j.id ? ' active' : ''}`}
@@ -620,6 +640,19 @@ export function ActPipelinePage() {
                   <span className={`dot ${statusClass(j.status)}`} />
                   <span className="act-job-id">{j.stepId}</span>
                   <span className="act-job-st">{j.status}</span>
+                </button>
+                <button
+                  type="button"
+                  className="act-job-delete"
+                  disabled={deletingJobId === j.id}
+                  title="删除此历史任务"
+                  aria-label={`删除任务 ${j.stepId}`}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    void onDeleteJob(j)
+                  }}
+                >
+                  {deletingJobId === j.id ? '…' : '×'}
                 </button>
               </li>
             ))}

@@ -229,6 +229,7 @@ def pipeline_spec(act_root: str | None = None, embody_root: str | None = None) -
                 {"key": "numEpochs", "label": "num-epochs", "type": "number", "io": "config", "default": 2000},
                 {"key": "batchSize", "label": "batch-size", "type": "number", "io": "config", "default": 64},
                 {"key": "numWorkers", "label": "DataLoader 并行数 (num-workers)", "type": "number", "io": "config", "default": 4},
+                {"key": "hdf5CacheSize", "label": "HDF5 LRU 缓存 (hdf5-cache-size)", "type": "number", "io": "config", "default": 16},
                 {"key": "lr", "label": "lr", "type": "number", "io": "config", "default": 1e-5},
                 {"key": "klWeight", "label": "kl-weight", "type": "number", "io": "config", "default": 10.0},
                 {"key": "hiddenDim", "label": "hidden-dim", "type": "number", "io": "config", "default": 512},
@@ -489,6 +490,7 @@ def build_argv(step_id: str, params: dict[str, Any]) -> tuple[list[str], Path, s
             _flag("nheads"), str(p["nheads"]),
             _flag("seed"), str(p["seed"]),
             _flag("numWorkers"), str(p["numWorkers"]),
+            _flag("hdf5CacheSize"), str(p["hdf5CacheSize"]),
             _flag("actionRepr"), str(p["actionRepr"]),
             _flag("poolSize"), str(p["poolSize"]),
             _flag("cumulativeLossWeight"), str(p["cumulativeLossWeight"]),
@@ -818,6 +820,27 @@ def cancel_job(job_id: str) -> dict[str, Any] | None:
     _append_job_log(job, "\n[runner] cancelled by user\n")
     _kill_job_process(job_id)
     return get_job(job_id)
+
+
+def delete_job(job_id: str) -> bool:
+    _load_jobs()
+    with _lock:
+        job = _jobs.get(job_id)
+    if not job:
+        return False
+    status = job.get("status")
+    if status in ("queued", "running"):
+        cancel_job(job_id)
+
+    log_path = Path(job.get("logPath", ""))
+    with _lock:
+        _jobs.pop(job_id, None)
+    json_path = _job_path(job_id)
+    if json_path.is_file():
+        json_path.unlink()
+    if log_path.is_file():
+        log_path.unlink()
+    return True
 
 
 def get_job(job_id: str) -> dict[str, Any] | None:
