@@ -18,6 +18,7 @@ Endpoints:
   DELETE /api/act-pipeline/link
   GET    /api/act-pipeline/jobs
   GET    /api/act-pipeline/jobs/<id>
+  POST   /api/act-pipeline/jobs/<id>/cancel
   POST   /api/act-pipeline/run
   GET    /api/fs/children?root=act|embody&path=<abs>&rootPath=<override>
   GET    /api/fs/roots
@@ -46,6 +47,7 @@ SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 from act_pipeline_runner import (
+    cancel_job,
     create_act_link,
     get_job,
     link_status,
@@ -926,6 +928,18 @@ class Handler(SimpleHTTPRequestHandler):
                 )
                 self._send_json({"ok": True, "job": job})
             except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        m_cancel = re.match(r"^/api/act-pipeline/jobs/([^/]+)/cancel$", path)
+        if m_cancel:
+            try:
+                job = cancel_job(m_cancel.group(1))
+                if not job:
+                    self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json({"ok": True, "job": job})
+            except ValueError as e:
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
 

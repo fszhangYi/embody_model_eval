@@ -57,6 +57,13 @@ export function runPipelineStep(
   })
 }
 
+export function cancelJob(id: string) {
+  return api<{ ok: boolean; job: PipelineJob }>(
+    `/api/act-pipeline/jobs/${encodeURIComponent(id)}/cancel`,
+    { method: 'POST' },
+  )
+}
+
 export function fetchFsChildren(rootKey: string, path = '', rootPath?: string) {
   const qs = new URLSearchParams({ root: rootKey })
   if (path) qs.set('path', path)

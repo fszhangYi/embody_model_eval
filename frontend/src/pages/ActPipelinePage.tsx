@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PathPickerModal } from '../components/PathPickerModal'
 import { PageNav } from '../components/PageNav'
-import { fetchJob, fetchJobs, fetchPipelineSpec, createActLink, removeActLink, runPipelineStep } from '../features/actPipeline/api'
+import { cancelJob, fetchJob, fetchJobs, fetchPipelineSpec, createActLink, removeActLink, runPipelineStep } from '../features/actPipeline/api'
+import { TrainMemoryGuide } from '../features/actPipeline/TrainMemoryGuide'
 import type { BrowseRoot, PipelineJob, PipelineSpec, PipelineStep, StepField } from '../features/actPipeline/types'
 import '../styles/act-pipeline.css'
 
@@ -166,8 +167,13 @@ function truncatePath(path: string, max = 42): string {
 function statusClass(status: string): string {
   if (status === 'succeeded') return 'ok'
   if (status === 'failed') return 'err'
+  if (status === 'cancelled') return 'cancel'
   if (status === 'running') return 'run'
   return 'idle'
+}
+
+function isJobActive(status: string): boolean {
+  return status === 'queued' || status === 'running'
 }
 
 export function ActPipelinePage() {
@@ -178,6 +184,9 @@ export function ActPipelinePage() {
   const [activeJob, setActiveJob] = useState<PipelineJob | null>(null)
   const [jobs, setJobs] = useState<PipelineJob[]>([])
   const [busy, setBusy] = useState(false)
+  const [logSyncing, setLogSyncing] = useState(false)
+  const [jobsSyncing, setJobsSyncing] = useState(false)
+  const [canceling, setCanceling] = useState(false)
   const [picker, setPicker] = useState<PickerTarget | null>(null)
   const [embodyRoot, setEmbodyRoot] = useState('')
   const [actRoot, setActRoot] = useState('')
@@ -258,12 +267,12 @@ export function ActPipelinePage() {
   }, [step])
 
   useEffect(() => {
-    if (!activeJob || activeJob.status === 'succeeded' || activeJob.status === 'failed') return
+    if (!activeJob || !isJobActive(activeJob.status)) return
     const t = setInterval(() => {
       fetchJob(activeJob.id)
         .then((r) => {
           setActiveJob(r.job)
-          if (r.job.status === 'succeeded' || r.job.status === 'failed') {
+          if (!isJobActive(r.job.status)) {
             fetchJobs().then((x) => setJobs(x.jobs)).catch(() => {})
           }
         })
@@ -271,6 +280,45 @@ export function ActPipelinePage() {
     }, 1500)
     return () => clearInterval(t)
   }, [activeJob])
+
+  const refreshJobs = useCallback(async () => {
+    setJobsSyncing(true)
+    try {
+      const list = await fetchJobs()
+      setJobs(list.jobs)
+    } catch {
+      /* ignore */
+    } finally {
+      setJobsSyncing(false)
+    }
+  }, [])
+
+  const refreshActiveJobLog = useCallback(async () => {
+    if (!activeJob?.id || activeJob.id === 'local') return
+    setLogSyncing(true)
+    try {
+      const [jobRes] = await Promise.all([fetchJob(activeJob.id), refreshJobs()])
+      setActiveJob(jobRes.job)
+    } catch {
+      /* ignore */
+    } finally {
+      setLogSyncing(false)
+    }
+  }, [activeJob?.id, refreshJobs])
+
+  const onCancel = useCallback(async () => {
+    if (!activeJob?.id || activeJob.id === 'local' || !isJobActive(activeJob.status)) return
+    setCanceling(true)
+    try {
+      const { job } = await cancelJob(activeJob.id)
+      setActiveJob(job)
+      await refreshJobs()
+    } catch {
+      /* ignore */
+    } finally {
+      setCanceling(false)
+    }
+  }, [activeJob, refreshJobs])
 
   const onRun = useCallback(async () => {
     if (!step || !linkReady) return
@@ -433,14 +481,13 @@ export function ActPipelinePage() {
 
       {loadErr ? <div className="act-banner err">{loadErr}</div> : null}
 
-      <div className={`act-layout${linkReady ? '' : ' locked'}`}>
+      <div className="act-layout">
         <aside className="act-steps">
           <h2>步骤</h2>
           {spec?.steps.map((s) => (
             <button
               key={s.id}
               type="button"
-              disabled={!linkReady}
               className={`act-step-btn${s.id === stepId ? ' active' : ''}${s.variant ? ' variant' : ''}`}
               onClick={() => setStepId(s.id)}
               title={s.subtitle ? `推荐脚本：${s.subtitle}` : undefined}
@@ -455,59 +502,111 @@ export function ActPipelinePage() {
         <main className="act-main">
           {step ? (
             <>
-              <div className="act-step-head">
-                <div>
-                  <h2>{step.title}</h2>
-                  <p className="muted">{step.description}</p>
+              <div className={`act-config${linkReady ? '' : ' locked'}`}>
+                <div className="act-step-head">
+                  <div>
+                    <h2>{step.title}</h2>
+                    <p className="muted">{step.description}</p>
+                    {!linkReady ? (
+                      <p className="act-config-hint muted">完成根目录选择与软链建立后，可配置并运行此步骤</p>
+                    ) : null}
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={busy || !linkReady}
+                    onClick={() => void onRun()}
+                  >
+                    {busy ? '启动中…' : '运行此步骤'}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  disabled={busy || !linkReady}
-                  onClick={() => void onRun()}
-                >
-                  {busy ? '启动中…' : '运行此步骤'}
-                </button>
+                <div className="act-fields">
+                  {step.fields.map((f) => (
+                    <FieldInput
+                      key={f.key}
+                      field={f}
+                      value={currentParams[f.key] ?? ''}
+                      browseRoots={browseRoots}
+                      onChange={(v) => setField(f.key, v)}
+                      disabled={!linkReady}
+                      ioRole={fieldIoRole(f, step)}
+                      onBrowse={
+                        f.type === 'path' && linkReady
+                          ? () => setPicker({ kind: 'field', field: f })
+                          : undefined
+                      }
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="act-fields">
-                {step.fields.map((f) => (
-                  <FieldInput
-                    key={f.key}
-                    field={f}
-                    value={currentParams[f.key] ?? ''}
-                    browseRoots={browseRoots}
-                    onChange={(v) => setField(f.key, v)}
-                    disabled={!linkReady}
-                    ioRole={fieldIoRole(f, step)}
-                    onBrowse={
-                      f.type === 'path' && linkReady
-                        ? () => setPicker({ kind: 'field', field: f })
-                        : undefined
-                    }
-                  />
-                ))}
-              </div>
+              {step.id === 'train' ? (
+                <TrainMemoryGuide
+                  batchSize={Number(currentParams.batchSize) || 64}
+                  numWorkers={Number(currentParams.numWorkers) || 4}
+                  cameraNames={String(currentParams.cameraNames ?? '')}
+                />
+              ) : null}
             </>
           ) : null}
 
           <section className="act-log">
             <div className="act-log-head">
               <h3>运行日志</h3>
-              {activeJob ? (
-                <span className={`act-status ${statusClass(activeJob.status)}`}>{activeJob.status}</span>
-              ) : null}
+              <div className="act-log-actions">
+                {activeJob?.scriptLogPath ? (
+                  <span className="act-log-file" title={activeJob.scriptLogPath}>
+                    训练日志
+                  </span>
+                ) : null}
+                {activeJob && activeJob.id !== 'local' && isJobActive(activeJob.status) ? (
+                  <button
+                    type="button"
+                    className="act-log-cancel"
+                    disabled={canceling}
+                    onClick={() => void onCancel()}
+                    title="终止当前任务及其子进程"
+                  >
+                    {canceling ? '取消中…' : '取消任务'}
+                  </button>
+                ) : null}
+                {activeJob && activeJob.id !== 'local' ? (
+                  <button
+                    type="button"
+                    className="act-log-refresh"
+                    disabled={logSyncing}
+                    onClick={() => void refreshActiveJobLog()}
+                    title="从日志文件重新读取并同步"
+                  >
+                    {logSyncing ? '同步中…' : '刷新同步日志'}
+                  </button>
+                ) : null}
+                {activeJob ? (
+                  <span className={`act-status ${statusClass(activeJob.status)}`}>{activeJob.status}</span>
+                ) : null}
+              </div>
             </div>
             {activeJob?.command ? <pre className="act-cmd">{activeJob.command}</pre> : null}
             <pre className="act-log-body">
               {activeJob?.logTail ||
                 activeJob?.error ||
-                (linkReady ? '选择步骤并点击「运行此步骤」' : '完成根目录选择与软链建立后，可配置并运行步骤')}
+                (linkReady ? '选择步骤并点击「运行此步骤」' : '可在右侧查看历史任务日志；配置步骤需先完成根目录选择')}
             </pre>
           </section>
         </main>
 
         <aside className="act-jobs">
-          <h2>历史任务</h2>
+          <div className="act-jobs-head">
+            <h2>历史任务</h2>
+            <button
+              type="button"
+              className="act-jobs-refresh"
+              disabled={jobsSyncing}
+              onClick={() => void refreshJobs()}
+              title="刷新历史任务列表"
+            >
+              {jobsSyncing ? '…' : '刷新'}
+            </button>
+          </div>
           <ul>
             {jobs.map((j) => (
               <li key={j.id}>

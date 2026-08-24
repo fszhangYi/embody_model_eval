@@ -38,3 +38,6 @@ agent_skills/.run/
 # React frontend
 frontend/node_modules/
 dist/
+
+# ACT
+act_robot/

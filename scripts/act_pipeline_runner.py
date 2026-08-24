@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import subprocess
 import sys
 import threading
@@ -22,6 +23,7 @@ ACT_LINK_NAME = "act_robot"
 
 _lock = threading.Lock()
 _jobs: dict[str, dict[str, Any]] = {}
+_procs: dict[str, subprocess.Popen[Any]] = {}
 
 
 def _resolve_dir(path: str) -> Path:
@@ -226,6 +228,7 @@ def pipeline_spec(act_root: str | None = None, embody_root: str | None = None) -
                 {"key": "chunkSize", "label": "chunk-size", "type": "number", "io": "config", "default": 10},
                 {"key": "numEpochs", "label": "num-epochs", "type": "number", "io": "config", "default": 2000},
                 {"key": "batchSize", "label": "batch-size", "type": "number", "io": "config", "default": 64},
+                {"key": "numWorkers", "label": "DataLoader 并行数 (num-workers)", "type": "number", "io": "config", "default": 4},
                 {"key": "lr", "label": "lr", "type": "number", "io": "config", "default": 1e-5},
                 {"key": "klWeight", "label": "kl-weight", "type": "number", "io": "config", "default": 10.0},
                 {"key": "hiddenDim", "label": "hidden-dim", "type": "number", "io": "config", "default": 512},
@@ -234,7 +237,6 @@ def pipeline_spec(act_root: str | None = None, embody_root: str | None = None) -
                 {"key": "decLayers", "label": "dec-layers", "type": "number", "io": "config", "default": 7},
                 {"key": "nheads", "label": "nheads", "type": "number", "io": "config", "default": 8},
                 {"key": "seed", "label": "seed", "type": "number", "io": "config", "default": 0},
-                {"key": "numWorkers", "label": "num-workers", "type": "number", "io": "config", "default": 4},
                 {"key": "useSam2Features", "label": "use-sam2-features", "type": "checkbox", "io": "config", "default": False},
                 {"key": "actionRepr", "label": "action-repr（SAM2）", "type": "select", "io": "config", "default": "absolute", "options": ["absolute", "delta"]},
                 {"key": "poolSize", "label": "pool-size（SAM2）", "type": "number", "io": "config", "default": 0},
@@ -581,47 +583,156 @@ def build_argv(step_id: str, params: dict[str, Any]) -> tuple[list[str], Path, s
     return argv, cwd, " ".join(argv)
 
 
+def _read_log_tail(path: Path, max_chars: int = 12000) -> str:
+    if not path.is_file():
+        return ""
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    return text[-max_chars:] if len(text) > max_chars else text
+
+
+def _log_header(job_id: str, cmdline: str, cwd: Path, *, script_log: Path | None = None) -> str:
+    lines = [
+        f"# act_pipeline job {job_id}",
+        f"# {cmdline}",
+        f"# cwd={cwd}",
+    ]
+    if script_log is not None:
+        lines.append(f"# scriptLog={script_log}")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _is_job_cancelled(job_id: str) -> bool:
+    with _lock:
+        job = _jobs.get(job_id)
+    return bool(job and job.get("status") == "cancelled")
+
+
+def _kill_job_process(job_id: str) -> None:
+    with _lock:
+        proc = _procs.get(job_id)
+    if proc is None or proc.poll() is not None:
+        return
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+    except (ProcessLookupError, OSError):
+        try:
+            proc.terminate()
+        except OSError:
+            return
+    try:
+        proc.wait(timeout=8)
+    except subprocess.TimeoutExpired:
+        try:
+            os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+        except (ProcessLookupError, OSError):
+            try:
+                proc.kill()
+            except OSError:
+                pass
+        try:
+            proc.wait(timeout=3)
+        except subprocess.TimeoutExpired:
+            pass
+
+
+def _append_job_log(job: dict[str, Any], line: str) -> None:
+    for key in ("logPath", "scriptLogPath"):
+        path = job.get(key)
+        if not path:
+            continue
+        try:
+            with open(path, "a", encoding="utf-8") as logf:
+                logf.write(line)
+        except OSError:
+            continue
+
+
 def _run_job(job_id: str) -> None:
     with _lock:
         job = _jobs.get(job_id)
-    if not job:
+    if not job or _is_job_cancelled(job_id):
         return
     log_path = Path(job["logPath"])
+    script_log_path = Path(job["scriptLogPath"]) if job.get("scriptLogPath") else None
+    if script_log_path is not None:
+        script_log_path.parent.mkdir(parents=True, exist_ok=True)
     RUNS_DIR.mkdir(parents=True, exist_ok=True)
     job["status"] = "running"
     job["startedAt"] = time.time()
     _persist_job(job_id, job)
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
     try:
+        if _is_job_cancelled(job_id):
+            return
         argv, cwd, cmdline = build_argv(job["stepId"], job["params"])
         job["command"] = cmdline
         job["argv"] = argv
+        header = _log_header(job_id, cmdline, cwd, script_log=script_log_path)
         with open(log_path, "w", encoding="utf-8") as logf:
-            logf.write(f"# act_pipeline job {job_id}\n# {cmdline}\n# cwd={cwd}\n\n")
+            logf.write(header)
             logf.flush()
-            proc = subprocess.Popen(
-                argv,
-                cwd=str(cwd),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
+            script_logf = (
+                open(script_log_path, "w", encoding="utf-8")
+                if script_log_path is not None
+                else None
             )
-            job["pid"] = proc.pid
-            _persist_job(job_id, job)
-            assert proc.stdout is not None
-            for line in proc.stdout:
-                logf.write(line)
-                logf.flush()
-            rc = proc.wait()
+            try:
+                if script_logf is not None:
+                    script_logf.write(header)
+                    script_logf.flush()
+                if _is_job_cancelled(job_id):
+                    return
+                proc = subprocess.Popen(
+                    argv,
+                    cwd=str(cwd),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    env=env,
+                    start_new_session=True,
+                )
+                with _lock:
+                    _procs[job_id] = proc
+                job["pid"] = proc.pid
+                _persist_job(job_id, job)
+                assert proc.stdout is not None
+                for line in proc.stdout:
+                    if _is_job_cancelled(job_id):
+                        break
+                    logf.write(line)
+                    logf.flush()
+                    if script_logf is not None:
+                        script_logf.write(line)
+                        script_logf.flush()
+                rc = proc.wait()
+            finally:
+                with _lock:
+                    _procs.pop(job_id, None)
+                if script_logf is not None:
+                    script_logf.close()
+        if _is_job_cancelled(job_id):
+            return
         job["exitCode"] = rc
         job["status"] = "succeeded" if rc == 0 else "failed"
         job["finishedAt"] = time.time()
     except Exception as exc:
+        if _is_job_cancelled(job_id):
+            return
         job["status"] = "failed"
         job["error"] = str(exc)
         job["finishedAt"] = time.time()
+        err_line = f"\n[runner] {exc}\n"
         with open(log_path, "a", encoding="utf-8") as logf:
-            logf.write(f"\n[runner] {exc}\n")
+            logf.write(err_line)
+        if script_log_path is not None:
+            with open(script_log_path, "a", encoding="utf-8") as script_logf:
+                script_logf.write(err_line)
     _persist_job(job_id, job)
 
 
@@ -666,6 +777,12 @@ def start_job(
             raise ValueError("软链未就绪：请先选择评测根目录与训练/推理根目录并完成软链")
     job_id = uuid.uuid4().hex[:12]
     log_path = RUNS_DIR / f"{job_id}.log"
+    script_log_path: Path | None = None
+    if step_id == "train":
+        ckpt_dir = str(merged.get("ckptDir") or "").strip()
+        if ckpt_dir:
+            script_log_path = Path(ckpt_dir) / f"train_{job_id}.log"
+            script_log_path.parent.mkdir(parents=True, exist_ok=True)
     job = {
         "id": job_id,
         "stepId": step_id,
@@ -674,10 +791,33 @@ def start_job(
         "createdAt": time.time(),
         "logPath": str(log_path),
     }
+    if script_log_path is not None:
+        job["scriptLogPath"] = str(script_log_path)
     _persist_job(job_id, job)
     t = threading.Thread(target=_run_job, args=(job_id,), daemon=True)
     t.start()
     return job
+
+
+def cancel_job(job_id: str) -> dict[str, Any] | None:
+    _load_jobs()
+    with _lock:
+        job = _jobs.get(job_id)
+    if not job:
+        return None
+    status = job.get("status")
+    if status in ("succeeded", "failed", "cancelled"):
+        return get_job(job_id)
+    if status not in ("queued", "running"):
+        raise ValueError(f"无法取消状态为 {status} 的任务")
+
+    job["status"] = "cancelled"
+    job["finishedAt"] = time.time()
+    job["error"] = "用户取消"
+    _persist_job(job_id, job)
+    _append_job_log(job, "\n[runner] cancelled by user\n")
+    _kill_job_process(job_id)
+    return get_job(job_id)
 
 
 def get_job(job_id: str) -> dict[str, Any] | None:
@@ -686,16 +826,13 @@ def get_job(job_id: str) -> dict[str, Any] | None:
         job = _jobs.get(job_id)
     if not job:
         return None
-    tail = ""
-    lp = Path(job.get("logPath", ""))
-    if lp.is_file():
-        try:
-            text = lp.read_text(encoding="utf-8", errors="replace")
-            tail = text[-12000:] if len(text) > 12000 else text
-        except OSError:
-            tail = ""
+    tails: list[str] = []
+    for key in ("logPath", "scriptLogPath"):
+        tail = _read_log_tail(Path(job.get(key, "")))
+        if tail:
+            tails.append(tail)
     out = dict(job)
-    out["logTail"] = tail
+    out["logTail"] = max(tails, key=len) if tails else ""
     return out
 
 

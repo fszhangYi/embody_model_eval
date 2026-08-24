@@ -53,11 +53,13 @@ export interface ActLinkStatus {
 export interface PipelineJob {
   id: string
   stepId: string
-  status: 'queued' | 'running' | 'succeeded' | 'failed'
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
   params?: Record<string, unknown>
   command?: string
   exitCode?: number
   error?: string
+  logPath?: string
+  scriptLogPath?: string
   logTail?: string
   createdAt?: number
   startedAt?: number
