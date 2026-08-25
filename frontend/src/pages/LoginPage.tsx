@@ -75,7 +75,7 @@ export function LoginPage() {
         <section className="login-card" aria-labelledby="login-title">
           <div className="login-card-shine" aria-hidden="true" />
           <h1 id="login-title">登录到 Embody</h1>
-          <p className="login-sub">评测可视化 · 机型浏览 · ACT 流水线 · 传感器</p>
+          <p className="login-sub">项目总览 · 评测可视化 · ACT 流水线 · 传感器</p>
 
           <form className="login-form" onSubmit={onSubmit} autoComplete="on">
             <label className="login-field">

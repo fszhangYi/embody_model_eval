@@ -151,7 +151,7 @@ function renderEpisodeTable() {
       <td class="${unitCls}">${u.inferred_unit || '—'}${u.issues.length ? '!' : ''}</td>
       <td>${r.summary.provenance.action_mode || '—'}</td>
       <td class="muted">${obsLabel}</td>
-      <td><a href="/?data=${encodeURIComponent(r.path)}">评测</a></td>
+      <td><a href="/eval?data=${encodeURIComponent(r.path)}">评测</a></td>
     </tr>`;
   }).join('') || '<tr><td colspan="13" class="muted">暂无 episode</td></tr>';
 

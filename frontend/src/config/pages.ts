@@ -1,4 +1,12 @@
-export type PageId = 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline' | 'sensors'
+export type PageId =
+  | 'home'
+  | 'eval'
+  | 'hub'
+  | 'pipeline'
+  | 'chat'
+  | 'robots'
+  | 'actPipeline'
+  | 'sensors'
 
 export interface PageDef {
   id: PageId
@@ -10,8 +18,15 @@ export interface PageDef {
 
 export const PAGES: PageDef[] = [
   {
-    id: 'eval',
+    id: 'home',
     path: '/',
+    label: '项目总览',
+    short: '总览',
+    desc: 'Embody 平台介绍与入口导航',
+  },
+  {
+    id: 'eval',
+    path: '/eval',
     label: '单轨迹评测',
     short: '评测',
     desc: '三臂对照、TCP / 观测 / 任务回放',

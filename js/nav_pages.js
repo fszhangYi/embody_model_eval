@@ -4,8 +4,15 @@
  */
 export const PAGES = [
   {
+    id: 'home',
+    href: './',
+    label: '项目总览',
+    short: '总览',
+    desc: 'Embody 平台介绍与入口导航',
+  },
+  {
     id: 'eval',
-    href: './index.html',
+    href: './eval',
     label: '单轨迹评测',
     short: '评测',
     desc: '三臂对照、TCP / 观测 / 任务回放',
@@ -51,14 +58,17 @@ const PAGE_NAV_Z = '2147483000';
 
 export function resolveCurrentPageId(pathname = location.pathname) {
   const base = pathname.split('/').pop() || '';
-  if (/hub\.html$/i.test(base)) return 'hub';
-  if (/pipeline\.html$/i.test(base)) return 'pipeline';
-  if (/chat\.html$/i.test(base)) return 'chat';
-  if (/robots\.html$/i.test(base)) return 'robots';
-  if (/sensors\.html$/i.test(base)) return 'sensors';
-  if (/index\.html$/i.test(base) || base === '' || base === '/') return 'eval';
+  const path = pathname.replace(/\/+$/, '') || '/';
+  if (path === '/' || base === '') return 'home';
+  if (/\/eval$/i.test(path) || /^eval$/i.test(base)) return 'eval';
+  if (/hub\.html$/i.test(base) || /\/hub$/i.test(path)) return 'hub';
+  if (/pipeline\.html$/i.test(base) || /\/pipeline$/i.test(path)) return 'pipeline';
+  if (/chat\.html$/i.test(base) || /\/chat$/i.test(path)) return 'chat';
+  if (/robots\.html$/i.test(base) || /\/robots$/i.test(path)) return 'robots';
+  if (/sensors\.html$/i.test(base) || /\/sensors$/i.test(path)) return 'sensors';
+  if (/index\.html$/i.test(base)) return 'eval';
   const hit = PAGES.find((p) => base && p.href.endsWith(base));
-  return hit?.id || 'eval';
+  return hit?.id || 'home';
 }
 
 function isTypingTarget(el) {

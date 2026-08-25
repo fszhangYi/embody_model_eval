@@ -61,7 +61,7 @@ embody_model_eval/
 │   ├── batch_score.py · bag_to_compare.py · refresh_data_index.py
 │   ├── gen_sim_episodes.py · gen_obs_media.py · gen_task_demo.py
 │   └── thresholds.example.json
-├── frontend/               # React SPA（含 /login · /sensors）
+├── frontend/               # React SPA（/ 总览 · /eval 评测 · /login · /sensors …）
 ├── agent_skills/           # Chat 托管 Skills
 └── docs/
     └── TODOLIST.md
@@ -80,7 +80,7 @@ cd /root/autodl-tmp/embody_model_eval
 python3 -m http.server 6006 --bind 0.0.0.0
 ```
 
-本地：`http://127.0.0.1:6006/`（首次会跳转 `/login`）
+本地：`http://127.0.0.1:6006/`（首次会跳转 `/login`；登录后进入项目总览 `/`，单轨迹评测为 `/eval`）
 
 ### 鉴权
 
@@ -180,7 +180,7 @@ python3 scripts/gen_sim_episodes.py --suite 20260819 --start 6 --count 3 --n-fra
 python3 scripts/gen_sim_episodes.py --suite ec616 --start 5 --count 2 --n-frames 40 --robot ec616 --overwrite --with-obs
 ```
 
-Hub 选 `ec616_short` / `ec616`；单轨迹示例：`/?data=./data/ec616_short/episode_1.json`
+Hub 选 `ec616_short` / `ec616`；单轨迹示例：`/eval?data=./data/ec616_short/episode_1.json`
 
 重新生成模拟评测数据（可选，在 `act_robot` 中）：
 

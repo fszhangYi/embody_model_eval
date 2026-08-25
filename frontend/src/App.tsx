@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react'
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
+import { HomePage } from './pages/HomePage'
 import { EvalPage } from './pages/EvalPage'
 import { HubPage } from './pages/HubPage'
 import { ChatPage } from './pages/ChatPage'
@@ -15,14 +16,34 @@ function Protected({ children }: { children: ReactNode }) {
   return <RequireAuth>{children}</RequireAuth>
 }
 
+/** Preserve query string when redirecting legacy eval URLs. */
+function RedirectEvalLegacy() {
+  const { search } = useLocation()
+  return <Navigate to={{ pathname: '/eval', search }} replace />
+}
+
+/** Old bookmarks used `/?data=...` for eval; send those to /eval. */
+function HomeOrEvalRedirect() {
+  const { search } = useLocation()
+  if (search && /(?:^|[?&])data=/.test(search)) {
+    return <Navigate to={{ pathname: '/eval', search }} replace />
+  }
+  return (
+    <Protected>
+      <HomePage />
+    </Protected>
+  )
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<HomeOrEvalRedirect />} />
           <Route
-            path="/"
+            path="/eval"
             element={
               <Protected>
                 <EvalPage />
@@ -77,7 +98,7 @@ export default function App() {
               </Protected>
             }
           />
-          <Route path="/index.html" element={<Navigate to="/" replace />} />
+          <Route path="/index.html" element={<RedirectEvalLegacy />} />
           <Route path="/hub.html" element={<Navigate to="/hub" replace />} />
           <Route path="/pipeline.html" element={<Navigate to="/pipeline" replace />} />
           <Route path="/chat.html" element={<Navigate to="/chat" replace />} />

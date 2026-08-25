@@ -12,13 +12,15 @@ function isTypingTarget(el: EventTarget | null): boolean {
 }
 
 function resolvePageId(pathname: string): PageId {
+  if (pathname === '/' || pathname === '') return 'home'
+  if (pathname.startsWith('/eval')) return 'eval'
   if (pathname.startsWith('/hub')) return 'hub'
   if (pathname.startsWith('/pipeline')) return 'pipeline'
   if (pathname.startsWith('/chat')) return 'chat'
   if (pathname.startsWith('/robots')) return 'robots'
   if (pathname.startsWith('/act-pipeline')) return 'actPipeline'
   if (pathname.startsWith('/sensors')) return 'sensors'
-  return 'eval'
+  return 'home'
 }
 
 export function PageNav() {
@@ -60,23 +62,23 @@ export function PageNav() {
       if (digit >= 1 && digit <= PAGES.length) {
         e.preventDefault()
         const page = PAGES[digit - 1]
-        if (page.id !== currentId) window.location.href = page.path
+        if (page.id !== currentId) navigate(page.path)
         return
       }
       if (e.key === 'ArrowLeft' || e.key === '[' || e.code === 'BracketLeft') {
         e.preventDefault()
         const next = (currentIdx - 1 + PAGES.length) % PAGES.length
-        window.location.href = PAGES[next].path
+        navigate(PAGES[next].path)
       }
       if (e.key === 'ArrowRight' || e.key === ']' || e.code === 'BracketRight') {
         e.preventDefault()
         const next = (currentIdx + 1) % PAGES.length
-        window.location.href = PAGES[next].path
+        navigate(PAGES[next].path)
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [currentId, currentIdx])
+  }, [currentId, currentIdx, navigate])
 
   useEffect(() => {
     if (!open || !btnRef.current || !menuRef.current) return
