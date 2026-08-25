@@ -1,0 +1,5 @@
+{
+  "username": "embody",
+  "password": "change-me-please",
+  "note": "Copy to config/.auth.json (gitignored). Prefer password_hash after first server boot, or set EMBODY_AUTH_USER / EMBODY_AUTH_PASSWORD. Disable with EMBODY_AUTH_DISABLED=1."
+}

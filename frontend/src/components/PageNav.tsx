@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useAuth } from '../auth/AuthContext'
 import { PAGES, type PageId } from '../config/pages'
 
 function isTypingTarget(el: EventTarget | null): boolean {
@@ -22,10 +23,13 @@ function resolvePageId(pathname: string): PageId {
 
 export function PageNav() {
   const location = useLocation()
+  const navigate = useNavigate()
+  const { authRequired, user, logout } = useAuth()
   const currentId = resolvePageId(location.pathname)
   const currentIdx = Math.max(0, PAGES.findIndex((p) => p.id === currentId))
   const current = PAGES[currentIdx]
   const [open, setOpen] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
@@ -127,6 +131,30 @@ export function PageNav() {
         <div className="page-nav-hint" role="note">
           Alt+← / Alt+→ 切换相邻页
         </div>
+        {authRequired ? (
+          <div className="page-nav-auth">
+            <span className="page-nav-auth-user" title="当前登录用户">
+              {user?.username || '已登录'}
+            </span>
+            <button
+              type="button"
+              className="page-nav-logout"
+              disabled={loggingOut}
+              onClick={async () => {
+                setLoggingOut(true)
+                try {
+                  await logout()
+                  setOpen(false)
+                  navigate('/login', { replace: true })
+                } finally {
+                  setLoggingOut(false)
+                }
+              }}
+            >
+              {loggingOut ? '退出中…' : '退出登录'}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   )

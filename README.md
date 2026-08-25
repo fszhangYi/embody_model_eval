@@ -12,7 +12,7 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 - AI Chat：`chat.html` 选择托管 Skill、配置 Agent 链接，将诉求与 skill 一并发送并显示回执
 - 传感器状态：`/sensors` 卡片墙（机械臂 / 夹爪 / 触觉 / RealSense / 六维力 / Gello）；机械臂已内置 `arm_kin` 运动学（原独立 `demo_test` 已合并），双击可测 FK/IK 并查看搭建说明
 
-浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库托管静态页，并由同一进程提供 `/api/*`（skills / chat / sensors）。
+浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库托管静态页，并由同一进程提供 `/api/*`（skills / chat / sensors）与 **Cookie 登录鉴权**。
 
 ## 环境
 
@@ -21,6 +21,7 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 | Python | **3.12**（已在 3.12.13 验证） |
 | 第三方包 | 托管页面无；见 `requirements.txt` |
 | 浏览器 | 现代 Chromium / Firefox（录制需 `MediaRecorder` + WebM） |
+| 鉴权 | 默认开启；登录页 `/login`；可用环境变量或 `config/.auth.json` 配置 |
 
 ```bash
 python3 -V   # 建议 >= 3.10，推荐 3.12
@@ -42,6 +43,7 @@ embody_model_eval/
 ├── assets/                 # favicon.svg / .ico / .png
 ├── config/
 │   ├── robots.json         # 机型注册表
+│   ├── auth.example.json   # 鉴权配置示例 → 复制为 .auth.json
 │   └── episodes.manifest.example.json
 ├── models/                 # URDF + mesh
 │   ├── so100_colored/      # SO-100 灰/红/蓝
@@ -53,12 +55,13 @@ embody_model_eval/
 ├── arm_kin/                # 内置六轴 FK/IK（原 demo_test）
 ├── vendor/                 # 离线 Three / Chart.js / urdf-loader
 ├── scripts/                # Python 工具与 agent_server
-│   ├── agent_server.py     # 静态托管 + /api/*
+│   ├── agent_server.py     # 静态托管 + /api/* + 鉴权
+│   ├── auth.py             # Cookie 会话鉴权
 │   ├── arm_kinematics.py · arm_kin_bridge.py
 │   ├── batch_score.py · bag_to_compare.py · refresh_data_index.py
 │   ├── gen_sim_episodes.py · gen_obs_media.py · gen_task_demo.py
 │   └── thresholds.example.json
-├── frontend/               # React SPA（含 /sensors 传感器页）
+├── frontend/               # React SPA（含 /login · /sensors）
 ├── agent_skills/           # Chat 托管 Skills
 └── docs/
     └── TODOLIST.md
@@ -77,8 +80,20 @@ cd /root/autodl-tmp/embody_model_eval
 python3 -m http.server 6006 --bind 0.0.0.0
 ```
 
-本地：`http://127.0.0.1:6006/`  
-AutoDL 若映射端口 6006，使用控制台公网地址。
+本地：`http://127.0.0.1:6006/`（首次会跳转 `/login`）
+
+### 鉴权
+
+默认开启 Cookie 会话鉴权（保护 `/api/*` 与 `/data` · `/config` · `/models` · `/agent_skills`）。
+
+| 方式 | 说明 |
+|------|------|
+| 首次启动 | 自动生成 `config/.auth.json`，并在终端打印用户名/密码 |
+| 环境变量 | `EMBODY_AUTH_USER` / `EMBODY_AUTH_PASSWORD` |
+| 配置文件 | 复制 `config/auth.example.json` → `config/.auth.json` |
+| 关闭鉴权 | `EMBODY_AUTH_DISABLED=1 ./serve.sh` |
+
+登录页布局仿 GitHub（居中卡片 + 品牌标识），视觉沿用站内深色青绿主题。页面菜单可「退出登录」。AutoDL 若映射端口 6006，使用控制台公网地址。
 
 > 仅静态浏览可用 `python3 -m http.server`；**AI Chat / skills API** 需要 `./serve.sh`（即 `scripts/agent_server.py`）。
 

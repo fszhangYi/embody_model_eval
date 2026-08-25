@@ -3,6 +3,10 @@
 
 Endpoints:
   GET    /api/health
+  GET    /api/auth/status
+  GET    /api/auth/me
+  POST   /api/auth/login
+  POST   /api/auth/logout
   GET    /api/skills
   GET    /api/skills/<id>
   GET    /api/skills/sources
@@ -75,6 +79,19 @@ from arm_kinematics import (
     get_arm_status,
     refresh_arm,
     test_arm,
+)
+from auth import (
+    auth_enabled,
+    cookie_header_clear,
+    cookie_header_set,
+    destroy_session,
+    init_auth,
+    is_authenticated,
+    parse_session_cookie,
+    path_requires_auth,
+    public_status,
+    request_user,
+    try_login,
 )
 from fs_browse import browse_roots, list_children
 
@@ -774,7 +791,14 @@ class Handler(SimpleHTTPRequestHandler):
             pass
         super().end_headers()
 
-    def _send(self, status: int, body: bytes, content_type: str) -> None:
+    def _send(
+        self,
+        status: int,
+        body: bytes,
+        content_type: str,
+        *,
+        set_cookie: str | None = None,
+    ) -> None:
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
@@ -782,12 +806,40 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Origin", "*")
         self.send_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        if set_cookie:
+            self.send_header("Set-Cookie", set_cookie)
         self.end_headers()
         self.wfile.write(body)
 
-    def _send_json(self, obj: Any, status: int = 200) -> None:
+    def _send_json(
+        self,
+        obj: Any,
+        status: int = 200,
+        *,
+        set_cookie: str | None = None,
+    ) -> None:
         st, raw, ctype = _json_bytes(obj, status)
-        self._send(st, raw, ctype)
+        self._send(st, raw, ctype, set_cookie=set_cookie)
+
+    def _unauthorized(self) -> None:
+        self._send_json(
+            {
+                "ok": False,
+                "error": "unauthorized",
+                "authRequired": True,
+                "loginPath": "/login",
+            },
+            HTTPStatus.UNAUTHORIZED,
+        )
+
+    def _require_auth(self, path: str) -> bool:
+        """Return True if the request may proceed."""
+        if not path_requires_auth(path):
+            return True
+        if is_authenticated(self.headers.get("Cookie")):
+            return True
+        self._unauthorized()
+        return False
 
     def do_OPTIONS(self) -> None:  # noqa: N802
         self._send(204, b"", "text/plain")
@@ -796,7 +848,45 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
         if path == "/api/health":
-            self._send_json({"ok": True, "skillsDir": str(SKILLS_DIR), "root": str(ROOT)})
+            self._send_json(
+                {
+                    "ok": True,
+                    "skillsDir": str(SKILLS_DIR),
+                    "root": str(ROOT),
+                    "authRequired": auth_enabled(),
+                }
+            )
+            return
+        if path == "/api/auth/status":
+            self._send_json(public_status())
+            return
+        if path == "/api/auth/me":
+            if not auth_enabled():
+                self._send_json(
+                    {"ok": True, "authRequired": False, "authenticated": True, "user": None}
+                )
+                return
+            user = request_user(self.headers.get("Cookie"))
+            if not user:
+                self._send_json(
+                    {
+                        "ok": True,
+                        "authRequired": True,
+                        "authenticated": False,
+                        "user": None,
+                    }
+                )
+                return
+            self._send_json(
+                {
+                    "ok": True,
+                    "authRequired": True,
+                    "authenticated": True,
+                    "user": {"username": user},
+                }
+            )
+            return
+        if not self._require_auth(path):
             return
         if path == "/api/skills":
             SKILLS_DIR.mkdir(parents=True, exist_ok=True)
@@ -935,6 +1025,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_PUT(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
+        if not self._require_auth(path):
+            return
         if path == "/api/agent/config":
             try:
                 body = _read_json_body(self)
@@ -970,6 +1062,8 @@ class Handler(SimpleHTTPRequestHandler):
     def do_DELETE(self) -> None:  # noqa: N802
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
+        if not self._require_auth(path):
+            return
         m = re.match(r"^/api/skills/([^/]+)$", path)
         if m:
             sid = m.group(1)
@@ -1010,6 +1104,41 @@ class Handler(SimpleHTTPRequestHandler):
             body = _read_json_body(self)
         except Exception as e:
             self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/auth/login":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            result = try_login(
+                str(body.get("username") or body.get("user") or ""),
+                str(body.get("password") or ""),
+            )
+            if not result.get("ok"):
+                self._send_json(result, HTTPStatus.UNAUTHORIZED)
+                return
+            token = result.get("token")
+            payload = {
+                "ok": True,
+                "authRequired": result.get("authRequired", auth_enabled()),
+                "user": result.get("user"),
+            }
+            self._send_json(
+                payload,
+                set_cookie=cookie_header_set(str(token)) if token else None,
+            )
+            return
+
+        if path == "/api/auth/logout":
+            token = parse_session_cookie(self.headers.get("Cookie"))
+            destroy_session(token)
+            self._send_json(
+                {"ok": True, "authenticated": False},
+                set_cookie=cookie_header_clear(),
+            )
+            return
+
+        if not self._require_auth(path):
             return
 
         if path == "/api/skills/import":
@@ -1148,11 +1277,19 @@ def main() -> None:
     parser.add_argument("--bind", default="0.0.0.0")
     args = parser.parse_args()
     SKILLS_DIR.mkdir(parents=True, exist_ok=True)
+    auth_info = init_auth()
     refresh = ROOT / "scripts" / "refresh_data_index.py"
     if refresh.is_file():
         subprocess.run([sys.executable, str(refresh)], check=False)
     httpd = ThreadingHTTPServer((args.bind, args.port), Handler)
     print(f"Serving {ROOT} on http://{args.bind}:{args.port}/ (agent API enabled)", flush=True)
+    if auth_info.get("enabled"):
+        print(
+            f"Auth: ON (user={auth_info.get('username')}, source={auth_info.get('source')}) → /login",
+            flush=True,
+        )
+    else:
+        print("Auth: OFF (EMBODY_AUTH_DISABLED)", flush=True)
     if (DIST / "index.html").is_file():
         print(f"React SPA: {DIST}", flush=True)
     else:
