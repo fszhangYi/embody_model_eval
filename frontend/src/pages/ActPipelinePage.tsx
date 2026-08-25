@@ -66,16 +66,18 @@ function FieldInput({
 
   if (field.type === 'checkbox') {
     return (
-      <label className={`${fieldClass} act-field-check`} htmlFor={id}>
-        <input
-          id={id}
-          type="checkbox"
-          checked={Boolean(value)}
-          disabled={disabled}
-          onChange={(e) => onChange(e.target.checked)}
-        />
-        {field.label}
-      </label>
+      <div className={`${fieldClass} act-field-check`}>
+        <label className="act-field-check-hit" htmlFor={id}>
+          <input
+            id={id}
+            type="checkbox"
+            checked={Boolean(value)}
+            disabled={disabled}
+            onChange={(e) => onChange(e.target.checked)}
+          />
+          <span>{field.label}</span>
+        </label>
+      </div>
     )
   }
   if (field.type === 'select') {
