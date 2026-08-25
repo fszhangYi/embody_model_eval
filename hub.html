@@ -134,7 +134,7 @@
     <div class="row" style="margin-top:10px">
       <label class="muted" for="suiteSelect">数据套件</label>
       <select id="suiteSelect" disabled>
-        <option value="">扫描 data/ …</option>
+        <option value="">请选择数据套件</option>
       </select>
       <button id="btnReloadSuites" type="button">刷新列表</button>
       <button id="btnLoadSuite" type="button">加载</button>
@@ -443,14 +443,14 @@ async function refreshSuiteSelect(preferred) {
   sel.innerHTML = '<option value="">扫描中…</option>';
   try {
     const suites = await discoverSuites();
-    sel.innerHTML = suites.map((id) => `<option value="${id}">${id}</option>`).join('')
-      || '<option value="">（无子目录）</option>';
+    const placeholder = '<option value="">请选择数据套件</option>';
+    sel.innerHTML = suites.length
+      ? placeholder + suites.map((id) => `<option value="${id}">${id}</option>`).join('')
+      : '<option value="">（无可用套件）</option>';
     sel.disabled = !suites.length;
-    const pick = preferred && suites.includes(preferred)
-      ? preferred
-      : (suites.includes('20260819') ? '20260819' : suites[0]);
-    if (pick) sel.value = pick;
-    return pick || '';
+    const pick = preferred && suites.includes(preferred) ? preferred : '';
+    sel.value = pick;
+    return pick;
   } catch (e) {
     sel.innerHTML = '<option value="">扫描失败</option>';
     throw e;
@@ -487,8 +487,11 @@ async function loadManifest(path) {
 }
 
 $('btnReloadSuites').onclick = () => {
-  refreshSuiteSelect($('suiteSelect').value).then((id) => {
-    $('status').textContent = id ? `已刷新套件列表 · 当前 ${id}` : '已刷新，但无套件';
+  const current = $('suiteSelect').value;
+  refreshSuiteSelect(current).then((id) => {
+    $('status').textContent = id
+      ? `已刷新套件列表 · 当前 ${id}`
+      : '已刷新套件列表 · 请选择数据套件';
   }).catch((e) => {
     $('status').innerHTML = `<span class="bad">${e.message}</span>`;
   });
@@ -534,7 +537,9 @@ $('btnAdd').onclick = async () => {
     const id = await refreshSuiteSelect(preferred);
     if (id) await loadSuite(id);
     else {
-      $('status').textContent = 'data/ 下暂无套件子目录';
+      $('status').textContent = preferred
+        ? `未找到套件 ${preferred}，请重新选择`
+        : '请选择数据套件后加载';
       render();
     }
   } catch (e) {

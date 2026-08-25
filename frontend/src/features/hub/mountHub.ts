@@ -301,15 +301,18 @@ async function refreshSuiteSelect(preferred) {
     return await withLoader(pageLoader, async (progress) => {
       progress(0.2, '扫描 data/ 套件…', '读取 index.json');
       const suites = await discoverSuites();
-      sel.innerHTML = suites.map((id) => `<option value="${id}">${id}</option>`).join('')
-        || '<option value="">（无子目录）</option>';
+      const placeholder = '<option value="">请选择数据套件</option>';
+      sel.innerHTML = suites.length
+        ? placeholder + suites.map((id) => `<option value="${id}">${id}</option>`).join('')
+        : '<option value="">（无可用套件）</option>';
       sel.disabled = !suites.length;
-      const pick = preferred && suites.includes(preferred)
-        ? preferred
-        : (suites.includes('20260819') ? '20260819' : suites[0]);
-      if (pick) sel.value = pick;
-      progress(0.9, '套件列表就绪', pick || '无可用套件');
-      return pick || '';
+      // Only preselect when caller asks (e.g. ?suite= or reload preserving current).
+      // Fresh Hub entry uses preferred='' → show placeholder, do not auto-pick.
+      const pick = preferred && suites.includes(preferred) ? preferred : '';
+      sel.value = pick;
+      sel.classList.toggle('placeholder', !pick);
+      progress(0.9, '套件列表就绪', pick || (suites.length ? '待选择' : '无可用套件'));
+      return pick;
     }, { text: '扫描数据套件', detail: 'data/' });
   } catch (e) {
     sel.innerHTML = '<option value="">扫描失败</option>';
@@ -354,8 +357,11 @@ async function loadManifest(path) {
 }
 
 $('btnReloadSuites').onclick = () => {
-  refreshSuiteSelect($('suiteSelect').value).then((id) => {
-    $('status').textContent = id ? `已刷新套件列表 · 当前 ${id}` : '已刷新，但无套件';
+  const current = $('suiteSelect').value;
+  refreshSuiteSelect(current).then((id) => {
+    $('status').textContent = id
+      ? `已刷新套件列表 · 当前 ${id}`
+      : '已刷新套件列表 · 请选择数据套件';
   }).catch((e) => {
     $('status').innerHTML = `<span class="bad">${e.message}</span>`;
   });
@@ -369,6 +375,7 @@ $('btnLoadSuite').onclick = () => {
 
 $('suiteSelect').addEventListener('change', () => {
   const id = $('suiteSelect').value;
+  $('suiteSelect').classList.toggle('placeholder', !id);
   if (!id) return;
   loadSuite(id).catch((e) => {
     $('status').innerHTML = `<span class="bad">${e.message}</span>`;
@@ -417,11 +424,14 @@ $('epPageSize').onchange = () => {
   try {
     await ensureRobotRegistry();
     const qs = new URLSearchParams(location.search);
+    // Only auto-load when URL explicitly asks (?suite=...); otherwise show placeholder.
     const preferred = qs.get('suite') || '';
     const id = await refreshSuiteSelect(preferred);
     if (id) await loadSuite(id);
     else {
-      $('status').textContent = 'data/ 下暂无套件子目录';
+      $('status').textContent = preferred
+        ? `未找到套件 ${preferred}，请重新选择`
+        : '请选择数据套件后加载';
       render();
     }
   } catch (e) {

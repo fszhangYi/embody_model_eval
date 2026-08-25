@@ -94,3 +94,13 @@
     border-color: #354a66;
     color: var(--text);
   }
+  .hub-page #suiteSelect:invalid,
+  .hub-page #suiteSelect.placeholder {
+    color: var(--muted);
+  }
+  .hub-page #suiteSelect option {
+    color: var(--text);
+  }
+  .hub-page #suiteSelect option[value=''] {
+    color: var(--muted);
+  }
