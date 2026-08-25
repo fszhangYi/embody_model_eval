@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { useLocale } from '../i18n/LocaleContext'
+import type { Locale } from '../i18n/types'
 import '../styles/login.css'
 
 type LocState = { from?: string }
 
 export function LoginPage() {
   const { loading, authRequired, authenticated, login, user } = useAuth()
+  const { m, locale, setLocale } = useLocale()
+  const loginCopy = m.login
   const navigate = useNavigate()
   const location = useLocation()
   const from = useMemo(() => {
@@ -30,7 +34,7 @@ export function LoginPage() {
     return (
       <div className="auth-boot" role="status" aria-live="polite">
         <div className="auth-boot-mark" aria-hidden="true" />
-        <p>正在加载…</p>
+        <p>{loginCopy.loading}</p>
       </div>
     )
   }
@@ -46,12 +50,13 @@ export function LoginPage() {
     try {
       const out = await login(username.trim(), password)
       if (!out.ok) {
-        setError(out.error || '登录失败')
+        const raw = out.error || ''
+        setError(!raw || /^HTTP \d+$/.test(raw) ? loginCopy.fail : raw)
         return
       }
       navigate(from, { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '网络错误')
+      setError(err instanceof Error ? err.message : loginCopy.networkError)
     } finally {
       setBusy(false)
     }
@@ -69,17 +74,30 @@ export function LoginPage() {
       <header className="login-brand">
         <img src="/assets/favicon.svg" alt="" width={48} height={48} className="login-logo" />
         <span className="login-brand-name">Embody Model Eval</span>
+        <div className="login-lang" role="group" aria-label={m.settings.language.ui}>
+          {(['zh', 'en'] as Locale[]).map((id) => (
+            <button
+              key={id}
+              type="button"
+              className={`login-lang-btn${locale === id ? ' active' : ''}`}
+              aria-pressed={locale === id}
+              onClick={() => setLocale(id)}
+            >
+              {id === 'zh' ? '中文' : 'English'}
+            </button>
+          ))}
+        </div>
       </header>
 
       <main className="login-main">
         <section className="login-card" aria-labelledby="login-title">
           <div className="login-card-shine" aria-hidden="true" />
-          <h1 id="login-title">登录到 Embody</h1>
-          <p className="login-sub">项目总览 · 评测可视化 · ACT 流水线 · 传感器</p>
+          <h1 id="login-title">{loginCopy.title}</h1>
+          <p className="login-sub">{loginCopy.sub}</p>
 
           <form className="login-form" onSubmit={onSubmit} autoComplete="on">
             <label className="login-field">
-              <span>用户名</span>
+              <span>{loginCopy.username}</span>
               <input
                 name="username"
                 autoComplete="username"
@@ -93,14 +111,14 @@ export function LoginPage() {
 
             <label className="login-field">
               <span className="login-field-row">
-                <span>密码</span>
+                <span>{loginCopy.password}</span>
                 <button
                   type="button"
                   className="login-ghost"
                   onClick={() => setShowPw((v) => !v)}
                   tabIndex={-1}
                 >
-                  {showPw ? '隐藏' : '显示'}
+                  {showPw ? loginCopy.hide : loginCopy.show}
                 </button>
               </span>
               <input
@@ -121,16 +139,14 @@ export function LoginPage() {
             ) : null}
 
             <button type="submit" className="login-submit" disabled={busy}>
-              {busy ? '登录中…' : '登录'}
+              {busy ? loginCopy.submitting : loginCopy.submit}
             </button>
           </form>
         </section>
 
         <aside className="login-aside">
-          <p>
-            默认用户 <code>embody</code>；密码见启动日志或 <code>config/.auth.json</code>。
-          </p>
-          <p className="login-aside-muted">会话 Cookie · HttpOnly · 7 天有效</p>
+          <p>{loginCopy.aside}</p>
+          <p className="login-aside-muted">{loginCopy.asideMuted}</p>
         </aside>
       </main>
 
@@ -139,7 +155,7 @@ export function LoginPage() {
         <span className="login-footer-dot" aria-hidden="true">
           ·
         </span>
-        <span>本地评测控制台</span>
+        <span>{loginCopy.footerTag}</span>
       </footer>
     </div>
   )

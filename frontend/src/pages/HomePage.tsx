@@ -2,7 +2,8 @@ import { Link } from 'react-router-dom'
 import { HomeParticles } from '../components/HomeParticles'
 import { PageNav } from '../components/PageNav'
 import { SettingsGear } from '../components/SettingsModal'
-import { PAGES, type PageId } from '../config/pages'
+import { useLocale } from '../i18n/LocaleContext'
+import type { PageId } from '../config/pages'
 import '../styles/home.css'
 
 const MODULE_IDS: PageId[] = [
@@ -15,23 +16,10 @@ const MODULE_IDS: PageId[] = [
   'sensors',
 ]
 
-const PILLARS = [
-  {
-    title: '离线评测',
-    text: '在同一坐标系叠画 current · GT · predict，量化 TCP 与关节误差，核对「下一时刻」策略是否合理。',
-  },
-  {
-    title: '多机型与感知',
-    text: 'SO-100 / EC616 / Koch 等 URDF 浏览，传感器卡片墙与内置 arm_kin 运动学联调。',
-  },
-  {
-    title: '数据与 Agent',
-    text: 'ACT 训练推理流水线、ComfyUI 式数据流演示，以及 Skills + 本地 / 远程 Agent Chat。',
-  },
-] as const
-
 export function HomePage() {
-  const modules = MODULE_IDS.map((id) => PAGES.find((p) => p.id === id)!).filter(Boolean)
+  const { m, pages } = useLocale()
+  const home = m.home
+  const modules = MODULE_IDS.map((id) => pages.find((p) => p.id === id)!).filter(Boolean)
 
   return (
     <div className="home-page">
@@ -47,7 +35,7 @@ export function HomePage() {
           <img src="/assets/favicon.svg" alt="" width={36} height={36} className="home-logo" />
           <div>
             <h1>Embody Model Eval</h1>
-            <p className="home-header-blurb">具身智能评测 · 机型 · 流水线 · 传感器一体控制台</p>
+            <p className="home-header-blurb">{home.blurb}</p>
           </div>
         </div>
         <div className="home-header-actions">
@@ -58,27 +46,24 @@ export function HomePage() {
 
       <main className="home-main">
         <section className="home-hero">
-          <p className="home-kicker">项目总览</p>
+          <p className="home-kicker">{home.kicker}</p>
           <h2 className="home-hero-title">
-            把策略回放、多机型资产与训练流水线
-            <span className="home-hero-accent">收进同一工作台</span>
+            {home.heroTitleBefore}
+            <span className="home-hero-accent">{home.heroTitleAccent}</span>
           </h2>
-          <p className="home-hero-lead">
-            Embody Model Eval 面向具身策略与模型的功能评测：本地静态托管 + Python 标准库 API，支持 Cookie
-            鉴权、离线 Three.js 可视化，以及 ACT / Skills Agent 联调。评测页与其它模块平级，从下方入口进入。
-          </p>
+          <p className="home-hero-lead">{home.heroLead}</p>
           <div className="home-hero-ctas">
             <Link className="home-cta primary" to="/eval">
-              进入单轨迹评测
+              {home.ctaEval}
             </Link>
             <Link className="home-cta ghost" to="/hub">
-              查看 Hub 汇总
+              {home.ctaHub}
             </Link>
           </div>
         </section>
 
-        <section className="home-pillars" aria-label="能力支柱">
-          {PILLARS.map((p) => (
+        <section className="home-pillars" aria-label={home.pillarsAria}>
+          {home.pillars.map((p) => (
             <article key={p.title} className="home-pillar">
               <h3>{p.title}</h3>
               <p>{p.text}</p>
@@ -88,8 +73,8 @@ export function HomePage() {
 
         <section className="home-modules" aria-labelledby="home-modules-title">
           <div className="home-section-head">
-            <h2 id="home-modules-title">功能模块</h2>
-            <p className="muted">与顶栏「页面」菜单同一套路由，可用 Alt+1…N 直达</p>
+            <h2 id="home-modules-title">{home.modulesTitle}</h2>
+            <p className="muted">{home.modulesHint}</p>
           </div>
           <div className="home-module-grid">
             {modules.map((p, i) => (
@@ -109,31 +94,25 @@ export function HomePage() {
 
         <section className="home-stack" aria-labelledby="home-stack-title">
           <div className="home-section-head">
-            <h2 id="home-stack-title">技术栈一览</h2>
-            <p className="muted">浏览器端不依赖外网 CDN；服务端以 stdlib 为主</p>
+            <h2 id="home-stack-title">{home.stackTitle}</h2>
+            <p className="muted">{home.stackHint}</p>
           </div>
           <ul className="home-stack-list">
             <li>
-              <strong>前端</strong>
-              <span>React SPA · Three.js / Chart.js / urdf-loader（vendor 离线）</span>
+              <strong>{home.stackFrontend}</strong>
+              <span>{home.stackFrontendBody}</span>
             </li>
             <li>
-              <strong>服务</strong>
-              <span>
-                <code>scripts/agent_server.py</code>：静态托管 + <code>/api/*</code> + Cookie 会话鉴权
-              </span>
+              <strong>{home.stackServer}</strong>
+              <span>{home.stackServerBody}</span>
             </li>
             <li>
-              <strong>数据</strong>
-              <span>
-                <code>data/</code> episode JSON · Hub 汇总 · ACT → embody 转换
-              </span>
+              <strong>{home.stackData}</strong>
+              <span>{home.stackDataBody}</span>
             </li>
             <li>
-              <strong>机型</strong>
-              <span>
-                <code>config/robots.json</code> + URDF mesh · 内置 <code>arm_kin</code>
-              </span>
+              <strong>{home.stackRobots}</strong>
+              <span>{home.stackRobotsBody}</span>
             </li>
           </ul>
         </section>
@@ -144,7 +123,7 @@ export function HomePage() {
         <span className="home-footer-dot" aria-hidden="true">
           ·
         </span>
-        <span>本地评测控制台</span>
+        <span>{home.footerTag}</span>
       </footer>
     </div>
   )

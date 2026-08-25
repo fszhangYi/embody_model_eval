@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
-import { PAGES, type PageId } from '../config/pages'
+import { useLocale } from '../i18n/LocaleContext'
+import type { PageId } from '../config/pages'
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!el || !(el instanceof Element)) return false
@@ -27,9 +28,10 @@ export function PageNav() {
   const location = useLocation()
   const navigate = useNavigate()
   const { authRequired, user, logout } = useAuth()
+  const { pages, t, m } = useLocale()
   const currentId = resolvePageId(location.pathname)
-  const currentIdx = Math.max(0, PAGES.findIndex((p) => p.id === currentId))
-  const current = PAGES[currentIdx]
+  const currentIdx = Math.max(0, pages.findIndex((p) => p.id === currentId))
+  const current = pages[currentIdx]
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -59,26 +61,26 @@ export function PageNav() {
         : /^[1-9]$/.test(e.key)
           ? Number(e.key)
           : 0
-      if (digit >= 1 && digit <= PAGES.length) {
+      if (digit >= 1 && digit <= pages.length) {
         e.preventDefault()
-        const page = PAGES[digit - 1]
+        const page = pages[digit - 1]
         if (page.id !== currentId) navigate(page.path)
         return
       }
       if (e.key === 'ArrowLeft' || e.key === '[' || e.code === 'BracketLeft') {
         e.preventDefault()
-        const next = (currentIdx - 1 + PAGES.length) % PAGES.length
-        navigate(PAGES[next].path)
+        const next = (currentIdx - 1 + pages.length) % pages.length
+        navigate(pages[next].path)
       }
       if (e.key === 'ArrowRight' || e.key === ']' || e.code === 'BracketRight') {
         e.preventDefault()
-        const next = (currentIdx + 1) % PAGES.length
-        navigate(PAGES[next].path)
+        const next = (currentIdx + 1) % pages.length
+        navigate(pages[next].path)
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [currentId, currentIdx, navigate])
+  }, [currentId, currentIdx, navigate, pages])
 
   useEffect(() => {
     if (!open || !btnRef.current || !menuRef.current) return
@@ -96,7 +98,7 @@ export function PageNav() {
         className="page-nav-btn pill"
         aria-expanded={open}
         aria-haspopup="true"
-        title={`切换页面 · Alt+1–${PAGES.length} 直达 · Alt+←/→ 上/下页`}
+        title={t('nav.switchPages', { n: pages.length })}
         onClick={(e) => {
           e.stopPropagation()
           setOpen((v) => !v)
@@ -114,7 +116,7 @@ export function PageNav() {
         hidden={!open}
         onClick={(e) => e.stopPropagation()}
       >
-        {PAGES.map((p, i) => (
+        {pages.map((p, i) => (
           <Link
             key={p.id}
             role="menuitem"
@@ -131,12 +133,12 @@ export function PageNav() {
           </Link>
         ))}
         <div className="page-nav-hint" role="note">
-          Alt+← / Alt+→ 切换相邻页
+          {m.nav.adjacentHint}
         </div>
         {authRequired ? (
           <div className="page-nav-auth">
-            <span className="page-nav-auth-user" title="当前登录用户">
-              {user?.username || '已登录'}
+            <span className="page-nav-auth-user" title={m.nav.loggedIn}>
+              {user?.username || m.nav.loggedIn}
             </span>
             <button
               type="button"
@@ -153,7 +155,7 @@ export function PageNav() {
                 }
               }}
             >
-              {loggingOut ? '退出中…' : '退出登录'}
+              {loggingOut ? m.nav.loggingOut : m.nav.logout}
             </button>
           </div>
         ) : null}

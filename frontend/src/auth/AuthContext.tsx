@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     async (username: string, password: string) => {
       const out = await apiLogin(username, password)
       if (!out.ok) {
-        return { ok: false, error: out.error || '登录失败' }
+        return { ok: false, error: out.error }
       }
       setAuthRequired(Boolean(out.authRequired))
       setAuthenticated(true)

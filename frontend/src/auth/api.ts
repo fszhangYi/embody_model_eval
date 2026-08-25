@@ -49,7 +49,7 @@ export async function login(username: string, password: string): Promise<LoginRe
   })
   const data = await parseJson<LoginResponse>(res)
   if (!res.ok && !data.error) {
-    data.error = `登录失败 (${res.status})`
+    data.error = `HTTP ${res.status}`
     data.ok = false
   }
   return data

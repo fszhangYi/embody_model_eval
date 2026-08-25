@@ -1,16 +1,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useLocale } from '../i18n/LocaleContext'
+import type { DocsLocale, Locale } from '../i18n/types'
 import '../styles/settings.css'
 
 type SettingsTab = 'appearance' | 'language' | 'auth' | 'users' | 'about'
-
-const TABS: { id: SettingsTab; label: string; hint: string }[] = [
-  { id: 'appearance', label: '外观', hint: '主题与界面密度' },
-  { id: 'language', label: '语言', hint: '界面与文档语言' },
-  { id: 'auth', label: '鉴权与安全', hint: '会话与细粒度权限' },
-  { id: 'users', label: '用户管理', hint: '账号与角色' },
-  { id: 'about', label: '关于', hint: '版本与占位说明' },
-]
 
 function GearIcon() {
   return (
@@ -33,7 +27,7 @@ function GearIcon() {
 function SettingRow({
   title,
   desc,
-  badge = '占位',
+  badge,
   children,
 }: {
   title: string
@@ -46,7 +40,7 @@ function SettingRow({
       <div className="settings-row-text">
         <div className="settings-row-title">
           <span>{title}</span>
-          <span className="settings-badge">{badge}</span>
+          {badge ? <span className="settings-badge">{badge}</span> : null}
         </div>
         <p className="settings-row-desc">{desc}</p>
       </div>
@@ -99,30 +93,30 @@ function Segmented({
 }
 
 function PanelAppearance() {
+  const { m } = useLocale()
+  const a = m.settings.appearance
+  const badge = m.common.placeholder
   const [dark, setDark] = useState(true)
   const [compact, setCompact] = useState(false)
   const [density, setDensity] = useState('comfortable')
 
   return (
     <>
-      <SettingRow
-        title="暗黑模式"
-        desc="跟随系统或强制深色 / 浅色。当前仅 UI 演示，不会写入本地偏好。"
-      >
-        <Toggle checked={dark} onChange={() => setDark((v) => !v)} label="暗黑模式" />
+      <SettingRow title={a.dark} desc={a.darkDesc} badge={badge}>
+        <Toggle checked={dark} onChange={() => setDark((v) => !v)} label={a.dark} />
       </SettingRow>
-      <SettingRow title="紧凑布局" desc="缩小顶栏与模块卡片间距，适合小屏或密集操作。">
-        <Toggle checked={compact} onChange={() => setCompact((v) => !v)} label="紧凑布局" />
+      <SettingRow title={a.compact} desc={a.compactDesc} badge={badge}>
+        <Toggle checked={compact} onChange={() => setCompact((v) => !v)} label={a.compact} />
       </SettingRow>
-      <SettingRow title="界面密度" desc="参考 VS Code / Linear 的密度档位。">
+      <SettingRow title={a.density} desc={a.densityDesc} badge={badge}>
         <Segmented
-          ariaLabel="界面密度"
+          ariaLabel={a.density}
           value={density}
           onChange={setDensity}
           options={[
-            { id: 'comfortable', label: '舒适' },
-            { id: 'compact', label: '紧凑' },
-            { id: 'dense', label: '密集' },
+            { id: 'comfortable', label: a.densityComfortable },
+            { id: 'compact', label: a.densityCompact },
+            { id: 'dense', label: a.densityDense },
           ]}
         />
       </SettingRow>
@@ -131,60 +125,66 @@ function PanelAppearance() {
 }
 
 function PanelLanguage() {
-  const [lang, setLang] = useState('zh')
-  const [docs, setDocs] = useState('zh')
+  const { locale, docsLocale, effectiveDocsLocale, setLocale, setDocsLocale, m, t } = useLocale()
+  const lang = m.settings.language
+  const live = m.common.live
 
   return (
     <>
-      <SettingRow title="界面语言" desc="中 / 英切换占位。文案与路由尚未接入 i18n。">
+      <SettingRow title={lang.ui} desc={lang.uiDesc} badge={live}>
         <Segmented
-          ariaLabel="界面语言"
-          value={lang}
-          onChange={setLang}
+          ariaLabel={lang.ui}
+          value={locale}
+          onChange={(id) => setLocale(id as Locale)}
           options={[
             { id: 'zh', label: '中文' },
             { id: 'en', label: 'English' },
           ]}
         />
       </SettingRow>
-      <SettingRow title="文档与提示语言" desc="影响 README 链接、空状态提示与 Agent Skills 说明。">
+      <SettingRow title={lang.docs} desc={lang.docsDesc} badge={live}>
         <Segmented
-          ariaLabel="文档语言"
-          value={docs}
-          onChange={setDocs}
+          ariaLabel={lang.docs}
+          value={docsLocale}
+          onChange={(id) => setDocsLocale(id as DocsLocale)}
           options={[
             { id: 'zh', label: '中文' },
             { id: 'en', label: 'English' },
-            { id: 'auto', label: '跟随界面' },
+            { id: 'auto', label: lang.followUi },
           ]}
         />
       </SettingRow>
+      <p className="settings-row-desc" style={{ marginTop: 4 }}>
+        {t('settings.language.applied', {
+          lang: effectiveDocsLocale === 'zh' ? '中文' : 'English',
+        })}
+      </p>
     </>
   )
 }
 
 function PanelAuth() {
+  const { m } = useLocale()
+  const a = m.settings.auth
+  const badge = m.common.placeholder
   const [sessionTtl, setSessionTtl] = useState(true)
   const [csrf, setCsrf] = useState(true)
   const [rbac, setRbac] = useState(false)
 
   return (
     <>
-      <SettingRow
-        title="会话 Cookie 鉴权"
-        desc="沿用现有 HttpOnly Cookie 登录流；此处为策略开关占位。"
-      >
-        <Toggle checked={sessionTtl} onChange={() => setSessionTtl((v) => !v)} label="会话鉴权" />
+      <SettingRow title={a.cookie} desc={a.cookieDesc} badge={badge}>
+        <Toggle checked={sessionTtl} onChange={() => setSessionTtl((v) => !v)} label={a.cookie} />
       </SettingRow>
-      <SettingRow title="细粒度鉴权（RBAC）" desc="按模块授予 eval / hub / pipeline / chat 等读写真权限。">
-        <Toggle checked={rbac} onChange={() => setRbac((v) => !v)} label="细粒度鉴权" />
+      <SettingRow title={a.rbac} desc={a.rbacDesc} badge={badge}>
+        <Toggle checked={rbac} onChange={() => setRbac((v) => !v)} label={a.rbac} />
       </SettingRow>
-      <SettingRow title="CSRF / SameSite 加固" desc="对写接口强制同源与 SameSite=Lax 策略校验。">
-        <Toggle checked={csrf} onChange={() => setCsrf((v) => !v)} label="CSRF 加固" />
+      <SettingRow title={a.csrf} desc={a.csrfDesc} badge={badge}>
+        <Toggle checked={csrf} onChange={() => setCsrf((v) => !v)} label={a.csrf} />
       </SettingRow>
-      <SettingRow title="API Token" desc="签发只读 / 读写 Personal Access Token（GitHub 风格）。">
+      <SettingRow title={a.token} desc={a.tokenDesc} badge={badge}>
         <button type="button" className="settings-ghost-btn" disabled>
-          生成 Token（即将推出）
+          {a.tokenBtn}
         </button>
       </SettingRow>
     </>
@@ -192,37 +192,41 @@ function PanelAuth() {
 }
 
 function PanelUsers() {
+  const { m } = useLocale()
+  const u = m.settings.users
+  const badge = m.common.placeholder
+
   return (
     <>
-      <SettingRow title="当前用户" desc="展示登录身份；真实资料编辑尚未接入。">
+      <SettingRow title={u.current} desc={u.currentDesc} badge={badge}>
         <span className="settings-pill">embody</span>
       </SettingRow>
-      <SettingRow title="邀请成员" desc="邮件邀请或分享一次性注册链接（占位）。">
+      <SettingRow title={u.invite} desc={u.inviteDesc} badge={badge}>
         <button type="button" className="settings-ghost-btn" disabled>
-          邀请…
+          {u.inviteBtn}
         </button>
       </SettingRow>
-      <SettingRow title="角色模板" desc="管理员 · 评测员 · 访客；参考 GitHub Org / Notion Workspace。">
+      <SettingRow title={u.roles} desc={u.rolesDesc} badge={badge}>
         <button type="button" className="settings-ghost-btn" disabled>
-          管理角色
+          {u.rolesBtn}
         </button>
       </SettingRow>
-      <div className="settings-table" role="table" aria-label="用户列表占位">
+      <div className="settings-table" role="table" aria-label={u.tableAria}>
         <div className="settings-table-head" role="row">
-          <span role="columnheader">用户</span>
-          <span role="columnheader">角色</span>
-          <span role="columnheader">状态</span>
+          <span role="columnheader">{u.colUser}</span>
+          <span role="columnheader">{u.colRole}</span>
+          <span role="columnheader">{u.colStatus}</span>
         </div>
         {[
-          { name: 'embody', role: '管理员', status: '在线' },
-          { name: 'eval_bot', role: '评测员', status: '停用' },
-          { name: 'guest', role: '访客', status: '占位' },
-        ].map((u) => (
-          <div key={u.name} className="settings-table-row" role="row">
-            <span role="cell">{u.name}</span>
-            <span role="cell">{u.role}</span>
+          { name: 'embody', role: u.roleAdmin, status: u.statusOnline },
+          { name: 'eval_bot', role: u.roleEval, status: u.statusOff },
+          { name: 'guest', role: u.roleGuest, status: u.statusPlaceholder },
+        ].map((row) => (
+          <div key={row.name} className="settings-table-row" role="row">
+            <span role="cell">{row.name}</span>
+            <span role="cell">{row.role}</span>
             <span role="cell" className="muted">
-              {u.status}
+              {row.status}
             </span>
           </div>
         ))}
@@ -232,15 +236,18 @@ function PanelUsers() {
 }
 
 function PanelAbout() {
+  const { m } = useLocale()
+  const a = m.settings.about
+
   return (
     <div className="settings-about">
       <p>
-        <strong>Embody Model Eval</strong> 设置面板为 UI 占位，交互状态仅保存在本次弹窗会话中，关闭后不持久化。
+        <strong>Embody Model Eval</strong> {a.p1}
       </p>
       <ul>
-        <li>布局参考：VS Code / Cursor Settings、Linear Preferences、GitHub Settings</li>
-        <li>暗黑模式、中英切换、细粒度鉴权与用户管理将在后续迭代接入</li>
-        <li>当前生产鉴权仍以 Cookie 会话为准</li>
+        <li>{a.li1}</li>
+        <li>{a.li2}</li>
+        <li>{a.li3}</li>
       </ul>
     </div>
   )
@@ -250,6 +257,8 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
   const titleId = useId()
   const closeRef = useRef<HTMLButtonElement>(null)
   const [tab, setTab] = useState<SettingsTab>('appearance')
+  const { m } = useLocale()
+  const tabs = m.settings.tabs
 
   useEffect(() => {
     if (!open) return
@@ -271,6 +280,8 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
 
   if (!open) return null
 
+  const tabIds = Object.keys(tabs) as SettingsTab[]
+
   return createPortal(
     <div
       className="settings-overlay"
@@ -288,14 +299,14 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
       >
         <header className="settings-head">
           <div>
-            <p className="settings-kicker">Preferences</p>
-            <h2 id={titleId}>设置</h2>
+            <p className="settings-kicker">{m.settings.kicker}</p>
+            <h2 id={titleId}>{m.settings.title}</h2>
           </div>
           <button
             ref={closeRef}
             type="button"
             className="settings-close"
-            aria-label="关闭设置"
+            aria-label={m.common.closeSettings}
             onClick={onClose}
           >
             ×
@@ -303,23 +314,23 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
         </header>
 
         <div className="settings-body">
-          <nav className="settings-nav" aria-label="设置分类">
-            {TABS.map((t) => (
+          <nav className="settings-nav" aria-label={m.settings.navAria}>
+            {tabIds.map((id) => (
               <button
-                key={t.id}
+                key={id}
                 type="button"
-                className={`settings-nav-item${tab === t.id ? ' active' : ''}`}
-                aria-current={tab === t.id ? 'page' : undefined}
-                onClick={() => setTab(t.id)}
+                className={`settings-nav-item${tab === id ? ' active' : ''}`}
+                aria-current={tab === id ? 'page' : undefined}
+                onClick={() => setTab(id)}
               >
-                <span className="settings-nav-label">{t.label}</span>
-                <span className="settings-nav-hint">{t.hint}</span>
+                <span className="settings-nav-label">{tabs[id].label}</span>
+                <span className="settings-nav-hint">{tabs[id].hint}</span>
               </button>
             ))}
           </nav>
 
           <div className="settings-panel" role="tabpanel">
-            <h3 className="settings-panel-title">{TABS.find((t) => t.id === tab)?.label}</h3>
+            <h3 className="settings-panel-title">{tabs[tab].label}</h3>
             {tab === 'appearance' ? <PanelAppearance /> : null}
             {tab === 'language' ? <PanelLanguage /> : null}
             {tab === 'auth' ? <PanelAuth /> : null}
@@ -329,9 +340,11 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
         </div>
 
         <footer className="settings-foot">
-          <span className="muted">更改不会保存 · Esc 关闭</span>
+          <span className="muted">
+            {tab === 'language' ? m.common.escHintSaved : m.common.escHint}
+          </span>
           <button type="button" className="settings-primary-btn" onClick={onClose}>
-            完成
+            {m.common.done}
           </button>
         </footer>
       </div>
@@ -340,9 +353,10 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
   )
 }
 
-/** Classic gear entry + preferences modal (placeholders only). */
+/** Classic gear entry + preferences modal (language live; other tabs placeholders). */
 export function SettingsGear() {
   const [open, setOpen] = useState(false)
+  const { m } = useLocale()
 
   return (
     <>
@@ -351,11 +365,11 @@ export function SettingsGear() {
         className="settings-gear-btn"
         aria-haspopup="dialog"
         aria-expanded={open}
-        title="设置"
+        title={m.common.settings}
         onClick={() => setOpen(true)}
       >
         <GearIcon />
-        <span className="settings-gear-label">设置</span>
+        <span className="settings-gear-label">{m.common.settings}</span>
       </button>
       <SettingsDialog open={open} onClose={() => setOpen(false)} />
     </>

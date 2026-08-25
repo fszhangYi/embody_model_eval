@@ -178,6 +178,40 @@
     0 16px 40px rgba(61, 214, 198, 0.18);
 }
 
+.login-lang {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid rgba(61, 214, 198, 0.28);
+  background: rgba(12, 18, 28, 0.65);
+  backdrop-filter: blur(8px);
+}
+
+.login-lang-btn {
+  appearance: none;
+  border: 0;
+  cursor: pointer;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  color: var(--muted, #8b9bb4);
+  background: transparent;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.login-lang-btn:hover {
+  color: var(--text, #e7ecf3);
+}
+
+.login-lang-btn.active {
+  color: #0b1018;
+  background: linear-gradient(120deg, #3dd6c6, #7ae0d4);
+}
+
 .login-brand-name {
   font-size: 1.35rem;
   font-weight: 650;

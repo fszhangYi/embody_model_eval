@@ -2,6 +2,7 @@ import type { ReactNode } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
+import { LocaleProvider } from './i18n/LocaleContext'
 import { HomePage } from './pages/HomePage'
 import { EvalPage } from './pages/EvalPage'
 import { HubPage } from './pages/HubPage'
@@ -38,8 +39,9 @@ function HomeOrEvalRedirect() {
 export default function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
+      <LocaleProvider>
+        <AuthProvider>
+          <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<HomeOrEvalRedirect />} />
           <Route
@@ -107,8 +109,9 @@ export default function App() {
           <Route path="/sensors.html" element={<Navigate to="/sensors" replace />} />
           <Route path="/login.html" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </AuthProvider>
+          </Routes>
+        </AuthProvider>
+      </LocaleProvider>
     </BrowserRouter>
   )
 }
