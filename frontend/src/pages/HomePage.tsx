@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { PageNav } from '../components/PageNav'
+import { SettingsGear } from '../components/SettingsModal'
 import { PAGES, type PageId } from '../config/pages'
 import '../styles/home.css'
 
@@ -48,6 +49,7 @@ export function HomePage() {
           </div>
         </div>
         <div className="home-header-actions">
+          <SettingsGear />
           <PageNav />
         </div>
       </header>
