@@ -1,5 +1,6 @@
 import type { ArmStatusResponse } from './armApi'
 import type { SensorDevice } from './types'
+import { trText } from '../../i18n/runtime'
 
 export function ArmLivePanel({
   device,
@@ -69,14 +70,14 @@ export function ArmLivePanel({
 
       <div className="sensors-modal-sections">
         {detail.sections.map((sec) => (
-          <section key={sec.title} className="sensors-modal-section">
-            <h3>{sec.title}</h3>
+          <section key={trText(sec.title)} className="sensors-modal-section">
+            <h3>{trText(sec.title)}</h3>
             <table>
               <tbody>
                 {sec.rows.map((row) => (
-                  <tr key={row.label}>
-                    <th scope="row">{row.label}</th>
-                    <td>{row.value}</td>
+                  <tr key={trText(row.label)}>
+                    <th scope="row">{trText(row.label)}</th>
+                    <td>{trText(row.value)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -146,9 +147,9 @@ export function ArmLivePanel({
           <h3>上线检查</h3>
           <ul className="sensors-check-list">
             {detail.checklist.map((item) => (
-              <li key={item}>
+              <li key={trText(item)}>
                 <span className="sensors-check-box" aria-hidden="true" />
-                {item}
+                {trText(item)}
               </li>
             ))}
           </ul>

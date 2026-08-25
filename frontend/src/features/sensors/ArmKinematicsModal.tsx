@@ -9,7 +9,8 @@ import { loadBuildGuideFallback } from './buildGuideFallback'
 import { ArmFkIkBuildGuide } from './ArmFkIkBuildGuide'
 import { ArmLivePanel } from './ArmLivePanel'
 import { ArmProjectPanel } from './ArmProjectPanel'
-import { KIND_LABEL, STATUS_LABEL, type SensorDevice, type SensorStatus } from './types'
+import { type SensorDevice, type SensorStatus } from './types'
+import { t, trText } from '../../i18n/runtime'
 
 type ArmTab = 'live' | 'guide' | 'project'
 
@@ -76,14 +77,14 @@ export function ArmKinematicsModal({
           setOverview(b.overview?.ok ? b.overview : null)
           setBundleError(
             b.guide?.error
-              ? `API 构建说明不可用，已加载静态副本：${b.guide.error}`
+              ? t('sensors.arm.guideApiFallback', { msg: b.guide.error })
               : null,
           )
           return
         }
         setGuide(b.guide || fallback)
         setOverview(b.overview)
-        setBundleError(fallback.error || b.guide?.error || '构建说明加载失败')
+        setBundleError(fallback.error || b.guide?.error || t('sensors.arm.guideLoadFail'))
       } catch (e) {
         if (cancelled) return
         try {
@@ -93,7 +94,7 @@ export function ArmKinematicsModal({
             setGuide(fallback)
             setOverview(null)
             setBundleError(
-              `${e instanceof Error ? e.message : String(e)} · 已回退到静态构建说明`,
+              t('sensors.arm.guideStaticFallback', { msg: e instanceof Error ? e.message : String(e) }),
             )
             return
           }
@@ -129,41 +130,41 @@ export function ArmKinematicsModal({
         <div className="sensors-modal-head">
           <div>
             <div className="sensors-modal-kicker">
-              <span className="sensors-kind-tag">{KIND_LABEL.arm}</span>
+              <span className="sensors-kind-tag">{t('sensors.kind.arm')}</span>
               <span className={`sensors-status ${statusClass(device.status)}`}>
-                {STATUS_LABEL[device.status]}
+                {t(`sensors.status.${device.status}`)}
               </span>
               <span className="sensors-tag-demo">arm_kin</span>
             </div>
-            <h2 id="sensors-arm-modal-title">{device.name}</h2>
-            <p className="muted">{device.model} · 运动学集成</p>
+            <h2 id="sensors-arm-modal-title">{trText(device.name)}</h2>
+            <p className="muted">{device.model} · {t('sensors.arm.subtitle')}</p>
           </div>
-          <button type="button" className="sensors-modal-close" onClick={onClose} aria-label="关闭">
+          <button type="button" className="sensors-modal-close" onClick={onClose} aria-label={t('pathPicker.closeAria')}>
             ×
           </button>
         </div>
 
-        <nav className="sensors-arm-tabs" aria-label="机械臂详情页">
+        <nav className="sensors-arm-tabs" aria-label={t("sensors.arm.tabsAria")}>
           <button
             type="button"
             className={tab === 'live' ? 'active' : ''}
             onClick={() => setTab('live')}
           >
-            状态与自检
+            {t('sensors.arm.tabLive')}
           </button>
           <button
             type="button"
             className={tab === 'guide' ? 'active' : ''}
             onClick={() => setTab('guide')}
           >
-            FK / IK 搭建说明
+            {t('sensors.arm.tabGuide')}
           </button>
           <button
             type="button"
             className={tab === 'project' ? 'active' : ''}
             onClick={() => setTab('project')}
           >
-            arm_kin 模块
+            {t('sensors.arm.tabProject')}
           </button>
         </nav>
 
@@ -191,10 +192,10 @@ export function ArmKinematicsModal({
             disabled={busy}
             onClick={() => onTest(device.id)}
           >
-            {busy ? '测试中…' : '运行 FK/IK 自检'}
+            {busy ? t('sensors.testing') : t('sensors.arm.btnSelfTest')}
           </button>
           <button type="button" className="sensors-btn primary" onClick={onClose}>
-            关闭
+            {t('pathPicker.closeAria')}
           </button>
         </div>
       </div>

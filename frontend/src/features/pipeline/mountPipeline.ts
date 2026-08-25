@@ -1,5 +1,7 @@
 // @ts-nocheck
 
+import { t } from '../../i18n/runtime';
+
 /** Auto-ported from pipeline.html */
 
 import {
@@ -33,7 +35,7 @@ const flow = new FlowCanvas({
   onDirtyChange: (dirty) => {
     btnSaveGraph.classList.toggle('dirty', dirty);
     if (dirty) {
-      saveStatus.textContent = '有未保存改动';
+      saveStatus.textContent = t('pipeline.unsaved');
       saveStatus.className = 'save-status';
     }
   },
@@ -81,36 +83,36 @@ function refresh() {
   flow.fitView();
   flow.stopAnim();
   if (btnAnim) {
-    btnAnim.textContent = '流动演示';
+    btnAnim.textContent = t('pipeline.btnAnim');
     btnAnim.classList.remove('active');
   }
 }
 
 async function loadServerGraphs() {
   await withLoader(stageLoader, async (progress) => {
-    progress(0.2, '加载数据流图…', 'pipeline_graphs.json');
+    progress(0.2, t('pipeline.loaderGraphs'), 'pipeline_graphs.json');
     try {
       const res = await fetch('/api/pipeline/graphs', { cache: 'no-store' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      progress(0.75, '应用图配置…', `${Object.keys(data.graphs || {}).length} 套`);
+      progress(0.75, t('pipeline.loaderApply'), t('pipeline.graphsCount', { n: Object.keys(data.graphs || {}).length }));
       const n = applyServerGraphs(data.graphs || {});
       if (n > 0) {
-        saveStatus.textContent = `已加载服务器图 ×${n}`;
+        saveStatus.textContent = t('pipeline.graphsLoaded', { n });
         saveStatus.className = 'save-status ok';
       }
-      progress(1, '数据流就绪', n > 0 ? `已加载 ${n} 套图` : '使用内置默认图');
+      progress(1, t('pipeline.loaderReady'), n > 0 ? t('pipeline.graphsLoadedDetail', { n }) : t('pipeline.loaderDefault'));
     } catch (err) {
       console.warn('pipeline graphs load skipped', err);
-      progress(1, '使用内置默认图', String(err.message || err));
+      progress(1, t('pipeline.loaderDefault'), String(err.message || err));
     }
-  }, { text: '加载管线配置', detail: '/api/pipeline/graphs' });
+  }, { text: t('pipeline.loaderTitle'), detail: '/api/pipeline/graphs' });
 }
 
 async function saveGraphsToServer() {
   flow.commitGraphToStore();
   btnSaveGraph.disabled = true;
-  saveStatus.textContent = '保存中…';
+  saveStatus.textContent = t('pipeline.saving');
   saveStatus.className = 'save-status';
   try {
     const res = await fetch('/api/pipeline/graphs', {
@@ -121,10 +123,10 @@ async function saveGraphsToServer() {
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
     flow.markDirty(false);
-    saveStatus.textContent = `已保存 · ${data.path || 'config/pipeline_graphs.json'}`;
+    saveStatus.textContent = t('pipeline.saved', { path: data.path || 'config/pipeline_graphs.json' });
     saveStatus.className = 'save-status ok';
   } catch (err) {
-    saveStatus.textContent = `保存失败：${err.message || err}`;
+    saveStatus.textContent = t('pipeline.saveFail', { msg: err.message || err });
     saveStatus.className = 'save-status err';
   } finally {
     btnSaveGraph.disabled = false;
@@ -140,11 +142,11 @@ if (btnSaveGraph) btnSaveGraph.addEventListener('click', () => { saveGraphsToSer
 if (btnAnim) btnAnim.addEventListener('click', () => {
   if (flow.animating) {
     flow.stopAnim();
-    btnAnim.textContent = '流动演示';
+    btnAnim.textContent = t('pipeline.btnAnim');
     btnAnim.classList.remove('active');
   } else {
     flow.startAnim();
-    btnAnim.textContent = '停止流动';
+    btnAnim.textContent = t('pipeline.btnAnimStop');
     btnAnim.classList.add('active');
   }
 });
@@ -196,7 +198,7 @@ function setRecUI(state) {
 }
 
 function syncAnimButton() {
-  btnAnim.textContent = flow.animating ? '停止流动' : '流动演示';
+  btnAnim.textContent = flow.animating ? t('pipeline.btnAnimStop') : t('pipeline.btnAnim');
   btnAnim.classList.toggle('active', flow.animating);
 }
 
@@ -208,16 +210,16 @@ function isTypingTarget(el) {
 
 btnRecStart.addEventListener('click', () => {
   if (typeof flow.beginCapture !== 'function') {
-    recStatus.textContent = '录像模块未加载，请强制刷新页面（Ctrl+Shift+R）';
+    recStatus.textContent = t('pipeline.recModuleMissing');
     return;
   }
   if (!window.MediaRecorder) {
-    recStatus.textContent = '当前浏览器不支持 MediaRecorder';
+    recStatus.textContent = t('pipeline.recNoMediaRecorder');
     return;
   }
   const mime = pickMimeType();
   if (!mime) {
-    recStatus.textContent = '浏览器不支持 WebM 录制';
+    recStatus.textContent = t('pipeline.recNoWebm');
     return;
   }
   try {
@@ -228,7 +230,7 @@ btnRecStart.addEventListener('click', () => {
     }
     captureHandle = flow.beginCapture(30);
     if (!captureHandle || !captureHandle.stream) {
-      throw new Error('beginCapture 未返回可用视频流（请强制刷新页面清除缓存）');
+      throw new Error(t('pipeline.recCaptureFail'));
     }
     const stream = captureHandle.stream;
     recChunks = [];
@@ -250,7 +252,7 @@ btnRecStart.addEventListener('click', () => {
       if (recTimerId) { clearInterval(recTimerId); recTimerId = null; }
       const sec = ((performance.now() - recStartedAt) / 1000).toFixed(1);
       const mb = (recBlob.size / (1024 * 1024)).toFixed(2);
-      recStatus.textContent = `已停止 · ${sec}s · ${mb} MB · 可保存`;
+      recStatus.textContent = t('pipeline.recStopped', { sec, mb });
       setRecUI('ready');
     };
     mediaRecorder.start(200);
@@ -259,7 +261,7 @@ btnRecStart.addEventListener('click', () => {
     recTimerId = setInterval(() => {
       if (recTimerEl) recTimerEl.textContent = formatMMSS(performance.now() - recStartedAt);
     }, 250);
-    recStatus.textContent = '录制中…';
+    recStatus.textContent = t('pipeline.recording');
     setRecUI('recording');
   } catch (e) {
     console.error(e);
@@ -270,7 +272,7 @@ btnRecStart.addEventListener('click', () => {
       syncAnimButton();
       recAutoAnim = false;
     }
-    recStatus.textContent = '开始录制失败: ' + (e && e.message ? e.message : e);
+    recStatus.textContent = t('pipeline.recStartFail', { msg: e && e.message ? e.message : e });
     setRecUI('idle');
   }
 });
@@ -289,7 +291,7 @@ btnRecSave.addEventListener('click', () => {
   a.download = `embody_pipeline_${stamp}.webm`;
   a.click();
   URL.revokeObjectURL(a.href);
-  recStatus.textContent = `已触发下载 · ${a.download}`;
+  recStatus.textContent = t('pipeline.recDownloaded', { filename: a.download });
 });
 
 window.addEventListener('keydown', (e) => {

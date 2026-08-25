@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchFsChildren, type FsEntry } from '../features/actPipeline/api'
 import type { BrowseRoot, PathKind } from '../features/actPipeline/types'
+import { t } from '../i18n/runtime'
 
 export interface PathPickerModalProps {
   open: boolean
@@ -129,20 +130,20 @@ export function PathPickerModal({
       >
         <header className="path-picker-head">
           <h3 id="path-picker-title">{title}</h3>
-          <button type="button" className="path-picker-close" onClick={onClose} aria-label="关闭">
+          <button type="button" className="path-picker-close" onClick={onClose} aria-label={t("pathPicker.closeAria")}>
             ×
           </button>
         </header>
 
         <div className="path-picker-root">
-          根目录：<code>{rootPath}</code>
+          {t("pathPicker.root")}<code>{rootPath}</code>
         </div>
 
         {err ? <div className="path-picker-err">{err}</div> : null}
 
-        <div className="path-picker-cascade" aria-label="路径级联选择">
+        <div className="path-picker-cascade" aria-label={t("pathPicker.cascade")}>
           {loading && columns.length === 0 ? (
-            <div className="path-picker-loading">加载中…</div>
+            <div className="path-picker-loading">{t("pathPicker.loading")}</div>
           ) : (
             columns.map((col, colIndex) => (
               <ul key={colIndex} className="path-picker-col">
@@ -167,21 +168,21 @@ export function PathPickerModal({
         </div>
 
         <label className="path-picker-edit">
-          <span>路径（可手动修改）</span>
+          <span>{t("pathPicker.pathEdit")}</span>
           <input
             type="text"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder={pathKind === 'dir' ? '目录绝对路径' : '文件绝对路径'}
+            placeholder={pathKind === 'dir' ? t('pathPicker.dirPlaceholder') : t('pathPicker.filePlaceholder')}
           />
         </label>
 
         <footer className="path-picker-foot">
           <button type="button" className="path-picker-btn ghost" onClick={onClose}>
-            取消
+            {t("pathPicker.cancel")}
           </button>
           <button type="button" className="path-picker-btn primary" onClick={onConfirmClick}>
-            确认
+            {t("pathPicker.confirm")}
           </button>
         </footer>
       </div>

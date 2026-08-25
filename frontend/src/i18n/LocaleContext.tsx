@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react'
 import { formatMessage, lookupMessage, messages, type MessageTree } from './messages'
+import { syncLocale } from './runtime'
 import {
   DOCS_LOCALE_STORAGE_KEY,
   LOCALE_STORAGE_KEY,
@@ -39,6 +40,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next)
+    syncLocale(next)
     try {
       localStorage.setItem(LOCALE_STORAGE_KEY, next)
     } catch {
@@ -56,6 +58,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
+    syncLocale(locale)
     document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en'
   }, [locale])
 

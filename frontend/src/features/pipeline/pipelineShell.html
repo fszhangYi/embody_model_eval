@@ -1,25 +1,25 @@
 <header>
   <div class="header-brand">
-    <h1 id="graphTitle" title="训练数据流">训练数据流</h1>
-    <p class="header-blurb" id="graphBlurb" title="冻结 SAM2 离线抽特征 → 只训 ACT 头">冻结 SAM2 离线抽特征 → 只训 ACT 头</p>
+    <h1 id="graphTitle" data-i18n="pipeline.title" data-i18n-title="pipeline.title" title="训练数据流">训练数据流</h1>
+    <p class="header-blurb" id="graphBlurb" data-i18n="pipeline.subtitle" data-i18n-title="pipeline.subtitle" title="冻结 SAM2 离线抽特征 → 只训 ACT 头">冻结 SAM2 离线抽特征 → 只训 ACT 头</p>
   </div>
   <div class="toolbar">
-    <label class="muted" for="pipelineSelect">模型</label>
-    <select id="pipelineSelect" class="pipeline-select" aria-label="选择模型管线"></select>
-    <div class="seg" role="group" aria-label="阶段">
-      <button type="button" id="btnTrain" class="active">训练</button>
-      <button type="button" id="btnInfer">推理</button>
+    <label class="muted" for="pipelineSelect" data-i18n="pipeline.modelLabel">模型</label>
+    <select id="pipelineSelect" class="pipeline-select" data-i18n-aria="pipeline.selectAria" aria-label="选择模型管线"></select>
+    <div class="seg" role="group" data-i18n-aria="pipeline.stageAria" aria-label="阶段">
+      <button type="button" id="btnTrain" class="active" data-i18n="pipeline.btnTrain">训练</button>
+      <button type="button" id="btnInfer" data-i18n="pipeline.btnInfer">推理</button>
     </div>
-    <button type="button" id="btnAnim">流动演示</button>
-    <button type="button" id="btnFit">适配视图</button>
-    <button type="button" id="btnSaveGraph" title="将当前四套图（含节点文案与位置）保存到服务器 config/pipeline_graphs.json">保存图</button>
+    <button type="button" id="btnAnim" data-i18n="pipeline.btnAnim">流动演示</button>
+    <button type="button" id="btnFit" data-i18n="pipeline.btnFit">适配视图</button>
+    <button type="button" id="btnSaveGraph" data-i18n="pipeline.btnSave" data-i18n-title="pipeline.btnSaveTitle" title="将当前四套图（含节点文案与位置）保存到服务器 config/pipeline_graphs.json">保存图</button>
     <span class="save-status" id="saveStatus"></span>
     <span class="rec-pill" id="recPill"><i class="blink"></i>REC <span id="recTimer">00:00</span></span>
-    <div class="rec-group" aria-label="录像">
-      <button type="button" id="btnRecStart" title="快捷键 R：开始录制画布">录像</button>
-      <button type="button" id="btnRecStop" class="danger" disabled title="快捷键 T：停止">停止</button>
-      <button type="button" id="btnRecSave" disabled title="快捷键 S：保存 WebM">保存</button>
-      <span class="rec-status" id="recStatus">未录制 · WebM · R/T/S</span>
+    <div class="rec-group" data-i18n-aria="pipeline.recAria" aria-label="录像">
+      <button type="button" id="btnRecStart" data-i18n="pipeline.btnRec" data-i18n-title="pipeline.btnRecTitle" title="快捷键 R：开始录制画布">录像</button>
+      <button type="button" id="btnRecStop" class="danger" disabled data-i18n="pipeline.btnStop" data-i18n-title="pipeline.btnStopTitle" title="快捷键 T：停止">停止</button>
+      <button type="button" id="btnRecSave" disabled data-i18n="pipeline.btnRecSave" data-i18n-title="pipeline.btnRecSaveTitle" title="快捷键 S：保存 WebM">保存</button>
+      <span class="rec-status" id="recStatus" data-i18n="pipeline.recIdle">未录制 · WebM · R/T/S</span>
     </div>
   </div>
 </header>
@@ -29,15 +29,15 @@
     <div id="flowStage">
       <canvas id="flowCanvas"></canvas>
     </div>
-    <button type="button" class="side-open-fab" id="btnShowSide" title="显示节点说明">节点说明</button>
+    <button type="button" class="side-open-fab" id="btnShowSide" data-i18n="pipeline.nodeHelp" data-i18n-title="pipeline.nodeHelpTitle" title="显示节点说明">节点说明</button>
   </div>
-  <aside class="side" id="nodeSide" aria-label="节点说明">
+  <aside class="side" id="nodeSide" data-i18n-aria="pipeline.nodeHelp" aria-label="节点说明">
     <div class="side-head">
-      <h2>节点说明</h2>
-      <button type="button" class="side-toggle" id="btnHideSide" title="隐藏说明面板">隐藏</button>
+      <h2 data-i18n="pipeline.nodeHelp">节点说明</h2>
+      <button type="button" class="side-toggle" id="btnHideSide" data-i18n="pipeline.btnHide" data-i18n-title="pipeline.btnHideTitle" title="隐藏说明面板">隐藏</button>
     </div>
     <div id="nodeDetail">
-      <p class="muted">点击节点查看说明；拖动画布空白处平移，滚轮缩放。</p>
+      <p class="muted" data-i18n="pipeline.nodeHint">点击节点查看说明；拖动画布空白处平移，滚轮缩放。</p>
     </div>
     <div class="legend">
       <span><i style="background:#3b82f6"></i>data</span>
@@ -49,11 +49,11 @@
       <span><i style="background:#64748b"></i>ctrl</span>
     </div>
     <ul class="hint-list">
-      <li>下拉切换 <strong>SAM2Grasp</strong> 与 <strong>纯 ACT (CVAE)</strong>；再选训练 / 推理。</li>
-      <li><strong>双击节点</strong>可编辑标题 / 类型 / 说明 / 文件；拖动可改位置。</li>
-      <li>顶栏 <strong>保存图</strong> 将改动写入服务器 <code>config/pipeline_graphs.json</code>。</li>
-      <li>连线表示张量 / 控制流，结构对齐 <code>act_robot</code> 源码路径。</li>
-      <li>顶栏 <strong>录像</strong> 可录制当前画布为 WebM（快捷键 R 开始 / T 停止 / S 保存）。</li>
+      <li data-i18n="pipeline.hint1">下拉切换 <strong>SAM2Grasp</strong> 与 <strong>纯 ACT (CVAE)</strong>；再选训练 / 推理。</li>
+      <li data-i18n="pipeline.hint2"><strong>双击节点</strong>可编辑标题 / 类型 / 说明 / 文件；拖动可改位置。</li>
+      <li data-i18n="pipeline.hint3">顶栏 <strong>保存图</strong> 将改动写入服务器 <code>config/pipeline_graphs.json</code>。</li>
+      <li data-i18n="pipeline.hint4">连线表示张量 / 控制流，结构对齐 <code>act_robot</code> 源码路径。</li>
+      <li data-i18n="pipeline.hint5">顶栏 <strong>录像</strong> 可录制当前画布为 WebM（快捷键 R 开始 / T 停止 / S 保存）。</li>
     </ul>
   </aside>
 </div>

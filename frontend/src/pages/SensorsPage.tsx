@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { PageNav } from '../components/PageNav'
+import { PageChrome } from '../components/PageChrome'
+import { useLocale } from '../i18n/LocaleContext'
+import { t, trText } from '../i18n/runtime'
 import { fetchArmStatus, refreshArm, testArm } from '../features/sensors/armApi'
 import { SensorDetailModal } from '../features/sensors/SensorDetailModal'
 import { ArmKinematicsModal } from '../features/sensors/ArmKinematicsModal'
 import {
-  KIND_LABEL,
   SENSOR_DEVICES,
-  STATUS_LABEL,
   applyArmStatus,
   type SensorDevice,
   type SensorStatus,
@@ -41,7 +41,7 @@ function SensorCard({
     <article
       className={`sensors-card kind-${device.kind}`}
       data-status={device.status}
-      title="双击查看详情"
+      title={t("sensors.dblclickTitle")}
       tabIndex={0}
       onDoubleClick={() => onOpen(device)}
       onKeyDown={(e) => {
@@ -50,22 +50,22 @@ function SensorCard({
     >
       <div className="sensors-card-head">
         <div className="sensors-card-title">
-          <span className="sensors-kind-tag">{KIND_LABEL[device.kind]}</span>
-          <h3>{device.name}</h3>
+          <span className="sensors-kind-tag">{t(`sensors.kind.${device.kind}`)}</span>
+          <h3>{trText(device.name)}</h3>
           <p className="muted">{device.model}</p>
         </div>
         <span className={`sensors-status ${statusClass(device.status)}`}>
-          {STATUS_LABEL[device.status]}
+          {t(`sensors.status.${device.status}`)}
         </span>
       </div>
 
-      <p className="sensors-card-note muted">{device.note}</p>
+      <p className="sensors-card-note muted">{trText(device.note)}</p>
 
       <dl className="sensors-metrics">
         {device.metrics.map((m) => (
           <div key={m.label} className="sensors-metric">
-            <dt>{m.label}</dt>
-            <dd>{m.value}</dd>
+            <dt>{trText(m.label)}</dt>
+            <dd>{trText(m.value)}</dd>
           </div>
         ))}
       </dl>
@@ -75,9 +75,9 @@ function SensorCard({
           ID <code>{device.id}</code>
         </span>
         <span className="muted">
-          端点 <code>{device.endpoint}</code>
+          {t("sensors.endpoint")} <code>{device.endpoint}</code>
         </span>
-        <span className="sensors-card-hint muted">双击打开详情</span>
+        <span className="sensors-card-hint muted">{t("sensors.dblclickHint")}</span>
       </div>
 
       <div className="sensors-card-actions">
@@ -90,19 +90,19 @@ function SensorCard({
             onTest(device.id)
           }}
         >
-          {busy && device.kind === 'arm' ? '测试中…' : '测试连接'}
+          {busy && device.kind === 'arm' ? t('sensors.testing') : t('sensors.testConn')}
         </button>
         <button
           type="button"
           className="sensors-btn ghost"
           disabled={!canRefresh || busy}
-          title={canRefresh ? '重新计算 FK 读数' : '后续接入实时刷新'}
+          title={canRefresh ? t('sensors.refreshFkTitle') : t('sensors.refreshLaterTitle')}
           onClick={(e) => {
             e.stopPropagation()
             onRefresh(device.id)
           }}
         >
-          刷新读数
+          {t("sensors.refreshReadings")}
         </button>
       </div>
     </article>
@@ -111,7 +111,8 @@ function SensorCard({
 
 export function SensorsPage() {
   const [filter, setFilter] = useState<'all' | SensorDevice['kind']>('all')
-  const [toast, setToast] = useState('正在加载机械臂 arm_kin 运动学…')
+  const { locale } = useLocale()
+  const [toast, setToast] = useState(() => t('sensors.toastLoading'))
   const [active, setActive] = useState<SensorDevice | null>(null)
   const [devices, setDevices] = useState<SensorDevice[]>(() => SENSOR_DEVICES.map((d) => ({ ...d })))
   const [armBusy, setArmBusy] = useState(false)
@@ -127,10 +128,10 @@ export function SensorsPage() {
     try {
       const arm = await fetchArmStatus()
       patchArm((base) => applyArmStatus(base, arm))
-      setToast(arm.message || (arm.available ? '机械臂运动学已加载' : '机械臂后端不可用'))
+      setToast(trText(arm.message || '') || (arm.available ? t('sensors.toastLoaded') : t('sensors.toastUnavailable')))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      setToast(`机械臂状态拉取失败：${msg}`)
+      setToast(t('sensors.toastFetchFail', { msg }))
       patchArm((base) => ({
         ...base,
         status: 'offline',
@@ -141,8 +142,9 @@ export function SensorsPage() {
   }, [patchArm])
 
   useEffect(() => {
+    setToast(t('sensors.toastLoading'))
     void loadArm()
-  }, [loadArm])
+  }, [locale, loadArm])
 
   const filtered = useMemo(
     () => (filter === 'all' ? devices : devices.filter((d) => d.kind === filter)),
@@ -166,18 +168,18 @@ export function SensorsPage() {
   const onTest = async (id: string) => {
     if (id !== ARM_ID) {
       const d = devices.find((x) => x.id === id)
-      setToast(`「${d?.name || id}」连接测试尚未接入硬件 API`)
+      setToast(t('sensors.toastPlaceholder', { name: trText(d?.name || id) }))
       return
     }
     setArmBusy(true)
-    setToast('机械臂：运行示教 FK 对表 + IK 回环…')
+    setToast(t('sensors.toastTestRunning'))
     try {
       const arm = await testArm()
       patchArm((base) => applyArmStatus(base, arm))
-      setToast(arm.message || '测试完成')
+      setToast(trText(arm.message || '') || t('sensors.toastTestDone'))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      setToast(`机械臂测试失败：${msg}`)
+      setToast(t('sensors.toastTestFail', { msg }))
     } finally {
       setArmBusy(false)
     }
@@ -189,10 +191,10 @@ export function SensorsPage() {
     try {
       const arm = await refreshArm()
       patchArm((base) => applyArmStatus(base, arm))
-      setToast(arm.message || '读数已刷新')
+      setToast(trText(arm.message || '') || t('sensors.toastRefreshDone'))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      setToast(`刷新失败：${msg}`)
+      setToast(t('sensors.toastRefreshFail', { msg }))
     } finally {
       setArmBusy(false)
     }
@@ -202,7 +204,7 @@ export function SensorsPage() {
     void onTest(ARM_ID)
     const others = devices.filter((d) => d.id !== ARM_ID).length
     if (others > 0) {
-      setToast((t) => `${t} · 另有 ${others} 路仍为占位`)
+      setToast((prev) => `${prev} · ${t('sensors.toastOthersPlaceholder', { n: others })}`)
     }
   }
 
@@ -211,10 +213,10 @@ export function SensorsPage() {
     try {
       const arm = await refreshArm({ useTeachIndex: index })
       patchArm((base) => applyArmStatus(base, arm))
-      setToast(`已切换到示教点 #${index} 并重算 FK`)
+      setToast(t('sensors.toastTeachSwitch', { index }))
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
-      setToast(`切换示教点失败：${msg}`)
+      setToast(t('sensors.toastTeachFail', { msg }))
     } finally {
       setArmBusy(false)
     }
@@ -224,11 +226,11 @@ export function SensorsPage() {
     <div className="sensors-page">
       <header className="sensors-header">
         <div className="sensors-header-brand">
-          <h1>传感器状态</h1>
-          <p className="sensors-header-blurb">连接检测 · 实时读数 · 多相机 / 力觉 / Gello</p>
+          <h1>{t('sensors.title')}</h1>
+          <p className="sensors-header-blurb">{t("sensors.subtitle")}</p>
         </div>
         <div className="sensors-header-actions">
-          <PageNav />
+          <PageChrome className="sensors-header-actions-inner" />
         </div>
       </header>
 
@@ -236,41 +238,41 @@ export function SensorsPage() {
         <section className="sensors-toolbar card">
           <div className="sensors-summary">
             <div className="sensors-stat">
-              <span className="l">设备</span>
+              <span className="l">{t("sensors.statDevices")}</span>
               <span className="v">{summary.total}</span>
             </div>
             <div className="sensors-stat">
-              <span className="l">在线</span>
+              <span className="l">{t("sensors.statOnline")}</span>
               <span className="v ok">{summary.ok}</span>
             </div>
             <div className="sensors-stat">
-              <span className="l">离线</span>
+              <span className="l">{t("sensors.statOffline")}</span>
               <span className="v off">{summary.offline}</span>
             </div>
             <div className="sensors-stat">
-              <span className="l">告警</span>
+              <span className="l">{t("sensors.statAlerts")}</span>
               <span className="v warn">{summary.bad}</span>
             </div>
           </div>
 
           <div className="sensors-toolbar-right">
             <label className="sensors-filter">
-              <span className="muted">类型</span>
+              <span className="muted">{t("sensors.filterType")}</span>
               <select
                 value={filter}
                 onChange={(e) => setFilter(e.target.value as typeof filter)}
-                aria-label="按传感器类型筛选"
+                aria-label={t("sensors.filterAria")}
               >
-                <option value="all">全部</option>
+                <option value="all">{t("sensors.filterAll")}</option>
                 {kinds.map((k) => (
                   <option key={k} value={k}>
-                    {KIND_LABEL[k]}
+                    {t(`sensors.kind.${k}`)}
                   </option>
                 ))}
               </select>
             </label>
             <button type="button" className="sensors-btn primary" disabled={armBusy} onClick={onTestAll}>
-              全部测试
+              {t("sensors.testAll")}
             </button>
           </div>
         </section>
@@ -279,7 +281,7 @@ export function SensorsPage() {
           {toast}
         </p>
 
-        <section className="sensors-grid" aria-label="传感器列表">
+        <section className="sensors-grid" aria-label={t("sensors.listAria")}>
           {filtered.map((d) => (
             <SensorCard
               key={d.id}

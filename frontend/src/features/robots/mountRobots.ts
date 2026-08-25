@@ -1,5 +1,7 @@
 // @ts-nocheck
 
+import { t } from '../../i18n/runtime';
+
 /** Auto-ported */
 
 import * as THREE from 'three';
@@ -118,7 +120,7 @@ function loadRobot(urdfUrl, { onProgress, rootEulerDeg, modelScale } = {}) {
 
     // URDF 结构一就绪就结束 loading；网格会异步补进场景，避免卡在 99%。
     const hardTimer = setTimeout(() => {
-      fail(new Error(`加载超时：${urdfUrl}`));
+      fail(new Error(t('robots.errorTimeout', { url: urdfUrl })));
     }, 30000);
 
     manager.onProgress = (_url, loaded, total) => {
@@ -249,17 +251,17 @@ function readJointDeg(name) {
 
 function renderMeta(profile) {
   els.title.textContent = profile.label;
-  els.desc.textContent = profile.description || `机型 id：${profile.id}`;
+  els.desc.textContent = profile.description || t('robots.modelId', { id: profile.id });
   const rows = [
     ['id', profile.id],
     ['URDF', profile.urdf.preview || profile.urdf.cur],
-    ['自由度', String(profile.joint_names.length)],
-    ['显示缩放', String(profile.model_scale ?? 1)],
+    [t('robots.metaDof'), String(profile.joint_names.length)],
+    [t('robots.metaScale'), String(profile.model_scale ?? 1)],
     ['TCP link', profile.tcp.link],
     ['TCP offset', profile.tcp.offset.map((x) => Number(x).toFixed(4)).join(', ')],
-    ['TCP 标定', (profile.tcp.calibration?.xyz || [0, 0, 0]).map((x) => Number(x).toFixed(4)).join(', ')],
-    ['碰撞', profile.collision?.method || 'hull'],
-    ['限位条目', String(Object.keys(profile.joint_limits || {}).length)],
+    [t('robots.metaTcpCalib'), (profile.tcp.calibration?.xyz || [0, 0, 0]).map((x) => Number(x).toFixed(4)).join(', ')],
+    [t('robots.metaCollision'), profile.collision?.method || 'hull'],
+    [t('robots.metaLimits'), String(Object.keys(profile.joint_limits || {}).length)],
   ];
   els.meta.innerHTML = rows.map(([k, v]) =>
     `<div class="meta-item"><div class="k">${k}</div><div class="v">${v}</div></div>`,
@@ -343,7 +345,7 @@ async function loadProfile(profile) {
   showError('');
   renderMeta(profile);
   els.joints.innerHTML = '';
-  setLoadProgress(0.05, `加载 ${profile.label}…`, profile.urdf.preview || profile.urdf.cur);
+  setLoadProgress(0.05, t('robots.loadingModel', { name: profile.label }), profile.urdf.preview || profile.urdf.cur);
 
   if (arm) {
     scene.remove(arm);
@@ -356,7 +358,7 @@ async function loadProfile(profile) {
       modelScale: profile.model_scale,
       onProgress: (p) => {
         if (token !== loadToken) return;
-        setLoadProgress(0.08 + p * 0.9, `加载 ${profile.label}…`, `${Math.round(p * 100)}%`);
+        setLoadProgress(0.08 + p * 0.9, t('robots.loadingModel', { name: profile.label }), `${Math.round(p * 100)}%`);
       },
     });
     if (token !== loadToken) return;
@@ -388,7 +390,7 @@ function populateSelect(defaultId) {
   els.select.innerHTML = items.map((r) =>
     `<option value="${r.id}">${r.label} (${r.id})</option>`,
   ).join('');
-  els.count.textContent = `${items.length} 机型`;
+  els.count.textContent = t('robots.count', { n: items.length });
   const prefer = defaultId
     || new URLSearchParams(location.search).get('robot')
     || registry.default
@@ -397,7 +399,7 @@ function populateSelect(defaultId) {
 }
 
 async function boot() {
-  setLoadProgress(0.02, '加载机械臂配置…', 'robots.json');
+  setLoadProgress(0.02, t('robots.loadConfig'), 'robots.json');
   registry = await loadRobotRegistry('/config/robots.json');
   profiles = Object.keys(registry.robots || {}).map((id) =>
     normalizeRobotProfile(registry.robots[id], id),
@@ -405,7 +407,7 @@ async function boot() {
   populateSelect();
   const id = els.select.value;
   const profile = profiles.find((p) => p.id === id) || profiles[0];
-  if (!profile) throw new Error('robots.json 中没有可用机型');
+  if (!profile) throw new Error(t('robots.errorNoRobots'));
   await loadProfile(profile);
 }
 

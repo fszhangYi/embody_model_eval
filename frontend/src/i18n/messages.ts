@@ -1,4 +1,5 @@
 import type { Locale } from './types'
+import { pageStrings } from './pageStrings'
 
 export type MessageTree = {
   common: {
@@ -213,7 +214,7 @@ export const messages: Record<Locale, MessageTree> = {
       },
       language: {
         ui: '界面语言',
-        uiDesc: '切换总览、设置与顶栏导航的显示语言；偏好保存在本机。',
+        uiDesc: '切换全站界面语言（总览、设置、导航及各功能页）；偏好保存在本机。',
         docs: '文档与提示语言',
         docsDesc: '用于 README / 空状态 / Skills 说明等文案；选「跟随界面」时与界面语言一致。',
         followUi: '跟随界面',
@@ -396,7 +397,7 @@ export const messages: Record<Locale, MessageTree> = {
       },
       language: {
         ui: 'Interface language',
-        uiDesc: 'Switches overview, settings, and top nav copy. Saved on this device.',
+        uiDesc: 'Switches the whole app UI (overview, settings, nav, and all modules). Saved on this device.',
         docs: 'Docs & tips language',
         docsDesc: 'For README / empty states / Skills tips. “Follow UI” tracks the interface language.',
         followUi: 'Follow UI',
@@ -499,11 +500,13 @@ export const messages: Record<Locale, MessageTree> = {
 }
 
 export function lookupMessage(locale: Locale, path: string): string | undefined {
+  const flat = pageStrings[locale]?.[path]
+  if (typeof flat === 'string') return flat
   const parts = path.split('.')
   let cur: unknown = messages[locale]
-  for (const p of parts) {
+  for (const part of parts) {
     if (cur == null || typeof cur !== 'object') return undefined
-    cur = (cur as Record<string, unknown>)[p]
+    cur = (cur as Record<string, unknown>)[part]
   }
   return typeof cur === 'string' ? cur : undefined
 }

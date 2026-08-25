@@ -7,7 +7,7 @@
         <div class="emb-load-bar-fill loading-bar-fill" id="loadBarFill"></div>
       </div>
       <div class="emb-load-meta loading-meta">
-        <span class="emb-load-detail" id="loadDetail">等待资源…</span>
+        <span class="emb-load-detail" id="loadDetail" data-i18n="eval.loadWait">等待资源…</span>
         <span class="emb-load-pct" id="loadPct">0%</span>
       </div>
     </div>
@@ -15,8 +15,8 @@
 </div>
 
 <div class="hud topbar">
-  <h1 id="title">Embody 模型评测</h1>
-  <span class="meta" id="subtitle">加载中…</span>
+  <h1 id="title" data-i18n="eval.title">Embody 模型评测</h1>
+  <span class="meta" id="subtitle" data-i18n="eval.loading">加载中…</span>
   <span class="rec-pill" id="recPill"><i class="blink"></i>REC <span id="recTimer">00:00</span></span>
   <span class="pill">
     <i class="dot" style="background:var(--cur)"></i><span class="tip" data-tip="cur" tabindex="0">cur</span>
@@ -28,14 +28,14 @@
 <div class="robot-guard" id="robotGuard" role="alert"></div>
 
 <aside class="hud drawer-rail left" id="railLeft" data-side="left">
-  <button type="button" class="rail-tab" id="railTabLeft" aria-expanded="false" aria-pressed="false" title="悬停展开 · 点击钉住左侧栏">控制</button>
+  <button type="button" class="rail-tab" id="railTabLeft" aria-expanded="false" aria-pressed="false" data-i18n-title="eval.railControlTitle" title="悬停展开 · 点击钉住左侧栏" data-i18n="eval.railControl">控制</button>
   <div class="rail-panels">
     <details class="drawer compact">
-      <summary><span class="tip" data-tip="play" tabindex="0">播放控制</span></summary>
+      <summary><span class="tip" data-tip="play" tabindex="0" data-i18n="eval.playControl">播放控制</span></summary>
       <div class="body">
         <div class="btn-grid">
-          <button id="btnPlay" type="button" title="空格：播放 / 暂停">播放</button>
-          <button id="btnReset" type="button" title="Home：回到第 0 帧">重置</button>
+          <button id="btnPlay" type="button" data-i18n-title="eval.btnPlayTitle" title="空格：播放 / 暂停" data-i18n="eval.btnPlay">播放</button>
+          <button id="btnReset" type="button" data-i18n-title="eval.btnResetTitle" title="Home：回到第 0 帧" data-i18n="eval.btnReset">重置</button>
         </div>
         <div class="ctrl-block">
           <div class="ctrl-label"><span class="tip" data-tip="frame" tabindex="0">帧</span><strong id="frameLabel">t=0</strong></div>
@@ -44,17 +44,17 @@
             <canvas id="errHeatmap"></canvas>
             <div class="heatmap-cursor" id="errHeatmapCursor"></div>
           </div>
-          <div class="heatmap-legend"><span class="tip" data-tip="ep" tabindex="0">低 e_p</span><span class="tip" data-tip="ep" tabindex="0">高 e_p</span></div>
+          <div class="heatmap-legend"><span class="tip" data-tip="ep" tabindex="0" data-i18n="eval.heatmapLow">低 e_p</span><span class="tip" data-tip="ep" tabindex="0" data-i18n="eval.heatmapHigh">高 e_p</span></div>
         </div>
         <div class="ctrl-block">
-          <div class="ctrl-label"><span class="tip" data-tip="speed" tabindex="0">速度</span><strong id="speedLabel">0.20×</strong></div>
+          <div class="ctrl-label"><span class="tip" data-tip="speed" tabindex="0" data-i18n="eval.speed">速度</span><strong id="speedLabel">0.20×</strong></div>
           <input id="speedSlider" type="range" min="0.05" max="1.5" step="0.05" value="0.2"/>
         </div>
       </div>
     </details>
 
     <details class="drawer compact">
-      <summary><span class="tip" data-tip="visibility" tabindex="0">显示机械臂</span></summary>
+      <summary><span class="tip" data-tip="visibility" tabindex="0" data-i18n="eval.showArms">显示机械臂</span></summary>
       <div class="body">
         <div class="btn-grid triple">
           <button id="btnToggleCur" class="toggle cur on tip" type="button" data-tip="cur">灰</button>
@@ -62,31 +62,31 @@
           <button id="btnTogglePred" class="toggle pred on tip" type="button" data-tip="pred">蓝</button>
         </div>
         <div class="btn-grid" style="margin-top:8px">
-          <button id="btnTogglePaths" class="toggle on tip" type="button" data-tip="full_path">整段轨迹</button>
-          <button id="btnToggleErrArrow" class="toggle on tip" type="button" data-tip="err_arrow">误差矢量</button>
+          <button id="btnTogglePaths" class="toggle on tip" type="button" data-tip="full_path" data-i18n="eval.toggleFullPath">整段轨迹</button>
+          <button id="btnToggleErrArrow" class="toggle on tip" type="button" data-tip="err_arrow" data-i18n="eval.toggleErrArrow">误差矢量</button>
         </div>
         <div class="btn-grid" style="margin-top:8px">
-          <button id="btnToggleCloud" class="toggle off tip" type="button" data-tip="cloud_view">点云视图</button>
+          <button id="btnToggleCloud" class="toggle off tip" type="button" data-tip="cloud_view" data-i18n="eval.toggleCloud">点云视图</button>
         </div>
       </div>
     </details>
 
     <details class="drawer compact">
-      <summary><span class="tip" data-tip="camera" tabindex="0">相机</span></summary>
+      <summary><span class="tip" data-tip="camera" tabindex="0" data-i18n="eval.camera">相机</span></summary>
       <div class="body">
         <div class="btn-grid triple">
-          <button id="btnCamSide" type="button" class="tip" data-tip="cam_side">侧视</button>
-          <button id="btnCamTop" type="button" class="tip" data-tip="cam_top">顶视</button>
-          <button id="btnCamFollow" type="button" class="tip" data-tip="cam_follow">跟随 TCP</button>
+          <button id="btnCamSide" type="button" class="tip" data-tip="cam_side" data-i18n="eval.camSide">侧视</button>
+          <button id="btnCamTop" type="button" class="tip" data-tip="cam_top" data-i18n="eval.camTop">顶视</button>
+          <button id="btnCamFollow" type="button" class="tip" data-tip="cam_follow" data-i18n="eval.camFollow">跟随 TCP</button>
         </div>
-        <p class="hint" style="margin-top:8px" id="camHint">自由轨道 · Orbit 拖拽</p>
+        <p class="hint" style="margin-top:8px" id="camHint" data-i18n="eval.camHint">自由轨道 · Orbit 拖拽</p>
       </div>
     </details>
 
     <details class="drawer" id="obsDrawer">
-      <summary><span class="tip" data-tip="obs_f" tabindex="0">观测相机 (F)</span></summary>
+      <summary><span class="tip" data-tip="obs_f" tabindex="0" data-i18n="eval.obsCamera">观测相机 (F)</span></summary>
       <div class="body">
-        <p class="hint tip" id="obsAlignHint" data-tip="obs_align" style="margin-bottom:8px" tabindex="0">加载观测对齐…</p>
+        <p class="hint tip" id="obsAlignHint" data-tip="obs_align" style="margin-bottom:8px" tabindex="0" data-i18n="eval.obsLoading">加载观测对齐…</p>
         <div class="row-ctrl">
           <label class="tip" data-tip="obs_cam" tabindex="0">流
             <select id="obsCamSelect"></select>
@@ -98,43 +98,43 @@
           <label><input type="checkbox" id="chkObsKp" checked /> 关键点</label>
           <label><input type="checkbox" id="chkObsHeat" checked /> 注意力</label>
         </div>
-        <p class="hint" style="margin-top:6px" id="obsFrameHint">与关节 / TCP 同帧同步</p>
+        <p class="hint" style="margin-top:6px" id="obsFrameHint" data-i18n="eval.obsSyncHint">与关节 / TCP 同帧同步</p>
       </div>
     </details>
 
     <details class="drawer compact">
-      <summary><span class="tip" data-tip="record" tabindex="0">录制</span></summary>
+      <summary><span class="tip" data-tip="record" tabindex="0" data-i18n="eval.record">录制</span></summary>
       <div class="body">
         <div class="btn-grid triple">
-          <button id="btnRecStart" type="button" title="快捷键 R：开始录制">开始</button>
-          <button id="btnRecStop" class="danger" type="button" disabled title="快捷键 T：停止录制">停止</button>
-          <button id="btnRecSave" type="button" disabled title="快捷键 S：保存录制">保存</button>
+          <button id="btnRecStart" type="button" data-i18n-title="eval.recStartTitle" title="快捷键 R：开始录制" data-i18n="eval.recStart">开始</button>
+          <button id="btnRecStop" class="danger" type="button" disabled data-i18n-title="eval.recStopTitle" title="快捷键 T：停止录制" data-i18n="eval.recStop">停止</button>
+          <button id="btnRecSave" type="button" disabled data-i18n-title="eval.recSaveTitle" title="快捷键 S：保存录制" data-i18n="eval.recSave">保存</button>
         </div>
         <div class="rec-status" id="recStatus">未录制 · WebM · 快捷键 R/T/S</div>
       </div>
     </details>
 
     <details class="drawer compact">
-      <summary><span class="tip" data-tip="gate" tabindex="0">导出 / 门禁</span></summary>
+      <summary><span class="tip" data-tip="gate" tabindex="0" data-i18n="eval.exportGate">导出 / 门禁</span></summary>
       <div class="body">
         <div class="btn-grid">
-          <button id="btnExportHtml" type="button" class="tip" data-tip="export_html">导出 HTML</button>
-          <button id="btnExportJson" type="button" class="tip" data-tip="export_json">导出 JSON</button>
+          <button id="btnExportHtml" type="button" class="tip" data-tip="export_html" data-i18n="eval.exportHtml">导出 HTML</button>
+          <button id="btnExportJson" type="button" class="tip" data-tip="export_json" data-i18n="eval.exportJson">导出 JSON</button>
         </div>
         <label class="hint tip" data-tip="export_shot" style="display:flex;gap:6px;align-items:center;margin-top:8px" tabindex="0">
           <input id="chkExportShot" type="checkbox"/> 附带当前画布缩略图（更占内存）
         </label>
-        <p class="hint tip" id="gateHint" data-tip="gate" style="margin-top:8px" tabindex="0">门禁：加载 thresholds…</p>
+        <p class="hint tip" id="gateHint" data-tip="gate" style="margin-top:8px" tabindex="0" data-i18n="eval.gateLoading">门禁：加载 thresholds…</p>
       </div>
     </details>
   </div>
 </aside>
 
 <aside class="hud drawer-rail right" id="railRight" data-side="right">
-  <button type="button" class="rail-tab" id="railTabRight" aria-expanded="false" aria-pressed="false" title="悬停展开 · 点击钉住右侧栏">评测</button>
+  <button type="button" class="rail-tab" id="railTabRight" aria-expanded="false" aria-pressed="false" data-i18n-title="eval.railEvalTitle" title="悬停展开 · 点击钉住右侧栏" data-i18n="eval.railEval">评测</button>
   <div class="rail-panels">
     <details class="drawer compact">
-      <summary><span class="tip" data-tip="overview" tabindex="0">概览</span></summary>
+      <summary><span class="tip" data-tip="overview" tabindex="0" data-i18n="eval.overview">概览</span></summary>
       <div class="body">
         <div class="stats-row" id="stats"></div>
         <div class="stats-row" id="tcpStats" style="margin-top:8px"></div>
@@ -143,30 +143,30 @@
     </details>
 
     <details class="drawer">
-      <summary><span class="tip" data-tip="tcp" tabindex="0">TCP 指标</span></summary>
+      <summary><span class="tip" data-tip="tcp" tabindex="0" data-i18n="eval.tcpMetrics">TCP 指标</span></summary>
       <div class="body">
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="ep_er" tabindex="0">TCP 位置 / 姿态误差</span><span class="sub" id="tcpErrSub">mm · deg</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="ep_er" tabindex="0" data-i18n="eval.tcpPosRotErr">TCP 位置 / 姿态误差</span><span class="sub" id="tcpErrSub">mm · deg</span></div>
           <div class="chart-wrap tall"><canvas id="tcpErrChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="dxyz" tabindex="0">TCP 分轴 Δxyz</span><span class="sub">mm</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="dxyz" tabindex="0" data-i18n="eval.tcpAxisDelta">TCP 分轴 Δxyz</span><span class="sub">mm</span></div>
           <div class="chart-wrap"><canvas id="tcpAxisChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="drpy" tabindex="0">TCP 姿态分轴 Δrpy</span><span class="sub">°</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="drpy" tabindex="0" data-i18n="eval.tcpRpyDelta">TCP 姿态分轴 Δrpy</span><span class="sub">°</span></div>
           <div class="chart-wrap"><canvas id="tcpRpyChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="vel_acc" tabindex="0">TCP 速度 / 加速度误差</span><span class="sub">m/s · °/s · m/s²</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="vel_acc" tabindex="0" data-i18n="eval.tcpVelAccErr">TCP 速度 / 加速度误差</span><span class="sub">m/s · °/s · m/s²</span></div>
           <div class="chart-wrap"><canvas id="tcpVelChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="segments" tabindex="0">分段 TCP 误差</span><span class="sub">路径等长四段</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="segments" tabindex="0" data-i18n="eval.tcpSegErr">分段 TCP 误差</span><span class="sub" data-i18n="eval.tcpSegSub">路径等长四段</span></div>
           <div class="chart-wrap"><canvas id="tcpSegChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="task" tabindex="0">任务 / 接近向量误差</span><span class="sub">相对 meta.goal_pose</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="task" tabindex="0" data-i18n="eval.taskApproachErr">任务 / 接近向量误差</span><span class="sub" data-i18n="eval.taskSub">相对 meta.goal_pose</span></div>
           <div class="chart-wrap"><canvas id="tcpTaskChart" class="chart"></canvas></div>
         </div>
         <p class="hint tip" id="tcpTaskHint" data-tip="task" style="margin-top:6px" tabindex="0"></p>
@@ -174,108 +174,108 @@
     </details>
 
     <details class="drawer">
-      <summary><span class="tip" data-tip="err_curves" tabindex="0">误差曲线</span></summary>
+      <summary><span class="tip" data-tip="err_curves" tabindex="0" data-i18n="eval.errCurves">误差曲线</span></summary>
       <div class="body">
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="l2" tabindex="0">L2 误差随时间</span><span class="sub" id="errSub">—</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="l2" tabindex="0" data-i18n="eval.l2OverTime">L2 误差随时间</span><span class="sub" id="errSub">—</span></div>
           <div class="chart-wrap"><canvas id="errChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="mae" tabindex="0">逐关节 MAE</span><span class="sub">deg</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="mae" tabindex="0" data-i18n="eval.jointMae">逐关节 MAE</span><span class="sub">deg</span></div>
           <div class="chart-wrap"><canvas id="maeChart" class="chart"></canvas></div>
         </div>
       </div>
     </details>
 
     <details class="drawer">
-      <summary><span class="tip" data-tip="joint_traj" tabindex="0">关节轨迹</span></summary>
+      <summary><span class="tip" data-tip="joint_traj" tabindex="0" data-i18n="eval.jointTraj">关节轨迹</span></summary>
       <div class="body">
         <div class="row-ctrl">
           <label>关节 <select id="jointSelect"></select></label>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="joint_traj" tabindex="0">位姿轨迹</span><span class="sub">current · GT · pred</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="joint_traj" tabindex="0" data-i18n="eval.poseTraj">位姿轨迹</span><span class="sub">current · GT · pred</span></div>
           <div class="chart-wrap tall"><canvas id="trajChart" class="chart"></canvas></div>
         </div>
       </div>
     </details>
 
     <details class="drawer">
-      <summary><span class="tip" data-tip="frame_values" tabindex="0">当前帧数值</span></summary>
+      <summary><span class="tip" data-tip="frame_values" tabindex="0" data-i18n="eval.frameValues">当前帧数值</span></summary>
       <div class="body">
         <p class="hint tip" id="tcpFrameHint" data-tip="tcp" style="margin-bottom:8px" tabindex="0"></p>
         <table>
           <thead>
             <tr>
-              <th class="tip" data-tip="joint" tabindex="0">关节</th>
-              <th class="tip" data-tip="cur" tabindex="0">当前</th>
+              <th class="tip" data-tip="joint" tabindex="0" data-i18n="eval.jointSelect">关节</th>
+              <th class="tip" data-tip="cur" tabindex="0" data-i18n="eval.colCurrent">当前</th>
               <th class="tip" data-tip="gt" tabindex="0">GT</th>
               <th class="tip" data-tip="pred" tabindex="0">pred</th>
-              <th class="tip" data-tip="joint_err" tabindex="0">误差</th>
+              <th class="tip" data-tip="joint_err" tabindex="0" data-i18n="eval.colErr">误差</th>
             </tr>
           </thead>
           <tbody id="frameTable"></tbody>
         </table>
         <div class="chart-card" style="margin-top:10px">
-          <div class="chart-head"><span class="name tip" data-tip="contrib" tabindex="0">关节→TCP 贡献</span><span class="sub">‖JᵢΔqᵢ‖ mm</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="contrib" tabindex="0" data-i18n="eval.jointTcpContrib">关节→TCP 贡献</span><span class="sub">‖JᵢΔqᵢ‖ mm</span></div>
           <div class="chart-wrap"><canvas id="jointContribChart" class="chart"></canvas></div>
         </div>
       </div>
     </details>
 
     <details class="drawer">
-      <summary><span class="tip" data-tip="worst_ws" tabindex="0">最差帧 / 工作空间</span></summary>
+      <summary><span class="tip" data-tip="worst_ws" tabindex="0" data-i18n="eval.worstWorkspace">最差帧 / 工作空间</span></summary>
       <div class="body">
-        <p class="hint tip" data-tip="worst_ws" style="margin-bottom:8px" tabindex="0">Top‑K 按 TCP e_p；点击跳转。下方为俯视 XY，颜色=e_p。</p>
+        <p class="hint tip" data-tip="worst_ws" style="margin-bottom:8px" tabindex="0" data-i18n="eval.worstHint">Top‑K 按 TCP e_p；点击跳转。下方为俯视 XY，颜色=e_p。</p>
         <ul class="worst-list" id="worstList"></ul>
         <div class="ws-wrap tip" style="margin-top:10px" data-tip="workspace" tabindex="0"><canvas id="workspaceCanvas"></canvas></div>
-        <p class="hint" style="margin-top:6px" id="wsHint">红点 GT · 蓝点 pred · 点击点跳帧</p>
+        <p class="hint" style="margin-top:6px" id="wsHint" data-i18n="eval.wsHint">红点 GT · 蓝点 pred · 点击点跳帧</p>
       </div>
     </details>
 
     <details class="drawer">
-      <summary><span class="tip" data-tip="task_g" tabindex="0">任务 / 接触 (G)</span></summary>
+      <summary><span class="tip" data-tip="task_g" tabindex="0" data-i18n="eval.taskContact">任务 / 接触 (G)</span></summary>
       <div class="body">
-        <p class="hint tip" id="taskOutcomeHint" data-tip="task_outcome" style="margin-bottom:8px" tabindex="0">任务结果…</p>
+        <p class="hint tip" id="taskOutcomeHint" data-tip="task_outcome" style="margin-bottom:8px" tabindex="0" data-i18n="eval.taskOutcome">任务结果…</p>
         <div class="stats-row" id="taskStats"></div>
-        <p class="hint tip" data-tip="contact_events" style="margin-top:8px" tabindex="0">接触 / 力事件 · 点击跳帧</p>
+        <p class="hint tip" data-tip="contact_events" style="margin-top:8px" tabindex="0" data-i18n="eval.contactEvents">接触 / 力事件 · 点击跳帧</p>
         <ul class="adv-list" id="taskEventList"></ul>
         <div class="chart-card" style="margin-top:10px">
-          <div class="chart-head"><span class="name tip" data-tip="contact_force" tabindex="0">接触力 / 滑移</span><span class="sub">N · mm</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="contact_force" tabindex="0" data-i18n="eval.contactForce">接触力 / 滑移</span><span class="sub">N · mm</span></div>
           <div class="chart-wrap"><canvas id="contactChart" class="chart"></canvas></div>
         </div>
         <div class="chart-card">
-          <div class="chart-head"><span class="name tip" data-tip="object_pose" tabindex="0">物体→TCP 距离</span><span class="sub">mm · 动态目标</span></div>
+          <div class="chart-head"><span class="name tip" data-tip="object_pose" tabindex="0" data-i18n="eval.objectDist">物体→TCP 距离</span><span class="sub" data-i18n="eval.objectDistSub">mm · 动态目标</span></div>
           <div class="chart-wrap"><canvas id="objectDistChart" class="chart"></canvas></div>
         </div>
-        <p class="hint" style="margin-top:6px" id="objectFrameHint">物体位姿随帧更新；3D 黄球=物体</p>
+        <p class="hint" style="margin-top:6px" id="objectFrameHint" data-i18n="eval.objectFrameHint">物体位姿随帧更新；3D 黄球=物体</p>
       </div>
     </details>
 
     <details class="drawer">
-      <summary><span class="tip" data-tip="protocol_c" tabindex="0">高级 · 协议 / 元数据 (C)</span></summary>
+      <summary><span class="tip" data-tip="protocol_c" tabindex="0" data-i18n="eval.advancedProtocol">高级 · 协议 / 元数据 (C)</span></summary>
       <div class="body">
-        <p class="hint tip" id="unitHint" data-tip="action_mode" tabindex="0">单位 / action_mode 校验…</p>
+        <p class="hint tip" id="unitHint" data-tip="action_mode" tabindex="0" data-i18n="eval.unitCheck">单位 / action_mode 校验…</p>
         <p class="hint tip" id="provHint" data-tip="provenance" style="margin-top:6px" tabindex="0">provenance…</p>
-        <p class="hint tip" data-tip="fail_class" style="margin-top:8px" tabindex="0">失败分类（大 e_p / e_R / 抖动）· 点击跳转</p>
+        <p class="hint tip" data-tip="fail_class" style="margin-top:8px" tabindex="0" data-i18n="eval.failClass">失败分类（大 e_p / e_R / 抖动）· 点击跳转</p>
         <ul class="adv-list" id="failClassList"></ul>
       </div>
     </details>
 
     <details class="drawer">
-      <summary><span class="tip" data-tip="safety_d" tabindex="0">高级 · 安全 / 可执行 (D)</span></summary>
+      <summary><span class="tip" data-tip="safety_d" tabindex="0" data-i18n="eval.advancedSafety">高级 · 安全 / 可执行 (D)</span></summary>
       <div class="body">
         <div class="stats-row" id="safetyStats"></div>
-        <p class="hint tip" data-tip="safety_d" style="margin-top:8px" tabindex="0">越限 / 近奇异 / 超速 · 点击跳转（抽样计算以控内存）</p>
+        <p class="hint tip" data-tip="safety_d" style="margin-top:8px" tabindex="0" data-i18n="eval.safetyHint">越限 / 近奇异 / 超速 · 点击跳转（抽样计算以控内存）</p>
         <ul class="adv-list" id="safetyList"></ul>
-        <p class="hint tip" id="collisionHint" data-tip="collision" style="margin-top:6px" tabindex="0">碰撞检测…</p>
+        <p class="hint tip" id="collisionHint" data-tip="collision" style="margin-top:6px" tabindex="0" data-i18n="eval.collisionCheck">碰撞检测…</p>
       </div>
     </details>
 
     <details class="drawer">
-      <summary><span class="tip" data-tip="help" tabindex="0">说明</span></summary>
+      <summary><span class="tip" data-tip="help" tabindex="0" data-i18n="eval.help">说明</span></summary>
       <div class="body">
-        <p class="hint">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹（同色浅→深）与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随；「观测相机 (F)」同步 RGB/Depth。「任务 / 接触 (G)」含成功标签、力事件与动态物体目标。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。带虚下划线的名词可悬停查看左下角解释。</p>
+        <p class="hint" data-i18n="eval.helpBody">三臂同原点：灰 current / 红 GT / 蓝 predict。TCP 轴 + 局部散点；可开整段轨迹（同色浅→深）与 GT→pred 误差矢量。左侧热力轴按 e_p 跳帧；相机含侧视/顶视/跟随；「观测相机 (F)」同步 RGB/Depth。「任务 / 接触 (G)」含成功标签、力事件与动态物体目标。右侧含 TCP 指标、关节贡献、最差帧与工作空间俯视。录制为 WebM。左右栏默认收起，悬停展开，点击侧边标签可钉住。带虚下划线的名词可悬停查看左下角解释。</p>
       </div>
     </details>
   </div>

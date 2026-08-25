@@ -1,19 +1,21 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PathPickerModal } from '../components/PathPickerModal'
-import { PageNav } from '../components/PageNav'
+import { PageChrome } from '../components/PageChrome'
+import { useLocale } from '../i18n/LocaleContext'
+import { t } from '../i18n/runtime'
 import { cancelJob, deleteJob, fetchJob, fetchJobs, fetchPipelineSpec, createActLink, removeActLink, runPipelineStep } from '../features/actPipeline/api'
 import { HyperparamBenchPanel } from '../features/actPipeline/HyperparamBenchPanel'
 import { TrainMemoryGuide } from '../features/actPipeline/TrainMemoryGuide'
 import type { BrowseRoot, PipelineJob, PipelineSpec, PipelineStep, StepField } from '../features/actPipeline/types'
 import '../styles/act-pipeline.css'
 
-const FLOW = [
-  { n: 1, label: '质量过滤', to: 'quality_pass.json' },
-  { n: 2, label: 'HDF5', to: 'converted/' },
-  { n: 3, label: '训练', to: 'ckpt/' },
-  { n: 4, label: '离线推理', to: 'infer/' },
-  { n: 5, label: 'embody JSON', to: 'data/' },
-]
+const FLOW_KEYS = [
+  { n: 1, labelKey: 'act.flow.quality', to: 'quality_pass.json' },
+  { n: 2, labelKey: 'act.flow.hdf5', to: 'converted/' },
+  { n: 3, labelKey: 'act.flow.train', to: 'ckpt/' },
+  { n: 4, labelKey: 'act.flow.infer', to: 'infer/' },
+  { n: 5, labelKey: 'act.flow.embody', to: 'data/' },
+] as const
 
 type PickerTarget =
   | { kind: 'field'; field: StepField }
@@ -96,7 +98,7 @@ function FieldInput({
     )
   }
   if (field.type === 'path') {
-    const tip = field.hint ? `推荐脚本：${field.hint}` : undefined
+    const tip = field.hint ? t('act.scriptHint', { hint: field.hint }) : undefined
     return (
       <label className={fieldClass}>
         <span className="act-field-label">
@@ -117,16 +119,16 @@ function FieldInput({
             disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
             title={tip}
-            placeholder={field.pathKind === 'file' ? '选择或输入文件路径' : '选择或输入目录路径'}
+            placeholder={field.pathKind === 'file' ? t('act.pathFilePlaceholder') : t('act.pathDirPlaceholder')}
           />
           <button
             type="button"
             className="act-path-browse"
-            title={tip || `浏览 ${browseRoots[field.browseRoot || 'act'] || ''}`}
+            title={tip || t('act.pathBrowseTitle', { root: browseRoots[field.browseRoot || 'act'] || '' })}
             onClick={onBrowse}
             disabled={disabled}
           >
-            选择
+            {t('act.btnBrowse')}
           </button>
         </div>
       </label>
@@ -180,6 +182,7 @@ function isJobActive(status: string): boolean {
 }
 
 export function ActPipelinePage() {
+  const { locale } = useLocale()
   const [spec, setSpec] = useState<PipelineSpec | null>(null)
   const [loadErr, setLoadErr] = useState('')
   const [stepId, setStepId] = useState('quality')
@@ -227,8 +230,8 @@ export function ActPipelinePage() {
     const act = actRoot.trim()
     if (!embody || !act) {
       setLinkReady(false)
-      if (!embody) setLinkMsg('请先选择评测根目录')
-      else if (!act) setLinkMsg('请选择训练/推理根目录以建立软链')
+      if (!embody) setLinkMsg(t('act.rootActDisabled'))
+      else if (!act) setLinkMsg(t('act.linkPickAct'))
       return
     }
 
@@ -245,7 +248,7 @@ export function ActPipelinePage() {
             setParams(initParamsFromSpec(s))
           } else {
             setLinkReady(false)
-            setLinkMsg(r.error || '软链未建立')
+            setLinkMsg(r.error || t('act.linkNotReady'))
           }
         })
         .catch((e: Error) => {
@@ -328,7 +331,7 @@ export function ActPipelinePage() {
     async (job: PipelineJob) => {
       if (!job.id || job.id === 'local') return
       const label = `${job.stepId} (${job.status})`
-      if (!confirm(`确定删除历史任务「${label}」？此操作不可恢复。`)) return
+      if (!confirm(t('act.confirmDeleteJob', { label }))) return
       setDeletingJobId(job.id)
       try {
         await deleteJob(job.id)
@@ -391,7 +394,7 @@ export function ActPipelinePage() {
     setEmbodyRoot(next)
     setActRoot('')
     setLinkReady(false)
-    setLinkMsg('请选择训练/推理根目录以建立软链')
+    setLinkMsg(t('act.linkPickAct'))
     setParams({})
   }
 
@@ -400,7 +403,7 @@ export function ActPipelinePage() {
     if (embodyRoot.trim()) void removeActLink(embodyRoot.trim())
     setActRoot(next)
     setLinkReady(false)
-    setLinkMsg('正在建立软链…')
+    setLinkMsg(t('act.linkCreating'))
   }
 
   const pickerValue = useMemo(() => {
@@ -428,59 +431,59 @@ export function ActPipelinePage() {
     if (linkReady) return linkMsg
     if (!embodyReady) return ''
     if (!actReady) return ''
-    return linkMsg || '正在建立软链…'
+    return linkMsg || t('act.linkCreating')
   }, [linkReady, embodyReady, actReady, linkMsg])
 
   const linkPlaceholder = useMemo(() => {
-    if (!embodyReady) return '请先选择评测根目录'
-    if (!actReady) return '请先选择训练/推理根目录'
+    if (!embodyReady) return t('act.rootActDisabled')
+    if (!actReady) return t('act.rootActNeed')
     if (linkReady) return ''
-    return '完成前两步后自动创建 act_robot 软链'
+    return t('act.linkAuto')
   }, [embodyReady, actReady, linkReady])
 
   return (
-    <div className="act-pipeline-page">
+    <div className="act-pipeline-page" data-locale={locale}>
       <header className="act-header">
         <div className="act-header-brand">
-          <h1>ACT 数据流水线</h1>
-          <p className="act-sub">raw → 质量过滤 → HDF5 → 训练 → 推理 → embody 对比 JSON</p>
+          <h1>{t('act.title')}</h1>
+          <p className="act-sub">{t('act.subtitle')}</p>
         </div>
         <div className="act-header-actions">
-          <PageNav />
+          <PageChrome className="act-header-actions-inner" />
         </div>
       </header>
 
       <div className="act-body">
       <div className="act-project-roots">
         <label className={`act-root-field act-root-step${embodyReady ? ' done' : ''}`}>
-          <span className="act-root-step-label">1. 评测根目录</span>
+          <span className="act-root-step-label">{t('act.rootEmbody')}</span>
           <div className="act-path-field">
             <input
               type="text"
               value={embodyRoot}
               onChange={(e) => applyEmbodyRoot(e.target.value)}
-              placeholder="选择评测项目根目录"
+              placeholder={t('act.rootEmbodyPlaceholder')}
             />
             <button
               type="button"
               className="act-path-browse"
               onClick={() => setPicker({ kind: 'root', root: 'embody' })}
             >
-              选择
+              {t('act.btnBrowse')}
             </button>
           </div>
         </label>
         <label
           className={`act-root-field act-root-step${actRoot.trim() ? ' done' : ''}${!embodyReady ? ' disabled' : ''}`}
         >
-          <span className="act-root-step-label">2. 训练/推理根目录</span>
+          <span className="act-root-step-label">{t('act.rootAct')}</span>
           <div className="act-path-field">
             <input
               type="text"
               value={actRoot}
               disabled={!embodyReady}
               onChange={(e) => applyActRoot(e.target.value)}
-              placeholder={embodyReady ? '选择训练/推理项目根目录' : '请先选择评测根目录'}
+              placeholder={embodyReady ? t('act.rootActPlaceholder') : t('act.rootActDisabled')}
             />
             <button
               type="button"
@@ -488,14 +491,14 @@ export function ActPipelinePage() {
               disabled={!embodyReady}
               onClick={() => setPicker({ kind: 'root', root: 'act' })}
             >
-              选择
+              {t('act.btnBrowse')}
             </button>
           </div>
         </label>
         <div
           className={`act-root-field act-root-step${linkReady ? ' done' : ''}${!embodyReady || !actReady ? ' disabled' : ''}`}
         >
-          <span className="act-root-step-label">3. 软链</span>
+          <span className="act-root-step-label">{t('act.rootLink')}</span>
           <div className="act-path-field">
             <input
               type="text"
@@ -509,13 +512,13 @@ export function ActPipelinePage() {
         </div>
       </div>
 
-      <div className="act-flow" aria-label="流程总览">
-        {FLOW.map((f, i) => (
+      <div className="act-flow" aria-label={t("act.flowAria")}>
+        {FLOW_KEYS.map((f, i) => (
           <div key={f.n} className="act-flow-item">
             <span className="act-flow-n">{f.n}</span>
-            <span className="act-flow-label">{f.label}</span>
+            <span className="act-flow-label">{t(f.labelKey)}</span>
             <span className="act-flow-to">{f.to}</span>
-            {i < FLOW.length - 1 ? <span className="act-flow-arrow">→</span> : null}
+            {i < FLOW_KEYS.length - 1 ? <span className="act-flow-arrow">→</span> : null}
           </div>
         ))}
       </div>
@@ -524,14 +527,14 @@ export function ActPipelinePage() {
 
       <div className="act-layout">
         <aside className="act-steps">
-          <h2>步骤</h2>
+          <h2>{t('act.steps')}</h2>
           {spec?.steps.map((s) => (
             <button
               key={s.id}
               type="button"
               className={`act-step-btn${s.id === stepId ? ' active' : ''}${s.variant ? ' variant' : ''}`}
               onClick={() => setStepId(s.id)}
-              title={s.subtitle ? `推荐脚本：${s.subtitle}` : undefined}
+              title={s.subtitle ? t('act.scriptHint', { hint: s.subtitle }) : undefined}
             >
               <span className="act-step-num">{s.step}{s.variant ? '·' : ''}</span>
               <span className="act-step-title">{s.title}</span>
@@ -549,7 +552,7 @@ export function ActPipelinePage() {
                     <h2>{step.title}</h2>
                     <p className="muted">{step.description}</p>
                     {!linkReady ? (
-                      <p className="act-config-hint muted">完成根目录选择与软链建立后，可配置并运行此步骤</p>
+                      <p className="act-config-hint muted">{t('act.configLocked')}</p>
                     ) : null}
                   </div>
                   <button
@@ -559,10 +562,10 @@ export function ActPipelinePage() {
                     onClick={() => void onRun()}
                   >
                     {busy
-                      ? '启动中…'
+                      ? t('act.btnStarting')
                       : step.id === 'hyperparam_bench'
-                        ? '开始超参搜索'
-                        : '运行此步骤'}
+                        ? t('act.btnHyperparam')
+                        : t('act.btnRun')}
                   </button>
                 </div>
                 <div className="act-fields">
@@ -609,11 +612,11 @@ export function ActPipelinePage() {
 
           <section className="act-log">
             <div className="act-log-head">
-              <h3>运行日志</h3>
+              <h3>{t('act.logTitle')}</h3>
               <div className="act-log-actions">
                 {activeJob?.scriptLogPath ? (
                   <span className="act-log-file" title={activeJob.scriptLogPath}>
-                    训练日志
+                    {t('act.trainLog')}
                   </span>
                 ) : null}
                 {activeJob && activeJob.id !== 'local' && isJobActive(activeJob.status) ? (
@@ -622,9 +625,9 @@ export function ActPipelinePage() {
                     className="act-log-cancel"
                     disabled={canceling}
                     onClick={() => void onCancel()}
-                    title="终止当前任务及其子进程"
+                    title={t('act.btnCancelTitle')}
                   >
-                    {canceling ? '取消中…' : '取消任务'}
+                    {canceling ? t('act.btnCanceling') : t('act.btnCancel')}
                   </button>
                 ) : null}
                 {activeJob && activeJob.id !== 'local' ? (
@@ -633,9 +636,9 @@ export function ActPipelinePage() {
                     className="act-log-refresh"
                     disabled={logSyncing}
                     onClick={() => void refreshActiveJobLog()}
-                    title="从日志文件重新读取并同步"
+                    title={t('act.btnSyncTitle')}
                   >
-                    {logSyncing ? '同步中…' : '刷新同步日志'}
+                    {logSyncing ? t('act.btnSyncing') : t('act.btnSyncLog')}
                   </button>
                 ) : null}
                 {activeJob ? (
@@ -647,22 +650,22 @@ export function ActPipelinePage() {
             <pre className="act-log-body">
               {activeJob?.logTail ||
                 activeJob?.error ||
-                (linkReady ? '选择步骤并点击「运行此步骤」' : '可在右侧查看历史任务日志；配置步骤需先完成根目录选择')}
+                (linkReady ? t('act.logEmptyReady') : t('act.logEmptyLocked'))}
             </pre>
           </section>
         </main>
 
         <aside className="act-jobs">
           <div className="act-jobs-head">
-            <h2>历史任务</h2>
+            <h2>{t('act.jobsTitle')}</h2>
             <button
               type="button"
               className="act-jobs-refresh"
               disabled={jobsSyncing}
               onClick={() => void refreshJobs()}
-              title="刷新历史任务列表"
+              title={t('act.jobsRefreshTitle')}
             >
-              {jobsSyncing ? '…' : '刷新'}
+              {jobsSyncing ? '…' : t('act.jobsRefresh')}
             </button>
           </div>
           <ul>
@@ -683,8 +686,8 @@ export function ActPipelinePage() {
                   type="button"
                   className="act-job-delete"
                   disabled={deletingJobId === j.id}
-                  title="删除此历史任务"
-                  aria-label={`删除任务 ${j.stepId}`}
+                  title={t('act.jobDelete')}
+                  aria-label={t('act.jobDeleteAria', { id: j.stepId })}
                   onClick={(e) => {
                     e.stopPropagation()
                     void onDeleteJob(j)
@@ -709,22 +712,22 @@ export function ActPipelinePage() {
         <div className="act-footer-paths">
           {embodyReady ? (
             <span className="act-footer-path" title={embodyRoot}>
-              评测 {truncatePath(embodyRoot)}
+              {t('act.footerEval')} {truncatePath(embodyRoot)}
             </span>
           ) : (
-            <span className="act-footer-path idle">未选择评测根目录</span>
+            <span className="act-footer-path idle">{t('act.footerEvalNone')}</span>
           )}
           {actRoot.trim() ? (
             <span className="act-footer-path" title={actRoot}>
-              训练 {truncatePath(actRoot)}
+              {t('act.footerTrain')} {truncatePath(actRoot)}
             </span>
           ) : embodyReady ? (
-            <span className="act-footer-path idle">未选择训练根目录</span>
+            <span className="act-footer-path idle">{t('act.footerTrainNone')}</span>
           ) : null}
         </div>
         <div className="act-footer-meta">
           {step ? <span className="act-footer-step">{step.title}</span> : null}
-          {jobs.length > 0 ? <span>{jobs.length} 个历史任务</span> : null}
+          {jobs.length > 0 ? <span>{t('act.jobsCount', { n: jobs.length })}</span> : null}
         </div>
       </footer>
 
@@ -734,8 +737,8 @@ export function ActPipelinePage() {
           title={
             picker.kind === 'root'
               ? picker.root === 'act'
-                ? '训练/推理根目录'
-                : '评测根目录'
+                ? t('act.pickerActRoot')
+                : t('act.pickerEmbodyRoot')
               : picker.field.label
           }
           value={pickerValue}

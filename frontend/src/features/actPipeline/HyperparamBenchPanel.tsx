@@ -1,3 +1,4 @@
+import { t } from '../../i18n/runtime'
 import { useEffect, useMemo, useState } from 'react'
 import { parseTrainScriptArgs, type ParsedTrainArg } from './api'
 
@@ -183,13 +184,13 @@ export function HyperparamBenchPanel({
     <section className={`act-hp-bench${disabled ? ' locked' : ''}`}>
       <div className="act-hp-bench-head">
         <div>
-          <h3>超参搜索配置</h3>
+          <h3>{t('act.hp.title')}</h3>
           <p className="muted">
             从 train 脚本解析 CLI 参数。勾选参与搜索的项并填写候选值（逗号分隔）；未勾选的作为固定基线。
           </p>
         </div>
         <div className="act-hp-bench-meta">
-          {loading ? <span className="muted">解析中…</span> : null}
+          {loading ? <span className="muted">{t('act.hp.parsing')}</span> : null}
           {!loading && rows.length ? (
             <span className="act-hp-pill">
               搜索 {selectedCount} 维 · 组合 {comboCount}
@@ -203,10 +204,10 @@ export function HyperparamBenchPanel({
           <table className="act-hp-table">
             <thead>
               <tr>
-                <th>搜索</th>
-                <th>参数</th>
-                <th>候选值 / 固定值</th>
-                <th>说明</th>
+                <th>{t('act.hp.colSearch')}</th>
+                <th>{t('act.hp.colParam')}</th>
+                <th>{t('act.hp.colValues')}</th>
+                <th>{t('act.hp.colHelp')}</th>
               </tr>
             </thead>
             <tbody>
@@ -218,7 +219,7 @@ export function HyperparamBenchPanel({
                       checked={row.selected}
                       disabled={disabled}
                       onChange={(e) => updateRow(row.flag, { selected: e.target.checked })}
-                      aria-label={`搜索 ${row.flag}`}
+                      aria-label={t('act.hp.searchFlag', { flag: row.flag })}
                     />
                   </td>
                   <td>
@@ -231,7 +232,7 @@ export function HyperparamBenchPanel({
                         type="text"
                         disabled={disabled}
                         value={row.candidates}
-                        placeholder="如 8, 16, 24"
+                        placeholder={t('act.hp.candidatesPlaceholder')}
                         onChange={(e) => updateRow(row.flag, { candidates: e.target.value })}
                       />
                     ) : row.meta.action === 'store_true' ? (
@@ -244,7 +245,7 @@ export function HyperparamBenchPanel({
                             updateRow(row.flag, { fixedValue: e.target.checked ? 'true' : 'false' })
                           }
                         />
-                        启用
+                        {t('act.hp.enable')}
                       </label>
                     ) : (
                       <input
@@ -265,7 +266,7 @@ export function HyperparamBenchPanel({
           </table>
         </div>
       ) : !loading && !err ? (
-        <p className="muted">请选择有效的 train 脚本以解析超参</p>
+        <p className="muted">{t('act.hp.noScript')}</p>
       ) : null}
       {comboCount > 0 ? (
         <p className="act-hp-hint muted">

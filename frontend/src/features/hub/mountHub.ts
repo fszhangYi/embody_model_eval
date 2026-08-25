@@ -1,5 +1,7 @@
 // @ts-nocheck
 
+import { t } from '../../i18n/runtime';
+
 /** Auto-ported from hub.html */
 
 import { summarizeEpisode, aggregateEpisodes, extractProvenance } from '../../lib/legacy/advanced_cd.js';
@@ -78,12 +80,12 @@ function parseDirListing(html) {
 async function listDir(url) {
   const base = url.endsWith('/') ? url : `${url}/`;
   const res = await fetch(base + '?_=' + Date.now());
-  if (!res.ok) throw new Error(`无法列出 ${base} → ${res.status}`);
+  if (!res.ok) throw new Error(t('hub.errorListDir', { path: base, status: res.status }));
   const ct = (res.headers.get('content-type') || '').toLowerCase();
   const text = await res.text();
   if (ct.includes('json')) {
     // unexpected JSON directory API — ignore
-    throw new Error(`${base} 返回 JSON，无法作为目录列表`);
+    throw new Error(t('hub.errorJsonDir', { path: base }));
   }
   return parseDirListing(text);
 }
@@ -97,7 +99,7 @@ async function discoverSuites() {
 
   const idx = await fetchJson(`${DATA_ROOT}/index.json`);
   const suites = (idx.suites || []).map((s) => (typeof s === 'string' ? s : s.id)).filter(Boolean);
-  if (!suites.length) throw new Error('data/ 下没有子目录，且 index.json 为空');
+  if (!suites.length) throw new Error(t('hub.errorNoSuites'));
   return suites;
 }
 
@@ -151,9 +153,9 @@ function renderEpisodeTable() {
       <td class="${unitCls}">${u.inferred_unit || '—'}${u.issues.length ? '!' : ''}</td>
       <td>${r.summary.provenance.action_mode || '—'}</td>
       <td class="muted">${obsLabel}</td>
-      <td><a href="/eval?data=${encodeURIComponent(r.path)}">评测</a></td>
+      <td><a href="/eval?data=${encodeURIComponent(r.path)}">${t('hub.linkEval')}</a></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="13" class="muted">暂无 episode</td></tr>';
+  }).join('') || `<tr><td colspan="13" class="muted">${t('hub.emptyEpisode')}</td></tr>`;
 
   const pagination = $('epPagination');
   const pageInfo = $('epPageInfo');
@@ -170,7 +172,7 @@ function renderEpisodeTable() {
   pagination.hidden = false;
   const from = start + 1;
   const to = Math.min(start + epPageSize, total);
-  pageInfo.textContent = `第 ${epPage} / ${totalPages} 页 · 显示 ${from}–${to} / 共 ${total} 条`;
+  pageInfo.textContent = t('hub.pageInfo', { page: epPage, totalPages, from, to, total });
   prevBtn.disabled = epPage <= 1;
   nextBtn.disabled = epPage >= totalPages;
   if (String(epPageSize) !== sizeSelect.value) sizeSelect.value = String(epPageSize);
@@ -182,8 +184,8 @@ function render() {
     ['episodes', agg.n],
     ['mean L2', fmt(agg.mean_l2, 3)],
     ['TCP e_p μ', fmt(agg.tcp_ep_mean_mm)],
-    ['双阈值达标', pct(agg.pass_both_rate)],
-    ['高达标 episode', `${agg.success_episodes ?? 0}`],
+    [t('hub.colPassBoth'), pct(agg.pass_both_rate)],
+    [t('hub.statHighPass'), `${agg.success_episodes ?? 0}`],
   ].map(([l, v]) => `<div class="stat"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
 
   renderEpisodeTable();
@@ -205,7 +207,7 @@ function render() {
       <td>${pct(aggM.pass_both_rate)}</td>
       <td class="muted">${prov.ckpt || '—'} / ${prov.policy || '—'}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" class="muted">暂无模型</td></tr>';
+  }).join('') || `<tr><td colspan="6" class="muted">${t('hub.emptyModel')}</td></tr>`;
 }
 
 async function enrichFromSidecar(path, summary) {
@@ -225,7 +227,7 @@ async function ingest(path, { id, label, model } = {}) {
   const data = await fetchJson(path);
   const check = validateEpisodeAgainstRegistry(data, registry);
   if (!check.ok) {
-    throw new Error(`${path} 防呆失败：${check.errors.join('；')}`);
+    throw new Error(t('hub.errorValidation', { path, errors: check.errors.join('; ') }));
   }
   const summary = summarizeEpisode(data, null);
   await enrichFromSidecar(path, summary);
@@ -245,24 +247,24 @@ async function ingest(path, { id, label, model } = {}) {
 }
 
 async function loadSuite(suiteId) {
-  if (!suiteId) throw new Error('请选择数据套件');
+  if (!suiteId) throw new Error(t('hub.errorSelectSuite'));
   await withLoader(pageLoader, async (progress) => {
     const registry = await ensureRobotRegistry();
     rows.length = 0;
     epPage = 1;
-    progress(0.06, `扫描 ${DATA_ROOT}/${suiteId}/`, '列出 episode 文件');
+    progress(0.06, t('hub.progressScan', { dir: `${DATA_ROOT}/${suiteId}/` }), t('hub.loaderListEpisodes'));
     const files = await listEpisodeFiles(suiteId);
     const skipped = [];
     const total = Math.max(files.length, 1);
     for (let i = 0; i < files.length; i++) {
       const name = files[i];
-      progress(0.1 + 0.82 * ((i + 1) / total), `加载 ${name}`, `${i + 1} / ${files.length}`);
+      progress(0.1 + 0.82 * ((i + 1) / total), t('hub.progressLoadName', { name }), `${i + 1} / ${files.length}`);
       const path = `${DATA_ROOT}/${suiteId}/${name}`;
       try {
         const data = await fetchJson(path);
         const check = validateEpisodeAgainstRegistry(data, registry);
         if (!check.ok) {
-          skipped.push(`${name}（${check.errors[0] || '校验失败'}）`);
+          skipped.push(`${name}（${check.errors[0] || t('hub.validationFailed')}）`);
           continue;
         }
         const summary = summarizeEpisode(data, null);
@@ -284,38 +286,38 @@ async function loadSuite(suiteId) {
       }
     }
     const known = listRobots(registry).map((r) => r.id).join(', ');
-    let msg = `套件 ${suiteId} · 已加载 ${rows.length} episode · 可用机型 [${known}]`;
-    if (files.length === 0) msg += ' · 目录下无 .json';
-    if (skipped.length) msg += ` · 跳过 ${skipped.length}：${skipped.join('；')}`;
-    progress(0.96, '渲染表格…', msg);
+    let msg = t('hub.statusSuite', { id: suiteId, n: rows.length, robots: known });
+    if (files.length === 0) msg += ' · ' + t('hub.statusNoJson');
+    if (skipped.length) msg += ' · ' + t('hub.statusSkipped', { n: skipped.length, list: skipped.join('; ') });
+    progress(0.96, t('hub.progressRender'), msg);
     $('status').textContent = msg;
     render();
-  }, { text: `加载套件 ${suiteId}`, detail: '读取 episode JSON' });
+  }, { text: t('hub.loaderLoadSuite', { id: suiteId }), detail: t('hub.loaderLoadDetail') });
 }
 
 async function refreshSuiteSelect(preferred) {
   const sel = $('suiteSelect');
   sel.disabled = true;
-  sel.innerHTML = '<option value="">扫描中…</option>';
+  sel.innerHTML = `<option value="">${t('hub.scanning')}</option>`;
   try {
     return await withLoader(pageLoader, async (progress) => {
-      progress(0.2, '扫描 data/ 套件…', '读取 index.json');
+      progress(0.2, t('hub.loaderScanSuites'), t('hub.loaderScanDetail'));
       const suites = await discoverSuites();
-      const placeholder = '<option value="">请选择数据套件</option>';
+      const placeholder = `<option value="">${t('hub.suitePlaceholder')}</option>`;
       sel.innerHTML = suites.length
         ? placeholder + suites.map((id) => `<option value="${id}">${id}</option>`).join('')
-        : '<option value="">（无可用套件）</option>';
+        : `<option value="">${t('hub.noSuites')}</option>`;
       sel.disabled = !suites.length;
       // Only preselect when caller asks (e.g. ?suite= or reload preserving current).
       // Fresh Hub entry uses preferred='' → show placeholder, do not auto-pick.
       const pick = preferred && suites.includes(preferred) ? preferred : '';
       sel.value = pick;
       sel.classList.toggle('placeholder', !pick);
-      progress(0.9, '套件列表就绪', pick || (suites.length ? '待选择' : '无可用套件'));
+      progress(0.9, t('hub.suiteListReady'), pick || (suites.length ? t('hub.suiteReadyPick') : t('hub.suiteReadyNone')));
       return pick;
-    }, { text: '扫描数据套件', detail: 'data/' });
+    }, { text: t('hub.loaderScanTitle'), detail: 'data/' });
   } catch (e) {
-    sel.innerHTML = '<option value="">扫描失败</option>';
+    sel.innerHTML = `<option value="">${t('hub.scanFailed')}</option>`;
     throw e;
   }
 }
@@ -325,7 +327,7 @@ async function loadManifest(path) {
     rows.length = 0;
     epPage = 1;
     const registry = await ensureRobotRegistry();
-    progress(0.12, `加载 manifest`, path);
+    progress(0.12, t('hub.loaderManifest'), path);
     const man = await fetchJson(path);
     const thr = man.thresholds || {};
     const skipped = [];
@@ -333,11 +335,11 @@ async function loadManifest(path) {
     const total = Math.max(episodes.length, 1);
     for (let i = 0; i < episodes.length; i++) {
       const ep = episodes[i];
-      progress(0.15 + 0.8 * ((i + 1) / total), `加载 ${ep.id || ep.path}`, `${i + 1} / ${episodes.length}`);
+      progress(0.15 + 0.8 * ((i + 1) / total), t('hub.progressLoadName', { name: ep.id || ep.path }), `${i + 1} / ${episodes.length}`);
       const data = await fetchJson(ep.path);
       const check = validateEpisodeAgainstRegistry(data, registry);
       if (!check.ok) {
-        skipped.push(`${ep.id || ep.path}（${check.errors[0] || '校验失败'}）`);
+        skipped.push(`${ep.id || ep.path}（${check.errors[0] || t('hub.validationFailed')}）`);
         continue;
       }
       const summary = summarizeEpisode(data, null, thr);
@@ -349,19 +351,19 @@ async function loadManifest(path) {
         summary,
       });
     }
-    let msg = `已加载 ${rows.length} episode · ${man.title || path}`;
-    if (skipped.length) msg += ` · 跳过 ${skipped.length}：${skipped.join('；')}`;
+    let msg = t('hub.statusLoaded', { n: rows.length, title: man.title || path });
+    if (skipped.length) msg += ' · ' + t('hub.statusSkipped', { n: skipped.length, list: skipped.join('; ') });
     $('status').textContent = msg;
     render();
-  }, { text: '加载 manifest', detail: path });
+  }, { text: t('hub.btnLoadManifest'), detail: path });
 }
 
 $('btnReloadSuites').onclick = () => {
   const current = $('suiteSelect').value;
   refreshSuiteSelect(current).then((id) => {
     $('status').textContent = id
-      ? `已刷新套件列表 · 当前 ${id}`
-      : '已刷新套件列表 · 请选择数据套件';
+      ? t('hub.statusRefreshed', { id })
+      : t('hub.statusRefreshedPick');
   }).catch((e) => {
     $('status').innerHTML = `<span class="bad">${e.message}</span>`;
   });
@@ -393,7 +395,7 @@ $('btnAdd').onclick = async () => {
     for (const p of raw.split(',').map((s) => s.trim()).filter(Boolean)) {
       await ingest(p);
     }
-    $('status').textContent = `当前 ${rows.length} 条`;
+    $('status').textContent = t('hub.statusCurrent', { n: rows.length });
     render();
   } catch (e) {
     $('status').innerHTML = `<span class="bad">${e.message}</span>`;
@@ -430,12 +432,12 @@ $('epPageSize').onchange = () => {
     if (id) await loadSuite(id);
     else {
       $('status').textContent = preferred
-        ? `未找到套件 ${preferred}，请重新选择`
-        : '请选择数据套件后加载';
+        ? t('hub.suiteNotFound', { id: preferred })
+        : t('hub.selectThenLoad');
       render();
     }
   } catch (e) {
-    $('status').innerHTML = `<span class="warn">初始化失败：${e.message}</span>`;
+    $('status').innerHTML = `<span class="warn">${t('hub.initFail', { msg: e.message })}</span>`;
     render();
   }
 })();

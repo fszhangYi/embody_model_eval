@@ -52,6 +52,7 @@ body:has(.act-pipeline-page),
 }
 
 .page-nav-floating,
+.eval-page-nav-inner,
 .eval-page-nav {
   position: fixed;
   top: 14px;
@@ -214,4 +215,14 @@ body:has(.act-pipeline-page),
   font-size: 0.72rem;
   color: var(--muted);
   flex-shrink: 0;
+}
+
+
+.page-nav-floating,
+.eval-page-nav-inner,
+.sensors-header-actions-inner,
+.act-header-actions-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }

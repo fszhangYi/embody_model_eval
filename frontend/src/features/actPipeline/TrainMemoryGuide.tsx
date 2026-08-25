@@ -1,3 +1,4 @@
+import { t } from '../../i18n/runtime'
 import { useMemo, useState } from 'react'
 
 const ALPHA_TRAIN = 28
@@ -81,7 +82,7 @@ export function TrainMemoryGuide({
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        <span className="act-train-mem-title">内存 / 显存估算</span>
+        <span className="act-train-mem-title">{t('act.mem.title')}</span>
         <span className="act-train-mem-badges">
           <span className={`act-train-mem-pill${highCpu ? ' warn' : ''}`}>
             CPU ≈ {fmtGb(est.cpuGb)}
@@ -120,20 +121,20 @@ export function TrainMemoryGuide({
                 onChange={(e) => setWidth(Math.max(1, Number(e.target.value) || DEFAULT_W))}
               />
             </label>
-            <span className="muted act-train-mem-res-hint">默认 480×640，与常见 HDF5 一致</span>
+            <span className="muted act-train-mem-res-hint">{t('act.mem.resHint')}</span>
           </div>
 
           <div className="act-train-mem-live">
-            <h4>当前参数估算</h4>
+            <h4>{t('act.mem.current')}</h4>
             <dl className="act-train-mem-stats">
               <div>
-                <dt>单样本图像</dt>
+                <dt>{t('act.mem.sample')}</dt>
                 <dd>
                   {est.K} 相机 × {height}×{width} ≈ {fmtGb(est.sampleGb)}
                 </dd>
               </div>
               <div>
-                <dt>单 batch 张量</dt>
+                <dt>{t('act.mem.batch')}</dt>
                 <dd>
                   B={est.B} → ≈ {fmtGb(est.batchGb)}
                 </dd>
@@ -145,14 +146,14 @@ export function TrainMemoryGuide({
                 </dd>
               </div>
               <div>
-                <dt>CPU 合计（估）</dt>
+                <dt>{t('act.mem.cpuTotal')}</dt>
                 <dd className={highCpu ? 'warn' : ''}>
                   主进程 {MAIN_GB} GB + workers {fmtGb(est.workersGb)} + 杂项 {MISC_GB} GB ≈{' '}
                   <strong>{fmtGb(est.cpuGb)}</strong>
                 </dd>
               </div>
               <div>
-                <dt>GPU 显存（粗估）</dt>
+                <dt>{t('act.mem.gpu')}</dt>
                 <dd className={highGpu ? 'warn' : ''}>
                   batch 激活 ×5 + 模型/优化器 ≈ <strong>{fmtGb(est.gpuGb)}</strong>（需实测校准）
                 </dd>
@@ -161,7 +162,7 @@ export function TrainMemoryGuide({
           </div>
 
           <details className="act-train-mem-details">
-            <summary>公式说明</summary>
+            <summary>{t('act.mem.formulas')}</summary>
             <div className="act-train-mem-formulas">
               <p>
                 <strong>单样本（float32）：</strong>
@@ -193,20 +194,20 @@ export function TrainMemoryGuide({
           </details>
 
           <table className="act-train-mem-table">
-            <caption>降内存与变量对应</caption>
+            <caption>{t('act.mem.tableCaption')}</caption>
             <thead>
               <tr>
-                <th>改法</th>
-                <th>影响</th>
+                <th>{t('act.mem.colMethod')}</th>
+                <th>{t('act.mem.colEffect')}</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td>减小 num-workers</td>
+                <td>{t('act.mem.reduceWorkers')}</td>
                 <td>W_train / W_val 下降，M_workers 近似线性减少</td>
               </tr>
               <tr>
-                <td>减小 batch-size</td>
+                <td>{t('act.mem.reduceBatch')}</td>
                 <td>M_batch 下降，worker 与 GPU batch 项同步减少</td>
               </tr>
               <tr>
@@ -214,7 +215,7 @@ export function TrainMemoryGuide({
                 <td>M_workers ≈ 0，但数据加载成为瓶颈</td>
               </tr>
               <tr>
-                <td>减少相机数 K</td>
+                <td>{t('act.mem.reduceCameras')}</td>
                 <td>M_sample 线性减少</td>
               </tr>
             </tbody>

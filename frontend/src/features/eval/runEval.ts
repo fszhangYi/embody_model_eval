@@ -1,5 +1,6 @@
 // @ts-nocheck
 
+import { t, trText } from '../../i18n/runtime';
 /** Auto-extracted from legacy/index.html */
 
 import * as THREE from 'three';
@@ -2075,7 +2076,7 @@ try {
     const li = e.target.closest('li[data-frame]');
     if (!li) return;
     playing = false;
-    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').textContent = t('eval.btnPlay');
     document.getElementById('btnPlay').classList.remove('active');
     showFrame(Number(li.dataset.frame));
   });
@@ -2090,7 +2091,7 @@ try {
     const hit = workspaceHitFrame(wsCanvas, e.clientX, e.clientY);
     if (hit < 0) return;
     playing = false;
-    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').textContent = t('eval.btnPlay');
     document.getElementById('btnPlay').classList.remove('active');
     showFrame(hit);
   });
@@ -2100,7 +2101,7 @@ try {
     const t = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     const idx = Math.round(t * (meta.n_frames - 1));
     playing = false;
-    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').textContent = t('eval.btnPlay');
     document.getElementById('btnPlay').classList.remove('active');
     showFrame(idx);
   });
@@ -2321,7 +2322,7 @@ try {
   // ---- Advanced C / D (local-only features; not pushed) ----
   function pauseJump(i) {
     playing = false;
-    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').textContent = t('eval.btnPlay');
     document.getElementById('btnPlay').classList.remove('active');
     showFrame(i);
   }
@@ -2490,19 +2491,19 @@ try {
 
   slider.addEventListener('input', () => {
     playing = false;
-    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').textContent = t('eval.btnPlay');
     document.getElementById('btnPlay').classList.remove('active');
     showFrame(Number(slider.value));
   });
   document.getElementById('btnPlay').addEventListener('click', () => {
     playing = !playing;
     const b = document.getElementById('btnPlay');
-    b.textContent = playing ? '暂停' : '播放';
+    b.textContent = playing ? t('eval.btnPause') : t('eval.btnPlay');
     b.classList.toggle('active', playing);
   });
   document.getElementById('btnReset').addEventListener('click', () => {
     playing = false;
-    document.getElementById('btnPlay').textContent = '播放';
+    document.getElementById('btnPlay').textContent = t('eval.btnPlay');
     document.getElementById('btnPlay').classList.remove('active');
     showFrame(0);
   });
@@ -2524,7 +2525,7 @@ try {
   function setPlaying(on) {
     playing = !!on;
     const b = document.getElementById('btnPlay');
-    b.textContent = playing ? '暂停' : '播放';
+    b.textContent = playing ? t('eval.btnPause') : t('eval.btnPlay');
     b.classList.toggle('active', playing);
   }
 
@@ -2679,7 +2680,7 @@ try {
   }
   requestAnimationFrame(loop);
 } catch (err) {
-  document.getElementById('subtitle').textContent = '加载失败: ' + err.message;
+  document.getElementById('subtitle').textContent = t('eval.loadFail', { msg: err.message });
   failLoader(evalLoader, '加载失败', err.message);
   const fill = document.getElementById('loadBarFill');
   if (fill) fill.style.background = 'linear-gradient(90deg, #7f1d1d, #f87171)';

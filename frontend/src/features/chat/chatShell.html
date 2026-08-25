@@ -1,67 +1,67 @@
 <header>
   <div>
     <h1>AI Chat</h1>
-    <p class="header-blurb">选择托管 Skill → 配置 Agent 链接 → 发送诉求并查看回执</p>
+    <p class="header-blurb" data-i18n="chat.subtitle">选择托管 Skill → 配置 Agent 链接 → 发送诉求并查看回执</p>
   </div>
-  <div class="header-status" id="apiStatus">检测 API…</div>
+  <div class="header-status" id="apiStatus" data-i18n="chat.apiChecking">检测 API…</div>
 </header>
 
 <div class="layout">
-  <aside class="panel" aria-label="托管 Skills">
+  <aside class="panel" data-i18n-aria="chat.skillsAria" aria-label="托管 Skills">
     <h2>
-      托管 Skills
-      <button type="button" class="btn-sm" id="btnRefresh" title="刷新列表与配置">刷新</button>
+      <span data-i18n="chat.skillsTitle">托管 Skills</span>
+      <button type="button" class="btn-sm" id="btnRefresh" data-i18n="chat.btnRefresh" data-i18n-title="chat.btnRefreshTitle" title="刷新列表与配置">刷新</button>
     </h2>
-    <p class="muted" id="selectedHint">未选择 skill</p>
+    <p class="muted" id="selectedHint" data-i18n="chat.selectedNone">未选择 skill</p>
     <div id="managedSkills"></div>
     <div class="preview-box" id="skillPreview" hidden>
       <div class="preview-head">
-        <span id="previewTitle">Skill 预览</span>
-        <button type="button" class="btn-sm" id="btnClosePreview">收起</button>
+        <span id="previewTitle" data-i18n="chat.previewTitle">Skill 预览</span>
+        <button type="button" class="btn-sm" id="btnClosePreview" data-i18n="chat.btnClosePreview">收起</button>
       </div>
       <pre class="preview-body" id="previewBody"></pre>
     </div>
-    <h3 id="sourceHeading">可导入</h3>
+    <h3 id="sourceHeading" data-i18n="chat.sourcesTitle">可导入</h3>
     <div id="sourceSkills"></div>
   </aside>
 
-  <main class="chat-main" aria-label="对话">
+  <main class="chat-main" data-i18n-aria="chat.chatAria" aria-label="对话">
     <div class="chat-toolbar">
-      <span class="muted" id="turnHint">新会话</span>
+      <span class="muted" id="turnHint" data-i18n="chat.turnNew">新会话</span>
       <span class="grow"></span>
-      <button type="button" class="btn-sm" id="btnClearChat" title="清空本页对话历史">清空对话</button>
-      <button type="button" class="btn-sm" id="btnExportChat" title="导出本页对话为 Markdown">导出 MD</button>
+      <button type="button" class="btn-sm" id="btnClearChat" data-i18n="chat.btnClear" data-i18n-title="chat.btnClearTitle" title="清空本页对话历史">清空对话</button>
+      <button type="button" class="btn-sm" id="btnExportChat" data-i18n="chat.btnExportMd" data-i18n-title="chat.btnExportMdTitle" title="导出本页对话为 Markdown">导出 MD</button>
     </div>
     <div id="chatLog"></div>
     <div class="composer">
-      <textarea id="chatInput" placeholder="输入诉求…（Ctrl/⌘ + Enter 发送）"></textarea>
+      <textarea id="chatInput" data-i18n-placeholder="chat.inputPlaceholder" placeholder="输入诉求…（Ctrl/⌘ + Enter 发送）"></textarea>
       <div class="composer-row">
         <span class="muted"></span>
-        <button type="button" class="btn-primary" id="btnSend">发送</button>
+        <button type="button" class="btn-primary" id="btnSend" data-i18n="chat.btnSend">发送</button>
       </div>
     </div>
   </main>
 
-  <aside class="panel" aria-label="Agent 链接">
-    <h2>Agent 链接</h2>
+  <aside class="panel" data-i18n-aria="chat.agentAria" aria-label="Agent 链接">
+    <h2 data-i18n="chat.agentTitle">Agent 链接</h2>
     <div class="field">
-      <label for="cfgMode">模式</label>
+      <label for="cfgMode" data-i18n="chat.modeLabel">模式</label>
       <select id="cfgMode">
-        <option value="dry_run">dry_run（本地回执，不调外部）</option>
-        <option value="openai">openai（兼容 /chat/completions）</option>
-        <option value="webhook">webhook（POST 诉求+skills JSON）</option>
-        <option value="cursor_sdk">cursor_sdk（可选 pip：cursor-sdk）</option>
-        <option value="dsh_agent">dsh_agent（embody_dsh_agent 工具循环）</option>
+        <option value="dry_run" data-i18n="chat.modeDryRun">dry_run（本地回执，不调外部）</option>
+        <option value="openai" data-i18n="chat.modeOpenai">openai（兼容 /chat/completions）</option>
+        <option value="webhook" data-i18n="chat.modeWebhook">webhook（POST 诉求+skills JSON）</option>
+        <option value="cursor_sdk" data-i18n="chat.modeCursorSdk">cursor_sdk（可选 pip：cursor-sdk）</option>
+        <option value="dsh_agent" data-i18n="chat.modeDsh">dsh_agent（embody_dsh_agent 工具循环）</option>
       </select>
     </div>
     <div id="linkFields" hidden>
       <div class="field">
         <label for="cfgBaseUrl">Base URL</label>
-        <input id="cfgBaseUrl" placeholder="https://api.openai.com/v1 或自建网关" />
+        <input id="cfgBaseUrl" data-i18n-placeholder="chat.baseUrlPlaceholder" placeholder="https://api.openai.com/v1 或自建网关" />
       </div>
       <div class="field">
         <label for="cfgPath">Path</label>
-        <input id="cfgPath" placeholder="/chat/completions 或 webhook 路径" />
+        <input id="cfgPath" data-i18n-placeholder="chat.pathPlaceholder" placeholder="/chat/completions 或 webhook 路径" />
       </div>
     </div>
     <div class="field">
@@ -73,11 +73,11 @@
       <input id="cfgApiKey" type="password" autocomplete="off" />
     </div>
     <div class="field">
-      <label for="cfgSystem">System 前缀</label>
+      <label for="cfgSystem" data-i18n="chat.systemLabel">System 前缀</label>
       <textarea id="cfgSystem"></textarea>
     </div>
-    <button type="button" id="btnSaveConfig">保存到服务端</button>
-    <p class="muted" style="margin-top:10px">配置写入 <code>agent_skills/.agent_config.json</code>（勿提交密钥）。也可用环境变量 <code>CURSOR_API_KEY</code> / <code>AGENT_API_KEY</code>。</p>
+    <button type="button" id="btnSaveConfig" data-i18n="chat.btnSaveConfig">保存到服务端</button>
+    <p class="muted" style="margin-top:10px" data-i18n="chat.configHint">配置写入 <code>agent_skills/.agent_config.json</code>（勿提交密钥）。也可用环境变量 <code>CURSOR_API_KEY</code> / <code>AGENT_API_KEY</code>。</p>
   </aside>
 </div>
 

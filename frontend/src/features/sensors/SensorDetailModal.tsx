@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { t, trText } from '../../i18n/runtime'
 import {
-  KIND_LABEL,
-  STATUS_LABEL,
   type SensorDevice,
   type SensorStatus,
 } from './types'
@@ -62,12 +61,12 @@ export function SensorDetailModal({
         <div className="sensors-modal-head">
           <div>
             <div className="sensors-modal-kicker">
-              <span className="sensors-kind-tag">{KIND_LABEL[device.kind]}</span>
+              <span className="sensors-kind-tag">{t(`sensors.kind.${device.kind}`)}</span>
               <span className={`sensors-status ${statusClass(device.status)}`}>
-                {STATUS_LABEL[device.status]}
+                {t(`sensors.status.${device.status}`)}
               </span>
             </div>
-            <h2 id="sensors-modal-title">{device.name}</h2>
+            <h2 id="sensors-modal-title">{trText(device.name)}</h2>
             <p className="muted">{device.model}</p>
           </div>
           <button type="button" className="sensors-modal-close" onClick={onClose} aria-label="关闭">
@@ -138,14 +137,14 @@ export function SensorDetailModal({
 
           <div className="sensors-modal-sections">
             {detail.sections.map((sec) => (
-              <section key={sec.title} className="sensors-modal-section">
-                <h3>{sec.title}</h3>
+              <section key={trText(sec.title)} className="sensors-modal-section">
+                <h3>{trText(sec.title)}</h3>
                 <table>
                   <tbody>
                     {sec.rows.map((row) => (
-                      <tr key={row.label}>
-                        <th scope="row">{row.label}</th>
-                        <td>{row.value}</td>
+                      <tr key={trText(row.label)}>
+                        <th scope="row">{trText(row.label)}</th>
+                        <td>{trText(row.value)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -219,9 +218,9 @@ export function SensorDetailModal({
               <h3>上线检查</h3>
               <ul className="sensors-check-list">
                 {detail.checklist.map((item) => (
-                  <li key={item}>
+                  <li key={trText(item)}>
                     <span className="sensors-check-box" aria-hidden="true" />
-                    {item}
+                    {trText(item)}
                   </li>
                 ))}
               </ul>
@@ -246,7 +245,7 @@ export function SensorDetailModal({
                 </tr>
                 <tr>
                   <th scope="row">说明</th>
-                  <td>{device.note}</td>
+                  <td>{trText(device.note)}</td>
                 </tr>
               </tbody>
             </table>

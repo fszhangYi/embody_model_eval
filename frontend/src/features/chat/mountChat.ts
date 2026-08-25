@@ -1,5 +1,7 @@
 // @ts-nocheck
 
+import { t } from '../../i18n/runtime';
+
 /** Auto-ported */
 
 import {
@@ -61,7 +63,7 @@ async function copyText(text) {
   const value = String(text || '');
   try {
     await navigator.clipboard.writeText(value);
-    toast('已复制', 'ok');
+    toast(t('chat.copied'), 'ok');
   } catch (_) {
     const ta = document.createElement('textarea');
     ta.value = value;
@@ -69,7 +71,7 @@ async function copyText(text) {
     ta.select();
     document.execCommand('copy');
     ta.remove();
-    toast('已复制', 'ok');
+    toast(t('chat.copied'), 'ok');
   }
 }
 
@@ -118,20 +120,20 @@ function historyForApi() {
 
 function syncTurnHint() {
   const n = historyForApi().length;
-  $('#turnHint').textContent = n ? `本会话 ${n} 条` : '新会话';
+  $('#turnHint').textContent = n ? t('chat.turnCount', { n }) : t('chat.turnNew');
 }
 
 function setSendBusy(busy) {
   state.busy = busy;
   const btn = $('#btnSend');
   if (busy) {
-    btn.textContent = '取消';
+    btn.textContent = t('chat.btnCancel');
     btn.classList.remove('btn-primary');
     btn.classList.add('btn-cancel');
     btn.disabled = false;
-    btn.title = '取消等待';
+    btn.title = t('chat.btnCancelTitle');
   } else {
-    btn.textContent = '发送';
+    btn.textContent = t('chat.btnSend');
     btn.classList.add('btn-primary');
     btn.classList.remove('btn-cancel');
     btn.disabled = false;
@@ -149,7 +151,7 @@ function appendBubble(role, text, { meta, receipt, skillIds, persist = true } = 
   const log = $('#chatLog');
   const div = document.createElement('div');
   div.className = `bubble bubble-${role}`;
-  const who = role === 'user' ? '你' : role === 'assistant' ? 'Agent' : '系统';
+  const who = role === 'user' ? t('chat.whoYou') : role === 'assistant' ? 'Agent' : t('chat.whoSystem');
   div.innerHTML = `<div class="bubble-who">${who}</div><pre class="bubble-text"></pre>`;
   div.querySelector('.bubble-text').textContent = text;
 
@@ -165,25 +167,25 @@ function appendBubble(role, text, { meta, receipt, skillIds, persist = true } = 
     actions.className = 'bubble-actions';
     const btnCopy = document.createElement('button');
     btnCopy.type = 'button';
-    btnCopy.textContent = '复制';
+    btnCopy.textContent = t('chat.btnCopy');
     btnCopy.addEventListener('click', () => copyText(text));
     actions.appendChild(btnCopy);
 
     if (role === 'assistant') {
       const btnMd = document.createElement('button');
       btnMd.type = 'button';
-      btnMd.textContent = '导出此条';
+      btnMd.textContent = t('chat.btnExportBubble');
       btnMd.addEventListener('click', () => {
-        downloadText(`chat-reply-${Date.now()}.md`, `# Agent 回执\n\n${text}\n`);
-        toast('已导出', 'ok');
+        downloadText(`chat-reply-${Date.now()}.md`, `# ${t('chat.exportReplyTitle')}\n\n${text}\n`);
+        toast(t('chat.exported'), 'ok');
       });
       actions.appendChild(btnMd);
 
       if (receipt) {
         const btnReceipt = document.createElement('button');
         btnReceipt.type = 'button';
-        btnReceipt.textContent = '复制打包 JSON';
-        btnReceipt.title = '复制 dry_run receipt（含 messages）';
+        btnReceipt.textContent = t('chat.btnCopyReceipt');
+        btnReceipt.title = t('chat.btnCopyReceiptTitle');
         btnReceipt.addEventListener('click', () => {
           copyText(JSON.stringify(receipt, null, 2));
         });
@@ -215,7 +217,7 @@ function renderChatFromState() {
   const log = $('#chatLog');
   log.innerHTML = '';
   if (!state.turns.length) {
-    appendBubble('system', '开始对话：可先勾选 skill，或点下方模板填入诉求。', { persist: false });
+    appendBubble('system', t('chat.systemStart'), { persist: false });
     syncTurnHint();
     return;
   }
@@ -231,30 +233,30 @@ function renderChatFromState() {
 }
 
 function clearChat() {
-  if (state.busy) return toast('请先取消进行中的请求', 'err');
-  if (state.turns.length && !confirm('清空本页对话历史？')) return;
+  if (state.busy) return toast(t('chat.clearBusy'), 'err');
+  if (state.turns.length && !confirm(t('chat.confirmClear'))) return;
   state.turns = [];
   persistTurns();
   renderChatFromState();
-  toast('已清空对话', 'ok');
+  toast(t('chat.cleared'), 'ok');
 }
 
 function exportChatMd() {
-  const lines = ['# AI Chat 导出', ''];
+  const lines = [`# ${t('chat.exportTitle')}`, ''];
   for (const t of state.turns) {
     const who = t.role === 'user' ? 'User' : 'Assistant';
     lines.push(`## ${who}`);
     if (t.meta) lines.push(`_${t.meta}_`, '');
     lines.push(t.content, '');
   }
-  if (lines.length <= 2) return toast('暂无对话可导出', 'err');
+  if (lines.length <= 2) return toast(t('chat.exportEmpty'), 'err');
   downloadText(`chat-session-${Date.now()}.md`, `${lines.join('\n')}\n`);
-  toast('已导出会话', 'ok');
+  toast(t('chat.exportedSession'), 'ok');
 }
 
 function syncSelectedHint() {
   const n = state.selected.size;
-  $('#selectedHint').textContent = n ? `已选 ${n} 个 skill · 点击名称可预览` : '未选择 skill（仍可纯对话）';
+  $('#selectedHint').textContent = n ? t('chat.selectedHint', { n }) : t('chat.selectedFallback');
 }
 
 async function showSkillPreview(id) {
@@ -263,17 +265,17 @@ async function showSkillPreview(id) {
   const title = $('#previewTitle');
   const body = $('#previewBody');
   box.hidden = false;
-  title.textContent = `预览 · ${id}`;
-  body.innerHTML = inlineLoadingHtml('加载 Skill 内容…');
+  title.textContent = t('chat.previewOf', { id });
+  body.innerHTML = inlineLoadingHtml(t('chat.previewLoading'));
   const out = await api(`/api/skills/${encodeURIComponent(id)}`);
   if (state.previewId !== id) return;
   if (!out.ok) {
-    body.textContent = out.error || '加载失败';
+    body.textContent = out.error || t('chat.previewLoadFail');
     return;
   }
   const skill = out.skill || {};
-  title.textContent = `预览 · ${skill.name || id}`;
-  body.textContent = skill.content || '(空)';
+  title.textContent = t('chat.previewOf', { id: skill.name || id });
+  body.textContent = skill.content || t('chat.previewEmpty');
 }
 
 function hideSkillPreview() {
@@ -284,7 +286,7 @@ function hideSkillPreview() {
 function renderSkillList() {
   const box = $('#managedSkills');
   if (!state.managed.length) {
-    box.innerHTML = '<p class="muted empty">托管目录尚无 skill，可从下方导入。</p>';
+    box.innerHTML = `<p class="muted empty">${t('chat.managedEmpty')}</p>`;
     return;
   }
   box.innerHTML = state.managed.map((s) => {
@@ -298,7 +300,7 @@ function renderSkillList() {
           <span class="skill-id">${s.id}</span>
           <span class="skill-desc">${desc}</span>
         </span>
-        <button type="button" class="skill-del" data-del="${s.id}" title="从托管目录删除">×</button>
+        <button type="button" class="skill-del" data-del="${s.id}" title=t('chat.btnDeleteSkill')>×</button>
       </label>`;
   }).join('');
 
@@ -323,14 +325,14 @@ function renderSkillList() {
       e.preventDefault();
       e.stopPropagation();
       const id = btn.dataset.del;
-      if (!confirm(`从托管目录删除 skill「${id}」？`)) return;
+      if (!confirm(t('chat.confirmDeleteSkill', { id }))) return;
       const out = await api(`/api/skills/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      if (!out.ok) return toast(out.error || '删除失败', 'err');
+      if (!out.ok) return toast(out.error || t('chat.deleteFail'), 'err');
       state.selected.delete(id);
       if (state.previewId === id) hideSkillPreview();
       await refreshSkills();
       persistTurns();
-      toast(`已删除 ${id}`, 'ok');
+      toast(t('chat.deleted', { id }), 'ok');
     });
   });
   syncSelectedHint();
@@ -340,7 +342,7 @@ function renderSources() {
   const box = $('#sourceSkills');
   const scanned = state.scanned || [];
   if (!scanned.length) {
-    box.innerHTML = '<p class="muted empty">暂无可导入 skill</p>';
+    box.innerHTML = `<p class="muted empty">${t('chat.sourcesEmpty')}</p>`;
     return;
   }
 
@@ -355,7 +357,7 @@ function renderSources() {
           ${desc ? `<div class="skill-desc">${escHtml(desc)}</div>` : ''}
         </div>
         <button type="button" class="btn-sm" data-rel="${escAttr(s.rel)}" ${already ? 'disabled' : ''}>
-          ${already ? '已托管' : '导入'}
+          ${already ? t('chat.btnManaged') : t('chat.btnImport')}
         </button>
       </div>`);
   }
@@ -373,7 +375,7 @@ function renderSources() {
       });
       if (!out.ok) {
         btn.disabled = false;
-        return toast(out.error || '导入失败', 'err');
+        return toast(out.error || t('chat.importFail'), 'err');
       }
       const id = (out.skill && out.skill.id) || rel.split('/').pop();
       state.selected.add(id);
@@ -405,8 +407,8 @@ function fillConfigForm(cfg) {
   $('#cfgSystem').value = cfg.systemPrompt || '';
   $('#cfgApiKey').value = '';
   $('#cfgApiKey').placeholder = cfg.apiKeySet
-    ? `已保存 (${cfg.apiKeyMasked})，留空保留`
-    : '可选 Bearer Token / CURSOR_API_KEY';
+    ? t('chat.apiKeySaved', { masked: cfg.apiKeyMasked })
+    : t('chat.apiKeyPlaceholder');
   toggleLinkFields();
 }
 
@@ -429,7 +431,7 @@ async function refreshSkills() {
     api('/api/skills'),
     api('/api/skills/sources'),
   ]);
-  if (!managed.ok) throw new Error(managed.error || 'skills API 不可用（请用 ./serve.sh 启动）');
+  if (!managed.ok) throw new Error(managed.error || t('chat.skillsApiFail'));
   state.managed = managed.skills || [];
   state.sources = (sources && sources.sources) || {};
   state.scanned = (sources && sources.scanned) || [];
@@ -437,7 +439,7 @@ async function refreshSkills() {
   const head = $('#sourceHeading');
   if (head) {
     const n = state.scanned.length;
-    head.textContent = n ? `可导入 · ${n}` : '可导入';
+    head.textContent = n ? t('chat.sourcesCount', { n }) : t('chat.sourcesTitle');
   }
   for (const id of [...state.selected]) {
     if (!state.managed.some((s) => s.id === id)) state.selected.delete(id);
@@ -448,7 +450,7 @@ async function refreshSkills() {
 
 async function refreshConfig() {
   const out = await api('/api/agent/config');
-  if (!out.ok) throw new Error(out.error || 'config API 失败');
+  if (!out.ok) throw new Error(out.error || t('chat.configApiFail'));
   fillConfigForm(out.config);
 }
 
@@ -463,15 +465,15 @@ async function saveConfig() {
   const key = $('#cfgApiKey').value.trim();
   if (key) body.apiKey = key;
   const out = await api('/api/agent/config', { method: 'PUT', body: JSON.stringify(body) });
-  if (!out.ok) return toast(out.error || '保存失败', 'err');
+  if (!out.ok) return toast(out.error || t('chat.saveFail'), 'err');
   fillConfigForm(out.config);
-  toast('Agent 链接已保存', 'ok');
+  toast(t('chat.configSaved'), 'ok');
 }
 
 async function sendChat() {
   if (state.busy) return;
   const message = $('#chatInput').value.trim();
-  if (!message) return toast('请输入诉求', 'err');
+  if (!message) return toast(t('chat.needInput'), 'err');
 
   const configOverride = {
     mode: $('#cfgMode').value,
@@ -491,13 +493,13 @@ async function sendChat() {
   setSendBusy(true);
   appendBubble('user', message, {
     meta: [
-      skillIds.length ? `skills=${skillIds.join(',')}` : '无 skill',
-      history.length ? `上文 ${history.length} 条` : '首轮',
+      skillIds.length ? `skills=${skillIds.join(',')}` : t('chat.metaNoSkill'),
+      history.length ? t('chat.metaHistory', { n: history.length }) : t('chat.metaFirstTurn'),
     ].join(' · '),
     skillIds,
   });
   $('#chatInput').value = '';
-  appendBubble('system', '发送中…', { persist: false });
+  appendBubble('system', t('chat.sending'), { persist: false });
 
   try {
     const body = {
@@ -533,8 +535,8 @@ async function sendChat() {
     if (last && last.classList.contains('bubble-system')) last.remove();
 
     if (!out.ok) {
-      appendBubble('system', `失败：${out.error || JSON.stringify(out.detail || out)}`, { persist: false });
-      toast(out.error || '调用失败', 'err');
+      appendBubble('system', t('chat.failPrefix', { msg: out.error || JSON.stringify(out.detail || out) }), { persist: false });
+      toast(out.error || t('chat.callFail'), 'err');
     } else {
       if (out.meta?.sessionId) {
         try {
@@ -546,7 +548,7 @@ async function sendChat() {
       const meta = out.meta
         ? `mode=${out.meta.mode} · skills=${(out.meta.skillIds || []).join(',') || '-'} · history=${out.meta.historyTurns ?? out.meta.historyTurns ?? 0} · model=${out.meta.model || '-'}`
         : '';
-      appendBubble('assistant', out.reply || '(空回执)', {
+      appendBubble('assistant', out.reply || t('chat.emptyReply'), {
         meta,
         receipt: out.receipt || null,
         skillIds,
@@ -557,11 +559,11 @@ async function sendChat() {
     const last = log.lastElementChild;
     if (last && last.classList.contains('bubble-system')) last.remove();
     if (err?.name === 'AbortError' || abort.signal.aborted) {
-      appendBubble('system', '已取消', { persist: false });
-      toast('已取消等待', 'info');
+      appendBubble('system', t('chat.canceled'), { persist: false });
+      toast(t('chat.cancelWait'), 'info');
     } else {
       appendBubble('system', String(err), { persist: false });
-      toast('网络或服务错误', 'err');
+      toast(t('chat.networkErr'), 'err');
     }
   } finally {
     setSendBusy(false);
@@ -573,11 +575,11 @@ $('#btnSaveConfig').addEventListener('click', () => saveConfig());
 $('#btnRefresh').addEventListener('click', async () => {
   try {
     await withLoader(pageLoader, async (progress) => {
-      progress(0.25, '刷新 Skills…', 'agent_skills/');
+      progress(0.25, t('chat.refreshSkills'), 'agent_skills/');
       await refreshSkills();
-      progress(0.75, '刷新配置…', 'agent 链接');
+      progress(0.75, t('chat.refreshConfig'), t('chat.agentTitle'));
       await refreshConfig();
-    }, { text: '刷新 Chat 数据', detail: 'Skills · 配置' });
+    }, { text: t('chat.refreshTitle'), detail: t('chat.refreshDetail') });
   } catch (e) {
     toast(String(e.message || e), 'err');
   }
@@ -600,23 +602,23 @@ $('#chatInput').addEventListener('keydown', (e) => {
   restoreTurns();
   try {
     await withLoader(pageLoader, async (progress) => {
-      progress(0.15, '连接 API…', '/api/health');
+      progress(0.15, t('chat.bootConnect'), '/api/health');
       const health = await api('/api/health');
-      if (!health.ok) throw new Error('API 不可用');
-      $('#apiStatus').textContent = 'API 已连接';
+      if (!health.ok) throw new Error(t('chat.apiUnavailable'));
+      $('#apiStatus').textContent = t('chat.apiConnected');
       $('#apiStatus').dataset.ok = '1';
-      progress(0.45, '加载 Skills…', 'agent_skills/');
+      progress(0.45, t('chat.bootSkills'), 'agent_skills/');
       await refreshSkills();
-      progress(0.8, '加载配置…', 'Agent 链接');
+      progress(0.8, t('chat.bootConfig'), t('chat.agentTitle'));
       await refreshConfig();
-      progress(1, '就绪', '可以开始对话');
-    }, { text: '初始化 AI Chat', detail: '连接后端服务' });
+      progress(1, t('chat.bootReady'), t('chat.bootReadyDetail'));
+    }, { text: t('chat.bootTitle'), detail: t('chat.bootDetail') });
     renderChatFromState();
   } catch (e) {
-    $('#apiStatus').textContent = 'API 未连接 — 请用 ./serve.sh 启动';
+    $('#apiStatus').textContent = t('chat.apiDisconnected');
     $('#apiStatus').dataset.ok = '0';
     renderChatFromState();
-    appendBubble('system', String(e.message || e) + '\n静态 python -m http.server 没有 /api/*，需 scripts/agent_server.py。', { persist: false });
+    appendBubble('system', String(e.message || e) + '\n' + t('chat.staticServerHint'), { persist: false });
   }
 })();
 }
