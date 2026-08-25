@@ -40,4 +40,5 @@ frontend/node_modules/
 dist/
 
 # ACT
+act_robot
 act_robot/

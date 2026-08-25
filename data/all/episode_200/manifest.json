@@ -1,0 +1,768 @@
+{
+  "episode": 200,
+  "suite": "ec616_act_chunk",
+  "infer_file": "/root/autodl-tmp/act_robot/data/infer_2/episode_200.json",
+  "output_dir": "/root/autodl-tmp/embody_model_eval/data/all/episode_200",
+  "num_frames_written": 126,
+  "num_failed": 0,
+  "total_ik_failures": 36,
+  "frames": [
+    {
+      "raw_frame": 5,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0005.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.611129688436183
+    },
+    {
+      "raw_frame": 6,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0006.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.68757017282374
+    },
+    {
+      "raw_frame": 7,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0007.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.83131816079618
+    },
+    {
+      "raw_frame": 8,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0008.json",
+      "chunk_steps": 10,
+      "mean_l2": 33.909823504459304
+    },
+    {
+      "raw_frame": 9,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0009.json",
+      "chunk_steps": 10,
+      "mean_l2": 32.01205390997874
+    },
+    {
+      "raw_frame": 10,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0010.json",
+      "chunk_steps": 10,
+      "mean_l2": 31.70963665867929
+    },
+    {
+      "raw_frame": 11,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0011.json",
+      "chunk_steps": 10,
+      "mean_l2": 27.263613199428818
+    },
+    {
+      "raw_frame": 12,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0012.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.725030142674864
+    },
+    {
+      "raw_frame": 13,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0013.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.362304488750816
+    },
+    {
+      "raw_frame": 14,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0014.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.151572881695227
+    },
+    {
+      "raw_frame": 15,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0015.json",
+      "chunk_steps": 10,
+      "mean_l2": 28.399496949046018
+    },
+    {
+      "raw_frame": 16,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0016.json",
+      "chunk_steps": 10,
+      "mean_l2": 24.060022550206398
+    },
+    {
+      "raw_frame": 17,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0017.json",
+      "chunk_steps": 10,
+      "mean_l2": 18.452674317438543
+    },
+    {
+      "raw_frame": 18,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0018.json",
+      "chunk_steps": 10,
+      "mean_l2": 14.545714030908078
+    },
+    {
+      "raw_frame": 19,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0019.json",
+      "chunk_steps": 10,
+      "mean_l2": 13.09090541107742
+    },
+    {
+      "raw_frame": 20,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0020.json",
+      "chunk_steps": 10,
+      "mean_l2": 9.777386099662392
+    },
+    {
+      "raw_frame": 21,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0021.json",
+      "chunk_steps": 10,
+      "mean_l2": 11.451723140719963
+    },
+    {
+      "raw_frame": 22,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0022.json",
+      "chunk_steps": 10,
+      "mean_l2": 10.307194374329368
+    },
+    {
+      "raw_frame": 23,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0023.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.9675385793685
+    },
+    {
+      "raw_frame": 24,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0024.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.923599465889833
+    },
+    {
+      "raw_frame": 25,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0025.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.93964574978034
+    },
+    {
+      "raw_frame": 26,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0026.json",
+      "chunk_steps": 10,
+      "mean_l2": 9.46295394217302
+    },
+    {
+      "raw_frame": 27,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0027.json",
+      "chunk_steps": 10,
+      "mean_l2": 10.298226971232376
+    },
+    {
+      "raw_frame": 28,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0028.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.923104470603425
+    },
+    {
+      "raw_frame": 29,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0029.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.709198797264186
+    },
+    {
+      "raw_frame": 30,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0030.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.513451237969091
+    },
+    {
+      "raw_frame": 31,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0031.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.49014435790462
+    },
+    {
+      "raw_frame": 32,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0032.json",
+      "chunk_steps": 10,
+      "mean_l2": 9.118242238823438
+    },
+    {
+      "raw_frame": 33,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0033.json",
+      "chunk_steps": 10,
+      "mean_l2": 9.068116717848255
+    },
+    {
+      "raw_frame": 34,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0034.json",
+      "chunk_steps": 10,
+      "mean_l2": 9.097700049320498
+    },
+    {
+      "raw_frame": 35,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0035.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.854057874125424
+    },
+    {
+      "raw_frame": 36,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0036.json",
+      "chunk_steps": 10,
+      "mean_l2": 7.657661818628348
+    },
+    {
+      "raw_frame": 37,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0037.json",
+      "chunk_steps": 10,
+      "mean_l2": 7.649836061623509
+    },
+    {
+      "raw_frame": 38,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0038.json",
+      "chunk_steps": 10,
+      "mean_l2": 9.054312417694982
+    },
+    {
+      "raw_frame": 39,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0039.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.385087956404162
+    },
+    {
+      "raw_frame": 40,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0040.json",
+      "chunk_steps": 10,
+      "mean_l2": 6.674513660794406
+    },
+    {
+      "raw_frame": 41,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0041.json",
+      "chunk_steps": 10,
+      "mean_l2": 5.466206890505855
+    },
+    {
+      "raw_frame": 42,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0042.json",
+      "chunk_steps": 10,
+      "mean_l2": 6.9364366518325955
+    },
+    {
+      "raw_frame": 43,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0043.json",
+      "chunk_steps": 10,
+      "mean_l2": 8.978798991549127
+    },
+    {
+      "raw_frame": 44,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0044.json",
+      "chunk_steps": 10,
+      "mean_l2": 9.967109994219864
+    },
+    {
+      "raw_frame": 45,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0045.json",
+      "chunk_steps": 10,
+      "mean_l2": 10.131633152724667
+    },
+    {
+      "raw_frame": 46,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0046.json",
+      "chunk_steps": 10,
+      "mean_l2": 12.421507829907814
+    },
+    {
+      "raw_frame": 47,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0047.json",
+      "chunk_steps": 10,
+      "mean_l2": 12.022435326346997
+    },
+    {
+      "raw_frame": 48,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0048.json",
+      "chunk_steps": 10,
+      "mean_l2": 13.294038063629788
+    },
+    {
+      "raw_frame": 49,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0049.json",
+      "chunk_steps": 10,
+      "mean_l2": 20.569949861047746
+    },
+    {
+      "raw_frame": 50,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0050.json",
+      "chunk_steps": 10,
+      "mean_l2": 24.25730539021108
+    },
+    {
+      "raw_frame": 51,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0051.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.83358782461881
+    },
+    {
+      "raw_frame": 52,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0052.json",
+      "chunk_steps": 10,
+      "mean_l2": 28.23852644333136
+    },
+    {
+      "raw_frame": 53,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0053.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.76025767744577
+    },
+    {
+      "raw_frame": 54,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0054.json",
+      "chunk_steps": 10,
+      "mean_l2": 25.459340507657508
+    },
+    {
+      "raw_frame": 55,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0055.json",
+      "chunk_steps": 10,
+      "mean_l2": 33.536650488848316
+    },
+    {
+      "raw_frame": 56,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0056.json",
+      "chunk_steps": 10,
+      "mean_l2": 32.08278488639984
+    },
+    {
+      "raw_frame": 57,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0057.json",
+      "chunk_steps": 10,
+      "mean_l2": 28.071775802817417
+    },
+    {
+      "raw_frame": 58,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0058.json",
+      "chunk_steps": 10,
+      "mean_l2": 29.045968972904824
+    },
+    {
+      "raw_frame": 59,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0059.json",
+      "chunk_steps": 10,
+      "mean_l2": 21.469064107768634
+    },
+    {
+      "raw_frame": 60,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0060.json",
+      "chunk_steps": 10,
+      "mean_l2": 21.070693849958207
+    },
+    {
+      "raw_frame": 61,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0061.json",
+      "chunk_steps": 10,
+      "mean_l2": 27.15097632528445
+    },
+    {
+      "raw_frame": 62,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0062.json",
+      "chunk_steps": 10,
+      "mean_l2": 24.498979821756482
+    },
+    {
+      "raw_frame": 63,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0063.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.567394664687185
+    },
+    {
+      "raw_frame": 64,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0064.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.645126430641096
+    },
+    {
+      "raw_frame": 65,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0065.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.263346902142324
+    },
+    {
+      "raw_frame": 66,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0066.json",
+      "chunk_steps": 10,
+      "mean_l2": 27.921984446351207
+    },
+    {
+      "raw_frame": 67,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0067.json",
+      "chunk_steps": 10,
+      "mean_l2": 27.152440381655488
+    },
+    {
+      "raw_frame": 68,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0068.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.437810047618644
+    },
+    {
+      "raw_frame": 69,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0069.json",
+      "chunk_steps": 10,
+      "mean_l2": 24.820802940827782
+    },
+    {
+      "raw_frame": 70,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0070.json",
+      "chunk_steps": 10,
+      "mean_l2": 28.912007533404676
+    },
+    {
+      "raw_frame": 71,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0071.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.094447030866906
+    },
+    {
+      "raw_frame": 72,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0072.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.780107220706288
+    },
+    {
+      "raw_frame": 73,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0073.json",
+      "chunk_steps": 10,
+      "mean_l2": 22.989630545132123
+    },
+    {
+      "raw_frame": 74,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0074.json",
+      "chunk_steps": 10,
+      "mean_l2": 19.554998776553013
+    },
+    {
+      "raw_frame": 75,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0075.json",
+      "chunk_steps": 10,
+      "mean_l2": 17.782291120616883
+    },
+    {
+      "raw_frame": 76,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0076.json",
+      "chunk_steps": 10,
+      "mean_l2": 18.7518628783208
+    },
+    {
+      "raw_frame": 77,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0077.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.225457055970644
+    },
+    {
+      "raw_frame": 78,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0078.json",
+      "chunk_steps": 10,
+      "mean_l2": 27.02689600474319
+    },
+    {
+      "raw_frame": 79,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0079.json",
+      "chunk_steps": 10,
+      "mean_l2": 28.952535936344002
+    },
+    {
+      "raw_frame": 80,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0080.json",
+      "chunk_steps": 10,
+      "mean_l2": 31.222400233394996
+    },
+    {
+      "raw_frame": 81,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0081.json",
+      "chunk_steps": 10,
+      "mean_l2": 34.27332170845641
+    },
+    {
+      "raw_frame": 82,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0082.json",
+      "chunk_steps": 10,
+      "mean_l2": 34.62594081164006
+    },
+    {
+      "raw_frame": 83,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0083.json",
+      "chunk_steps": 10,
+      "mean_l2": 32.83001434763237
+    },
+    {
+      "raw_frame": 84,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0084.json",
+      "chunk_steps": 10,
+      "mean_l2": 31.438989975531978
+    },
+    {
+      "raw_frame": 85,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0085.json",
+      "chunk_steps": 10,
+      "mean_l2": 37.36585603060056
+    },
+    {
+      "raw_frame": 86,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0086.json",
+      "chunk_steps": 10,
+      "mean_l2": 36.20273029018513
+    },
+    {
+      "raw_frame": 87,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0087.json",
+      "chunk_steps": 10,
+      "mean_l2": 34.43338257427303
+    },
+    {
+      "raw_frame": 88,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0088.json",
+      "chunk_steps": 10,
+      "mean_l2": 33.4646886165141
+    },
+    {
+      "raw_frame": 89,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0089.json",
+      "chunk_steps": 10,
+      "mean_l2": 32.80341193087473
+    },
+    {
+      "raw_frame": 90,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0090.json",
+      "chunk_steps": 10,
+      "mean_l2": 34.21201758152945
+    },
+    {
+      "raw_frame": 91,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0091.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.2245740184059
+    },
+    {
+      "raw_frame": 92,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0092.json",
+      "chunk_steps": 10,
+      "mean_l2": 25.35755282721001
+    },
+    {
+      "raw_frame": 93,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0093.json",
+      "chunk_steps": 10,
+      "mean_l2": 19.951350188624396
+    },
+    {
+      "raw_frame": 94,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0094.json",
+      "chunk_steps": 10,
+      "mean_l2": 18.415812749610495
+    },
+    {
+      "raw_frame": 95,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0095.json",
+      "chunk_steps": 10,
+      "mean_l2": 24.31994872729148
+    },
+    {
+      "raw_frame": 96,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0096.json",
+      "chunk_steps": 10,
+      "mean_l2": 20.58076517183663
+    },
+    {
+      "raw_frame": 97,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0097.json",
+      "chunk_steps": 10,
+      "mean_l2": 20.28449987805366
+    },
+    {
+      "raw_frame": 98,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0098.json",
+      "chunk_steps": 10,
+      "mean_l2": 25.776873259590786
+    },
+    {
+      "raw_frame": 99,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0099.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.355512748201306
+    },
+    {
+      "raw_frame": 100,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0100.json",
+      "chunk_steps": 10,
+      "mean_l2": 25.09124647073838
+    },
+    {
+      "raw_frame": 101,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0101.json",
+      "chunk_steps": 10,
+      "mean_l2": 21.20181643561063
+    },
+    {
+      "raw_frame": 102,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0102.json",
+      "chunk_steps": 10,
+      "mean_l2": 19.199265910897374
+    },
+    {
+      "raw_frame": 103,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0103.json",
+      "chunk_steps": 10,
+      "mean_l2": 16.484682002064574
+    },
+    {
+      "raw_frame": 104,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0104.json",
+      "chunk_steps": 10,
+      "mean_l2": 19.278657918121922
+    },
+    {
+      "raw_frame": 105,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0105.json",
+      "chunk_steps": 10,
+      "mean_l2": 18.800832883734547
+    },
+    {
+      "raw_frame": 106,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0106.json",
+      "chunk_steps": 10,
+      "mean_l2": 21.07348587051853
+    },
+    {
+      "raw_frame": 107,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0107.json",
+      "chunk_steps": 10,
+      "mean_l2": 19.98448564926924
+    },
+    {
+      "raw_frame": 108,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0108.json",
+      "chunk_steps": 10,
+      "mean_l2": 22.12019813439377
+    },
+    {
+      "raw_frame": 109,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0109.json",
+      "chunk_steps": 10,
+      "mean_l2": 23.554485522130456
+    },
+    {
+      "raw_frame": 110,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0110.json",
+      "chunk_steps": 10,
+      "mean_l2": 25.09901033354819
+    },
+    {
+      "raw_frame": 111,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0111.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.224645588188366
+    },
+    {
+      "raw_frame": 112,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0112.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.534951178264457
+    },
+    {
+      "raw_frame": 113,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0113.json",
+      "chunk_steps": 10,
+      "mean_l2": 31.082323824511302
+    },
+    {
+      "raw_frame": 114,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0114.json",
+      "chunk_steps": 10,
+      "mean_l2": 30.450169009257774
+    },
+    {
+      "raw_frame": 115,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0115.json",
+      "chunk_steps": 10,
+      "mean_l2": 34.70406675188021
+    },
+    {
+      "raw_frame": 116,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0116.json",
+      "chunk_steps": 10,
+      "mean_l2": 36.26775415744425
+    },
+    {
+      "raw_frame": 117,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0117.json",
+      "chunk_steps": 10,
+      "mean_l2": 26.02255891018249
+    },
+    {
+      "raw_frame": 118,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0118.json",
+      "chunk_steps": 10,
+      "mean_l2": 22.736067712007824
+    },
+    {
+      "raw_frame": 119,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0119.json",
+      "chunk_steps": 10,
+      "mean_l2": 17.660956098149807
+    },
+    {
+      "raw_frame": 120,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0120.json",
+      "chunk_steps": 10,
+      "mean_l2": 15.289535030679698
+    },
+    {
+      "raw_frame": 121,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0121.json",
+      "chunk_steps": 10,
+      "mean_l2": 14.86693084870971
+    },
+    {
+      "raw_frame": 122,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0122.json",
+      "chunk_steps": 9,
+      "mean_l2": 11.163079898854226
+    },
+    {
+      "raw_frame": 123,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0123.json",
+      "chunk_steps": 8,
+      "mean_l2": 12.85656824241308
+    },
+    {
+      "raw_frame": 124,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0124.json",
+      "chunk_steps": 7,
+      "mean_l2": 10.113614744852594
+    },
+    {
+      "raw_frame": 125,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0125.json",
+      "chunk_steps": 6,
+      "mean_l2": 8.288042430335707
+    },
+    {
+      "raw_frame": 126,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0126.json",
+      "chunk_steps": 5,
+      "mean_l2": 6.520649978620867
+    },
+    {
+      "raw_frame": 127,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0127.json",
+      "chunk_steps": 4,
+      "mean_l2": 6.597418230001164
+    },
+    {
+      "raw_frame": 128,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0128.json",
+      "chunk_steps": 3,
+      "mean_l2": 6.7723922935910394
+    },
+    {
+      "raw_frame": 129,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0129.json",
+      "chunk_steps": 2,
+      "mean_l2": 6.8006291794250755
+    },
+    {
+      "raw_frame": 130,
+      "path": "/root/autodl-tmp/embody_model_eval/data/all/episode_200/frame_0130.json",
+      "chunk_steps": 1,
+      "mean_l2": 8.308799940525741
+    }
+  ],
+  "errors": []
+}

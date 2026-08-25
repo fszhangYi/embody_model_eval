@@ -1,0 +1,9 @@
+{
+  "suite": "ec616_act",
+  "infer_dir": "/root/autodl-tmp/act_robot/data/infer_3",
+  "output_dir": "/root/autodl-tmp/embody_model_eval/data/half",
+  "num_converted": 167,
+  "num_failed": 0,
+  "elapsed_sec": 93.53941996814683,
+  "errors": []
+}
