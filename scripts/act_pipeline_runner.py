@@ -151,6 +151,113 @@ def _exec_fields(ar: Path, script_rel: str, script_hint: str, fields: list[dict[
     ]
 
 
+def parse_script_args(script_path: str) -> dict[str, Any]:
+    """Parse argparse.add_argument flags from a Python train-like script via AST."""
+    import ast
+
+    path = Path(script_path).expanduser().resolve()
+    if not path.is_file():
+        raise FileNotFoundError(f"script not found: {path}")
+    try:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    except SyntaxError as e:
+        raise ValueError(f"无法解析脚本: {e}") from e
+
+    def _literal(node: ast.AST | None) -> Any:
+        if node is None:
+            return None
+        try:
+            return ast.literal_eval(node)
+        except Exception:
+            if isinstance(node, ast.Name):
+                # type=int / float / str
+                if node.id in ("int", "float", "str", "bool"):
+                    return node.id
+                if node.id == "True":
+                    return True
+                if node.id == "False":
+                    return False
+                if node.id == "None":
+                    return None
+            return None
+
+    args_out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        is_add = (
+            isinstance(func, ast.Attribute) and func.attr == "add_argument"
+        ) or (isinstance(func, ast.Name) and func.id == "add_argument")
+        if not is_add:
+            continue
+        opt_names: list[str] = []
+        for a in node.args:
+            v = _literal(a)
+            if isinstance(v, str) and v.startswith("--"):
+                opt_names.append(v.lstrip("-"))
+        if not opt_names:
+            continue
+        flag = opt_names[0]
+        if flag in seen:
+            continue
+        seen.add(flag)
+        meta: dict[str, Any] = {
+            "flag": flag,
+            "cli": f"--{flag}",
+            "required": False,
+            "action": None,
+            "type": None,
+            "default": None,
+            "choices": None,
+            "nargs": None,
+            "help": "",
+            "sweepable": True,
+        }
+        for kw in node.keywords:
+            if kw.arg == "required":
+                meta["required"] = bool(_literal(kw.value))
+            elif kw.arg == "action":
+                meta["action"] = _literal(kw.value)
+            elif kw.arg == "type":
+                t = _literal(kw.value)
+                meta["type"] = t if isinstance(t, str) else None
+            elif kw.arg == "default":
+                meta["default"] = _literal(kw.value)
+            elif kw.arg == "choices":
+                meta["choices"] = _literal(kw.value)
+            elif kw.arg == "nargs":
+                meta["nargs"] = _literal(kw.value)
+            elif kw.arg == "help":
+                h = _literal(kw.value)
+                meta["help"] = h if isinstance(h, str) else ""
+        if meta["action"] == "store_true":
+            meta["type"] = "bool"
+            if meta["default"] is None:
+                meta["default"] = False
+        elif meta["type"] is None:
+            meta["type"] = "str"
+        # Paths / resume are fixed via dedicated UI fields or not meaningful for sweep
+        if flag in {"data-dir", "ckpt-dir", "resume-from"}:
+            meta["sweepable"] = False
+        args_out.append(meta)
+
+    # Preferred default sweep set for throughput search
+    default_sweep = {
+        "batch-size": ["8", "16", "24", "32"],
+        "num-workers": ["4", "8", "12", "16"],
+        "hdf5-cache-size": ["8", "16"],
+    }
+    return {
+        "ok": True,
+        "scriptPath": str(path),
+        "args": args_out,
+        "defaultSweepFlags": [k for k in default_sweep if any(a["flag"] == k for a in args_out)],
+        "defaultSweepValues": {k: v for k, v in default_sweep.items() if any(a["flag"] == k for a in args_out)},
+    }
+
+
 def pipeline_spec(act_root: str | None = None, embody_root: str | None = None) -> dict[str, Any]:
     ar = _resolve_dir(act_root) if act_root else ACT_ROBOT_ROOT
     er = _resolve_dir(embody_root) if embody_root else EMBODY_ROOT
@@ -249,6 +356,29 @@ def pipeline_spec(act_root: str | None = None, embody_root: str | None = None) -
                 {"key": "resumeFrom", "label": "resume-from（checkpoint）", "type": "path", "pathKind": "file", "browseRoot": "act", "io": "config", "default": ""},
                 {"key": "earlyStopPatience", "label": "early-stop-patience", "type": "number", "io": "config", "default": 100},
                 {"key": "earlyStopThreshold", "label": "early-stop-threshold", "type": "number", "io": "config", "default": 0.002},
+                ],
+            ),
+        },
+        {
+            "id": "hyperparam_bench",
+            "step": 3,
+            "title": "超参吞吐搜索",
+            "subtitle": "bench_hyperparam_combos.py",
+            "description": "从 train 脚本解析超参，勾选搜索维度与候选值后短测吞吐，输出最快组合。",
+            "variant": True,
+            "outputs": ["outJson"],
+            "ui": "hyperparam_bench",
+            "fields": _exec_fields(
+                ar,
+                "train.py",
+                "train.py（用于解析超参）",
+                [
+                {"key": "dataDir", "label": "HDF5 目录", "type": "path", "pathKind": "dir", "browseRoot": "act", "io": "input", "default": paths["convertedDir"]},
+                {"key": "trainSteps", "label": "每组计时 train steps", "type": "number", "io": "config", "default": 30},
+                {"key": "valSteps", "label": "每组 val steps", "type": "number", "io": "config", "default": 10},
+                {"key": "outJson", "label": "结果 JSON", "type": "path", "pathKind": "file", "browseRoot": "act", "io": "output", "default": str(ar / "data" / "bench_hyperparam_best.json")},
+                {"key": "sweepJson", "label": "sweep-json", "type": "text", "io": "config", "default": "{}", "hidden": True},
+                {"key": "baseJson", "label": "base-json", "type": "text", "io": "config", "default": "{}", "hidden": True},
                 ],
             ),
         },
@@ -503,6 +633,28 @@ def build_argv(step_id: str, params: dict[str, Any]) -> tuple[list[str], Path, s
         _append_flag_if(argv, "useCvae", p)
         _append_flag_if(argv, "cosineLr", p)
         _append_arg_if(argv, "resumeFrom", p.get("resumeFrom"), skip_empty=True)
+    elif step_id == "hyperparam_bench":
+        # Always run the combo bench harness under act_robot, regardless of
+        # which train.py was selected for argparse discovery.
+        bench = act_root / "scripts" / "bench_hyperparam_combos.py"
+        if not bench.is_file():
+            raise FileNotFoundError(f"bench script not found: {bench}")
+        argv = [PYTHON, str(bench)]
+        argv += [
+            _flag("dataDir"), str(p["dataDir"]),
+            _flag("trainSteps"), str(p["trainSteps"]),
+            _flag("valSteps"), str(p["valSteps"]),
+            "--out", str(p["outJson"]),
+            "--base-json", str(p.get("baseJson") or "{}"),
+            "--sweep-json", str(p.get("sweepJson") or "{}"),
+        ]
+        sweep_raw = str(p.get("sweepJson") or "{}").strip()
+        try:
+            sweep_obj = json.loads(sweep_raw) if sweep_raw else {}
+        except json.JSONDecodeError as e:
+            raise ValueError(f"sweepJson 不是合法 JSON: {e}") from e
+        if not isinstance(sweep_obj, dict) or not sweep_obj:
+            raise ValueError("请至少勾选一个超参并填写候选值后再运行")
     elif step_id == "infer_batch":
         argv += [
             _flag("filterJson"), str(p["filterJson"]),

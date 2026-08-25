@@ -13,6 +13,7 @@ Endpoints:
   GET    /api/pipeline/graphs
   PUT    /api/pipeline/graphs
   GET    /api/act-pipeline/spec
+  GET    /api/act-pipeline/parse-args?scriptPath=
   GET    /api/act-pipeline/link
   POST   /api/act-pipeline/link
   DELETE /api/act-pipeline/link
@@ -54,6 +55,7 @@ from act_pipeline_runner import (
     get_job,
     link_status,
     list_jobs,
+    parse_script_args,
     pipeline_spec,
     remove_act_link,
     start_job,
@@ -744,6 +746,17 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 self._send_json(pipeline_spec(act_root, embody_root))
             except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/api/act-pipeline/parse-args":
+            qs = parse_qs(parsed.query)
+            script_path = (qs.get("scriptPath") or qs.get("path") or [""])[0]
+            if not script_path:
+                self._send_json({"ok": False, "error": "scriptPath required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(parse_script_args(str(script_path)))
+            except (FileNotFoundError, ValueError) as e:
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
         if path == "/api/act-pipeline/link":

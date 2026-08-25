@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PathPickerModal } from '../components/PathPickerModal'
 import { PageNav } from '../components/PageNav'
 import { cancelJob, deleteJob, fetchJob, fetchJobs, fetchPipelineSpec, createActLink, removeActLink, runPipelineStep } from '../features/actPipeline/api'
+import { HyperparamBenchPanel } from '../features/actPipeline/HyperparamBenchPanel'
 import { TrainMemoryGuide } from '../features/actPipeline/TrainMemoryGuide'
 import type { BrowseRoot, PipelineJob, PipelineSpec, PipelineStep, StepField } from '../features/actPipeline/types'
 import '../styles/act-pipeline.css'
@@ -376,6 +377,14 @@ export function ActPipelinePage() {
     }))
   }
 
+  const setFields = (patch: Record<string, string | number | boolean>) => {
+    if (!step || !linkReady) return
+    setParams((prev) => ({
+      ...prev,
+      [step.id]: { ...(prev[step.id] ?? defaultParams(step)), ...patch },
+    }))
+  }
+
   const applyEmbodyRoot = (next: string) => {
     if (next === embodyRoot) return
     if (embodyRoot.trim()) void removeActLink(embodyRoot.trim())
@@ -549,11 +558,17 @@ export function ActPipelinePage() {
                     disabled={busy || !linkReady}
                     onClick={() => void onRun()}
                   >
-                    {busy ? '启动中…' : '运行此步骤'}
+                    {busy
+                      ? '启动中…'
+                      : step.id === 'hyperparam_bench'
+                        ? '开始超参搜索'
+                        : '运行此步骤'}
                   </button>
                 </div>
                 <div className="act-fields">
-                  {step.fields.map((f) => (
+                  {step.fields
+                    .filter((f) => !f.hidden)
+                    .map((f) => (
                     <FieldInput
                       key={f.key}
                       field={f}
@@ -570,6 +585,17 @@ export function ActPipelinePage() {
                     />
                   ))}
                 </div>
+                {step.id === 'hyperparam_bench' || step.ui === 'hyperparam_bench' ? (
+                  <HyperparamBenchPanel
+                    scriptPath={String(currentParams.scriptPath ?? '')}
+                    disabled={!linkReady}
+                    sweepJson={String(currentParams.sweepJson ?? '{}')}
+                    baseJson={String(currentParams.baseJson ?? '{}')}
+                    onChangeJson={(sweep, base) => {
+                      setFields({ sweepJson: sweep, baseJson: base })
+                    }}
+                  />
+                ) : null}
               </div>
               {step.id === 'train' ? (
                 <TrainMemoryGuide

@@ -57,6 +57,32 @@ export function runPipelineStep(
   })
 }
 
+export interface ParsedTrainArg {
+  flag: string
+  cli: string
+  required?: boolean
+  action?: string | null
+  type?: string | null
+  default?: unknown
+  choices?: unknown
+  nargs?: unknown
+  help?: string
+  sweepable?: boolean
+}
+
+export interface ParseTrainArgsResponse {
+  ok: boolean
+  scriptPath: string
+  args: ParsedTrainArg[]
+  defaultSweepFlags: string[]
+  defaultSweepValues: Record<string, string[]>
+}
+
+export function parseTrainScriptArgs(scriptPath: string) {
+  const qs = new URLSearchParams({ scriptPath })
+  return api<ParseTrainArgsResponse>(`/api/act-pipeline/parse-args?${qs}`)
+}
+
 export function cancelJob(id: string) {
   return api<{ ok: boolean; job: PipelineJob }>(
     `/api/act-pipeline/jobs/${encodeURIComponent(id)}/cancel`,

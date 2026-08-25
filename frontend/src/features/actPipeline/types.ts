@@ -14,6 +14,7 @@ export interface StepField {
   pathKind?: PathKind
   browseRoot?: BrowseRoot
   hint?: string
+  hidden?: boolean
 }
 
 export interface PipelineStep {
@@ -24,6 +25,7 @@ export interface PipelineStep {
   description: string
   variant?: boolean
   outputs?: string[]
+  ui?: string
   fields: StepField[]
 }
 
