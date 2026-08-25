@@ -94,8 +94,11 @@ AutoDL 若映射端口 6006，使用控制台公网地址。
    - `openai`：兼容 `/chat/completions` 网关（提交完整 messages，含历史）
    - `webhook`：向自定义 URL POST `{ message, history, skills, messages }`
    - `cursor_sdk`：可选 `pip install cursor-sdk`，用 API Key 跑本地 Agent（选中 skill 写入临时 project skills）
+   - `dsh_agent`：转发到本机 `embody_dsh_agent` 桥接（默认 `http://127.0.0.1:8790/agent/run`），支持 Skill 工具循环 / bash / 改文件
 
-配置保存在 `agent_skills/.agent_config.json`（已 gitignore）；也可用环境变量 `CURSOR_API_KEY` / `AGENT_API_KEY`。会话历史仅存本机 `localStorage`，不与其它页面耦合。
+配置保存在 `agent_skills/.agent_config.json`（已 gitignore）；也可用环境变量 `CURSOR_API_KEY` / `AGENT_API_KEY`。`dsh_agent` 也可设 `DSH_BRIDGE_URL`。会话历史仅存本机 `localStorage`，不与其它页面耦合。
+
+> 公网只开一个端口时：评测服务监听 `6008`，dsh bridge 监听本机 `127.0.0.1:8790`，由 Chat 服务端转发。
 
 ## 评测数据
 

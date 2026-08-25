@@ -405,6 +405,79 @@ def http_json(url: str, payload: dict[str, Any], api_key: str, timeout: float = 
         return {"ok": False, "status": 0, "message": str(e)}
 
 
+def try_dsh_agent(
+    message: str,
+    skills: list[dict[str, Any]],
+    cfg: dict[str, Any],
+    history: list[dict[str, str]],
+    session_id: str | None = None,
+) -> dict[str, Any]:
+    """Forward chat to embody_dsh_agent bridge (DeepSeek Harness + skills/tools)."""
+    base = (
+        (cfg.get("baseUrl") or "").strip()
+        or os.environ.get("DSH_BRIDGE_URL", "").strip()
+        or "http://127.0.0.1:8790"
+    ).rstrip("/")
+    path = (cfg.get("path") or "/agent/run").strip() or "/agent/run"
+    if not path.startswith("/"):
+        path = "/" + path
+    url = base + path
+
+    parts: list[str] = []
+    if skills:
+        names = ", ".join(s.get("id") or s.get("name") or "?" for s in skills)
+        parts.append(
+            "用户在评测 Chat 中勾选了以下 Skill（若 harness 侧有同名 skill，请按需调用）："
+            + names
+        )
+    if history:
+        hist_lines = []
+        for h in history[-12:]:
+            hist_lines.append(f"{h.get('role')}: {h.get('content')}")
+        parts.append("对话上文：\n" + "\n".join(hist_lines))
+    parts.append("当前用户诉求：\n" + message)
+    full_message = "\n\n".join(parts)
+
+    payload_body: dict[str, Any] = {"message": full_message}
+    if session_id:
+        payload_body["sessionId"] = session_id
+
+    # Agent 循环可能较久
+    resp = http_json(url, payload_body, cfg.get("apiKey") or "", timeout=300.0)
+    if not resp.get("ok"):
+        return {
+            "ok": False,
+            "message": resp.get("message")
+            or "无法连接 embody_dsh_agent 桥接（请确认 bridge_server 已在本机启动）",
+            "status": resp.get("status"),
+            "url": url,
+            "error": resp.get("error"),
+        }
+    data = resp.get("data")
+    if not isinstance(data, dict):
+        return {"ok": False, "message": "dsh bridge 返回非 JSON 对象", "url": url, "raw": data}
+    if data.get("ok") is False:
+        return {
+            "ok": False,
+            "message": data.get("error") or "dsh_agent 执行失败",
+            "url": url,
+            "status": resp.get("status"),
+            "raw": data,
+        }
+    reply = data.get("reply")
+    if reply is None:
+        reply = extract_openai_text(data)
+    return {
+        "ok": True,
+        "reply": str(reply or ""),
+        "sessionId": data.get("sessionId") or session_id,
+        "finishReason": data.get("finishReason"),
+        "url": url,
+        "status": resp.get("status"),
+        "raw": data,
+    }
+
+
 def extract_openai_text(data: Any) -> str:
     if not isinstance(data, dict):
         return str(data)
@@ -570,6 +643,35 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
             "ok": True,
             "reply": out.get("reply") or "",
             "meta": {**meta, "agentId": out.get("agentId"), "runId": out.get("runId"), "status": out.get("status")},
+        }
+
+    if mode == "dsh_agent":
+        # embody_dsh_agent HTTP bridge（默认本机 8790；可由 baseUrl/path 覆盖）
+        out = try_dsh_agent(
+            message,
+            skills,
+            cfg,
+            history,
+            session_id=str(payload.get("sessionId") or "").strip() or None,
+        )
+        if not out.get("ok"):
+            return {
+                "ok": False,
+                "error": out.get("message") or "dsh_agent failed",
+                "detail": out,
+                "meta": {**meta, "url": out.get("url"), "httpStatus": out.get("status")},
+            }
+        return {
+            "ok": True,
+            "reply": out.get("reply") or "",
+            "meta": {
+                **meta,
+                "url": out.get("url"),
+                "httpStatus": out.get("status"),
+                "sessionId": out.get("sessionId"),
+                "finishReason": out.get("finishReason"),
+            },
+            "raw": out.get("raw"),
         }
 
     base = (cfg.get("baseUrl") or "").rstrip("/")

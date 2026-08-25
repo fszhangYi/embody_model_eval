@@ -403,8 +403,16 @@ function fillConfigForm(cfg) {
 
 function toggleLinkFields() {
   const mode = $('#cfgMode').value;
-  const needUrl = mode === 'openai' || mode === 'webhook';
+  const needUrl = mode === 'openai' || mode === 'webhook' || mode === 'dsh_agent';
   $('#linkFields').hidden = !needUrl;
+  if (mode === 'dsh_agent') {
+    if (!$('#cfgBaseUrl').value.trim()) $('#cfgBaseUrl').value = 'http://127.0.0.1:8790';
+    if (!$('#cfgPath').value.trim() || $('#cfgPath').value.trim() === '/chat/completions') {
+      $('#cfgPath').value = '/agent/run';
+    }
+    $('#cfgBaseUrl').placeholder = 'http://127.0.0.1:8790（embody_dsh_agent bridge）';
+    $('#cfgPath').placeholder = '/agent/run';
+  }
 }
 
 async function refreshSkills() {
@@ -483,15 +491,29 @@ async function sendChat() {
   appendBubble('system', '发送中…', { persist: false });
 
   try {
+    const body = {
+      message,
+      skillIds,
+      history,
+      config: configOverride,
+    };
+    if (configOverride.mode === 'dsh_agent') {
+      let sid = '';
+      try {
+        sid = localStorage.getItem('embody_dsh_session') || '';
+      } catch (_) {}
+      if (!sid) {
+        sid = `chat-${Date.now().toString(36)}`;
+        try {
+          localStorage.setItem('embody_dsh_session', sid);
+        } catch (_) {}
+      }
+      body.sessionId = sid;
+    }
     const out = await api('/api/chat', {
       method: 'POST',
       signal: abort.signal,
-      body: JSON.stringify({
-        message,
-        skillIds,
-        history,
-        config: configOverride,
-      }),
+      body: JSON.stringify(body),
     });
     const log = $('#chatLog');
     const last = log.lastElementChild;
@@ -501,6 +523,11 @@ async function sendChat() {
       appendBubble('system', `失败：${out.error || JSON.stringify(out.detail || out)}`, { persist: false });
       toast(out.error || '调用失败', 'err');
     } else {
+      if (out.meta?.sessionId) {
+        try {
+          localStorage.setItem('embody_dsh_session', out.meta.sessionId);
+        } catch (_) {}
+      }
       const meta = out.meta
         ? `mode=${out.meta.mode} · skills=${(out.meta.skillIds || []).join(',') || '-'} · history=${out.meta.historyTurns ?? 0} · model=${out.meta.model || '-'}`
         : '';
