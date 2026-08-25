@@ -10,3 +10,8 @@
 # act_robot/scripts/compare_pose_offline.py (--mode simulate):
 # numpy>=1.24
 # pyarrow>=14.0
+#
+# Optional — sensors page arm_kin FK/IK (also listed in arm_kin/requirements.txt):
+# numpy>=1.20,<1.25
+# scipy>=1.9,<1.11
+# pytest>=7.0,<8.0

@@ -1,0 +1,159 @@
+import type { ArmStatusResponse } from './armApi'
+import type { SensorDevice } from './types'
+
+export function ArmLivePanel({
+  device,
+  arm,
+  busy,
+  onSelectTeach,
+}: {
+  device: SensorDevice
+  arm: ArmStatusResponse | undefined
+  busy: boolean
+  onSelectTeach?: (index: number) => void
+}) {
+  const { detail } = device
+  const teachSamples = arm?.teachCheck?.samples
+
+  return (
+    <>
+      <p className="sensors-modal-summary">{detail.summary}</p>
+
+      <div className="sensors-modal-preview">
+        {arm?.pose ? (
+          <div className="sensors-arm-preview">
+            <div className="sensors-arm-preview-row">
+              <span className="muted">法兰 TCP (mm)</span>
+              <strong>{arm.pose.tcpText}</strong>
+            </div>
+            <div className="sensors-arm-preview-row">
+              <span className="muted">姿态 XYZ (°)</span>
+              <strong>{arm.pose.rpyText}</strong>
+            </div>
+            <div className="sensors-arm-preview-row">
+              <span className="muted">关节 (°)</span>
+              <code>{arm.pose.jointText}</code>
+            </div>
+            {arm.config?.teachPoseCount ? (
+              <div className="sensors-arm-teach-btns">
+                <span className="muted">示教点</span>
+                {Array.from({ length: Math.min(arm.config.teachPoseCount, 9) }, (_, i) => i + 1).map(
+                  (n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className="sensors-btn ghost"
+                      disabled={busy || !onSelectTeach}
+                      onClick={() => onSelectTeach?.(n)}
+                    >
+                      #{n}
+                    </button>
+                  ),
+                )}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <span className="muted">机械臂位姿（加载中或 arm_kin 不可用）</span>
+        )}
+      </div>
+
+      <dl className="sensors-metrics sensors-metrics-lg">
+        {device.metrics.map((m) => (
+          <div key={m.label} className="sensors-metric">
+            <dt>{m.label}</dt>
+            <dd>{m.value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="sensors-modal-sections">
+        {detail.sections.map((sec) => (
+          <section key={sec.title} className="sensors-modal-section">
+            <h3>{sec.title}</h3>
+            <table>
+              <tbody>
+                {sec.rows.map((row) => (
+                  <tr key={row.label}>
+                    <th scope="row">{row.label}</th>
+                    <td>{row.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        ))}
+      </div>
+
+      {teachSamples?.length ? (
+        <section className="sensors-modal-section">
+          <h3>示教样本误差（arm_kin 回归）</h3>
+          <div className="sensors-teach-table-wrap">
+            <table className="sensors-teach-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>err (mm)</th>
+                  <th>FK xyz</th>
+                  <th>示教 xyz</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {teachSamples.map((s) => (
+                  <tr key={s.index} data-ok={s.ok ? '1' : '0'}>
+                    <td>{s.index}</td>
+                    <td>{s.errMm.toFixed(4)}</td>
+                    <td>
+                      <code>{s.fkMm.map((x) => x.toFixed(1)).join(', ')}</code>
+                    </td>
+                    <td>
+                      <code>{s.refMm.map((x) => x.toFixed(1)).join(', ')}</code>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="sensors-btn ghost"
+                        disabled={busy || !onSelectTeach}
+                        onClick={() => onSelectTeach?.(s.index)}
+                      >
+                        加载
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
+
+      {detail.channels?.length ? (
+        <section className="sensors-modal-section">
+          <h3>数据通道</h3>
+          <ul className="sensors-chip-list">
+            {detail.channels.map((c) => (
+              <li key={c}>
+                <code>{c}</code>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {detail.checklist?.length ? (
+        <section className="sensors-modal-section">
+          <h3>上线检查</h3>
+          <ul className="sensors-check-list">
+            {detail.checklist.map((item) => (
+              <li key={item}>
+                <span className="sensors-check-box" aria-hidden="true" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </>
+  )
+}

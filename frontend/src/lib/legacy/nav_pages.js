@@ -38,6 +38,13 @@ export const PAGES = [
     short: '机型',
     desc: '下拉选择机型，Three.js 浏览 URDF',
   },
+  {
+    id: 'sensors',
+    href: './sensors.html',
+    label: '传感器状态',
+    short: '传感器',
+    desc: '机械臂 / 夹爪 / 触觉 / RealSense / 六维力 / Gello',
+  },
 ];
 
 const PAGE_NAV_Z = '2147483000';
@@ -48,6 +55,7 @@ export function resolveCurrentPageId(pathname = location.pathname) {
   if (/pipeline\.html$/i.test(base)) return 'pipeline';
   if (/chat\.html$/i.test(base)) return 'chat';
   if (/robots\.html$/i.test(base)) return 'robots';
+  if (/sensors\.html$/i.test(base)) return 'sensors';
   if (/index\.html$/i.test(base) || base === '' || base === '/') return 'eval';
   const hit = PAGES.find((p) => base && p.href.endsWith(base));
   return hit?.id || 'eval';

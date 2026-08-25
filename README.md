@@ -10,8 +10,9 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 - 机械臂 3D：`robots.html` 下拉选择 `config/robots.json` 中的机型并浏览 URDF（当前含 SO-100 / EC616 / Koch）
 - 数据流：`pipeline.html` ComfyUI 风格画布，演示 ACT/SAM2 训练与推理张量流向
 - AI Chat：`chat.html` 选择托管 Skill、配置 Agent 链接，将诉求与 skill 一并发送并显示回执
+- 传感器状态：`/sensors` 卡片墙（机械臂 / 夹爪 / 触觉 / RealSense / 六维力 / Gello）；机械臂已内置 `arm_kin` 运动学（原独立 `demo_test` 已合并），双击可测 FK/IK 并查看搭建说明
 
-浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库托管静态页，并由同一进程提供 `/api/*`（skills / chat）。
+浏览器加载本地 `vendor/` 中的 Three.js / Chart.js / urdf-loader，**不依赖 Node.js，也不依赖外网 CDN**；本仓库用 Python 标准库托管静态页，并由同一进程提供 `/api/*`（skills / chat / sensors）。
 
 ## 环境
 
@@ -49,12 +50,15 @@ embody_model_eval/
 │   ├── index.json          # 启动时由 serve.sh 实时刷新
 │   ├── 20260819/ · 20260405/ · short/
 │   └── ec616_short/ · ec616/
+├── arm_kin/                # 内置六轴 FK/IK（原 demo_test）
 ├── vendor/                 # 离线 Three / Chart.js / urdf-loader
 ├── scripts/                # Python 工具与 agent_server
 │   ├── agent_server.py     # 静态托管 + /api/*
+│   ├── arm_kinematics.py · arm_kin_bridge.py
 │   ├── batch_score.py · bag_to_compare.py · refresh_data_index.py
 │   ├── gen_sim_episodes.py · gen_obs_media.py · gen_task_demo.py
 │   └── thresholds.example.json
+├── frontend/               # React SPA（含 /sensors 传感器页）
 ├── agent_skills/           # Chat 托管 Skills
 └── docs/
     └── TODOLIST.md

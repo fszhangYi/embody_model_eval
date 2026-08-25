@@ -24,6 +24,13 @@ Endpoints:
   POST   /api/act-pipeline/run
   GET    /api/fs/children?root=act|embody&path=<abs>&rootPath=<override>
   GET    /api/fs/roots
+  GET    /api/sensors/arm
+  GET    /api/sensors/arm/kin
+  GET    /api/sensors/arm/kin/overview
+  GET    /api/sensors/arm/kin/build-guide
+  POST   /api/sensors/arm/test
+  POST   /api/sensors/arm/refresh
+  POST   /api/sensors/arm/fk
   POST   /api/chat   (body: message, skillIds?, history?, config?)
 """
 
@@ -59,6 +66,15 @@ from act_pipeline_runner import (
     pipeline_spec,
     remove_act_link,
     start_job,
+)
+from arm_kinematics import (
+    compute_fk,
+    get_arm_build_guide,
+    get_arm_kin_bundle,
+    get_arm_kin_overview,
+    get_arm_status,
+    refresh_arm,
+    test_arm,
 )
 from fs_browse import browse_roots, list_children
 
@@ -782,6 +798,36 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._send_json({"ok": True, "job": job})
             return
+        if path == "/api/sensors/arm":
+            try:
+                self._send_json(get_arm_status(run_check=False))
+            except Exception as e:  # noqa: BLE001
+                self._send_json(
+                    {"ok": False, "available": False, "status": "error", "error": str(e)},
+                    HTTPStatus.INTERNAL_SERVER_ERROR,
+                )
+            return
+        if path == "/api/sensors/arm/kin":
+            try:
+                self._send_json(get_arm_kin_bundle())
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        if path == "/api/sensors/arm/kin/overview":
+            try:
+                self._send_json(get_arm_kin_overview())
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        if path == "/api/sensors/arm/kin/build-guide":
+            try:
+                self._send_json(get_arm_build_guide())
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+        if path.startswith("/api/"):
+            self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+            return
         super().do_GET()
 
     def do_PUT(self) -> None:  # noqa: N802
@@ -962,6 +1008,32 @@ class Handler(SimpleHTTPRequestHandler):
                     return
                 self._send_json({"ok": True, "job": job})
             except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/sensors/arm/test":
+            try:
+                self._send_json(test_arm())
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if path == "/api/sensors/arm/refresh":
+            try:
+                self._send_json(refresh_arm(body if isinstance(body, dict) else {}))
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/sensors/arm/fk":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                result = compute_fk(body)
+                status = 200 if result.get("ok") else HTTPStatus.BAD_REQUEST
+                self._send_json(result, status)
+            except Exception as e:  # noqa: BLE001
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
 

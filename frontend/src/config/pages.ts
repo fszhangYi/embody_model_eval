@@ -1,4 +1,4 @@
-export type PageId = 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline'
+export type PageId = 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline' | 'sensors'
 
 export interface PageDef {
   id: PageId
@@ -50,6 +50,13 @@ export const PAGES: PageDef[] = [
     label: 'ACT 数据流水线',
     short: 'ACT',
     desc: 'raw → HDF5 → 训练 → 推理 → embody JSON',
+  },
+  {
+    id: 'sensors',
+    path: '/sensors',
+    label: '传感器状态',
+    short: '传感器',
+    desc: '机械臂 / 夹爪 / 触觉 / RealSense / 六维力 / Gello',
   },
 ]
 

@@ -30,7 +30,8 @@ body {
 
 .hub-page,
 .chat-page,
-.robots-page {
+.robots-page,
+.sensors-page {
   min-height: 100vh;
 }
 
