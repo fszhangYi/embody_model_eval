@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { HomeParticles } from '../components/HomeParticles'
 import { PageNav } from '../components/PageNav'
 import { SettingsGear } from '../components/SettingsModal'
 import { PAGES, type PageId } from '../config/pages'
@@ -38,6 +39,7 @@ export function HomePage() {
         <div className="home-grid" />
         <div className="home-orb home-orb-a" />
         <div className="home-orb home-orb-b" />
+        <HomeParticles />
       </div>
 
       <header className="home-header">
