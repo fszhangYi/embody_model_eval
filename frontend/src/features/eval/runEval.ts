@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-import { t, trText } from '../../i18n/runtime';
+import { applyDomI18n, onLocaleChange, t, trText } from '../../i18n/runtime';
 /** Auto-extracted from legacy/index.html */
 
 import * as THREE from 'three';
@@ -50,6 +50,15 @@ import {
   hideLoader,
   failLoader,
 } from '../../lib/legacy/loading.js';
+
+let evalLocaleRefresh = null;
+
+export function refreshEvalLocale() {
+  applyDomI18n(document.querySelector('.eval-page') || document);
+  if (evalLocaleRefresh) evalLocaleRefresh();
+}
+
+onLocaleChange(() => refreshEvalLocale());
 
 export async function bootstrapEval(): Promise<void> {
 
@@ -547,21 +556,212 @@ function appendStat(box, label, value, tipKey) {
   if (!box) return;
   const d = document.createElement('div');
   d.className = 'stat';
-  const shown = trText(String(label));
+  const shown = tipKey ? t(`eval.gloss.${tipKey}.title`) : trText(String(label));
   const labelHtml = tipKey
-    ? `<div class="label tip" data-tip="${tipKey}" tabindex="0">${shown}</div>`
+    ? `<div class="label tip" data-tip="${tipKey}" data-gloss-tip="${tipKey}" tabindex="0">${shown}</div>`
     : `<div class="label">${shown}</div>`;
   d.innerHTML = `${labelHtml}<div class="value">${value}</div>`;
   box.appendChild(d);
 }
 
+/** Cached eval payload for locale refresh without full reload. */
+let EVAL_LOCALE_STATE = null;
+
+function refreshGateHint(gates) {
+  const gateEl = document.getElementById('gateHint');
+  if (!gateEl || !gates) return;
+  const failed = gates.checks.filter((c) => !c.ok).map((c) => c.name);
+  gateEl.textContent = gates.checks.length
+    ? t('eval.dyn.gateResult', { status: gates.passed ? 'PASS' : 'FAIL', n: gates.checks.length })
+      + (failed.length ? t('eval.dyn.gateFailed', { items: failed.join(', ') }) : '')
+    : t('eval.dyn.gateNone');
+}
+
+function formatTemporalHint(tcp) {
+  const lagSign = tcp.temporal.lag_frames > 0
+    ? t('eval.dyn.lagBehind')
+    : (tcp.temporal.lag_frames < 0 ? t('eval.dyn.lagAhead') : t('eval.dyn.lagNone'));
+  return t('eval.dyn.temporalSummary', {
+    lag: tcp.temporal.lag_frames,
+    sec: tcp.temporal.lag_s.toFixed(3),
+    sign: lagSign,
+    ep: tcp.temporal.mean_ep_at_lag_mm.toFixed(2),
+    dtw: (tcp.temporal.dtw_normalized_m * 1000).toFixed(2),
+  });
+}
+
+function formatTaskHint(tcp) {
+  if (!tcp.task.available) {
+    return t('eval.dyn.taskErr', { reason: tcp.task.reason });
+  }
+  const pf = tcp.task.pred.final;
+  const gf = tcp.task.gt.final;
+  const dlt = tcp.task.delta_final;
+  return t('eval.dyn.taskSummary', {
+    predEp: tcp.task.pred.ep_mm.mean.toFixed(2),
+    predAp: tcp.task.pred.approach_deg.mean.toFixed(2),
+    finalPredEp: pf.ep_mm.toFixed(2),
+    finalPredAp: pf.approach_deg.toFixed(2),
+    deltaEp: dlt.ep_mm.toFixed(2),
+    deltaAp: dlt.approach_deg.toFixed(2),
+    gtFinalEp: gf.ep_mm.toFixed(2),
+  });
+}
+
+function rebuildMainStats(meta, robotCfg) {
+  const stats = document.getElementById('stats');
+  if (!stats) return;
+  stats.innerHTML = '';
+  for (const [label, value, tipKey] of [
+    ['机型', robotCfg.label, 'robot'],
+    ['平均 L2', meta.mean_l2.toFixed(3), 'l2_mean'],
+    ['最大 L2', meta.max_l2.toFixed(3), 'l2_max'],
+    ['帧数', String(meta.n_frames), 'n_frames'],
+    ['数据 FPS', String(meta.fps), 'fps'],
+  ]) {
+    appendStat(stats, label, value, tipKey);
+  }
+}
+
+function rebuildTcpStatsPanel(state) {
+  const { meta, tcp, thrEp, thrEr, passEp, passEr, passBoth, gates } = state;
+  fillTcpOverview(tcp);
+  const tcpStats = document.getElementById('tcpStats');
+  for (const [label, value, tipKey] of [
+    [`e_p<${thrEp}mm`, `${(passEp * 100).toFixed(1)}%`, 'pass_ep'],
+    [`e_R<${thrEr}°`, `${(passEr * 100).toFixed(1)}%`, 'pass_er'],
+    [t('eval.dyn.passBoth'), `${(passBoth * 100).toFixed(1)}%`, 'pass_both'],
+    ['action', String(meta.action_mode ?? '—'), 'action'],
+  ]) {
+    appendStat(tcpStats, label, value, tipKey);
+  }
+  appendStat(
+    tcpStats,
+    t('eval.dyn.gateWord'),
+    gates.checks.length ? (gates.passed ? 'PASS' : 'FAIL') : '—',
+    'gate_stat',
+  );
+  refreshGateHint(gates);
+  const temporalEl = document.getElementById('tcpTemporalHint');
+  if (temporalEl) temporalEl.textContent = formatTemporalHint(tcp);
+  const taskEl = document.getElementById('tcpTaskHint');
+  if (taskEl) taskEl.textContent = formatTaskHint(tcp);
+}
+
+function rebuildSafetyPanel(safety, stride) {
+  const sBox = document.getElementById('safetyStats');
+  if (sBox) {
+    sBox.innerHTML = '';
+    for (const [label, value, tipKey] of [
+      ['越限', String(safety.limits.n_over), 'limit_over'],
+      ['近限位', String(safety.limits.n_near), 'limit_near'],
+      ['近奇异', String(safety.limits.n_sing), 'sing'],
+      ['超速事件', String(safety.smooth.n_over_speed), 'overspeed'],
+      ['桌面碰', String(safety.collision.n_table), 'table_hit'],
+      ['自碰', String(safety.collision.n_self), 'self_hit'],
+    ]) {
+      appendStat(sBox, label, value, tipKey);
+    }
+  }
+  const sList = document.getElementById('safetyList');
+  if (sList) {
+    const items = [];
+    for (const h of safety.limits.over_limit.slice(0, 12)) {
+      items.push({
+        i: h.i,
+        cls: 'bad',
+        text: t('eval.dyn.limitEvent', { t: h.i, joint: h.joint, q: h.q.toFixed(1) }),
+      });
+    }
+    for (const h of safety.limits.singularity_frames.slice(0, 8)) {
+      items.push({
+        i: h.i,
+        cls: 'warn',
+        text: t('eval.dyn.singEvent', { t: h.i, w: h.manipulability.toExponential(2) }),
+      });
+    }
+    for (const h of safety.smooth.over_speed.slice(0, 8)) {
+      items.push({
+        i: h.i,
+        cls: 'warn',
+        text: t('eval.dyn.speedEvent', { t: h.i, joint: h.joint, deg: h.deg_s.toFixed(0) }),
+      });
+    }
+    for (const h of safety.smooth.jump_frames.slice(0, 6)) {
+      items.push({
+        i: h.i,
+        cls: 'warn',
+        text: t('eval.dyn.jumpEvent', { t: h.i, l2: h.l2_deg.toFixed(1) }),
+      });
+    }
+    sList.innerHTML = items.map((x) =>
+      `<li data-frame="${x.i}" class="${x.cls}">${x.text}</li>`
+    ).join('') || `<li>${t('eval.dyn.noSafetyAlert')}</li>`;
+  }
+  const colHint = document.getElementById('collisionHint');
+  if (colHint) {
+    const th = safety.collision.table_hits[0];
+    const sh = safety.collision.self_hits[0];
+    const method = safety.collision.method || 'hull';
+    colHint.textContent =
+      `${t('eval.gloss.collision.title')}(${method}) stride=${stride} · ${t('eval.gloss.table_hit.title')} ${safety.collision.n_table}`
+      + (th ? t('eval.dyn.collisionExample', { t: th.i, link: th.link, z: th.z.toFixed(3) }) : '')
+      + ` · ${t('eval.gloss.self_hit.title')} ${safety.collision.n_self}`
+      + (sh ? t('eval.dyn.selfCollisionExample', { t: sh.i, a: sh.a, b: sh.b, dist: sh.dist_mm.toFixed(1) }) : '')
+      + t('eval.dyn.collisionSample');
+  }
+}
+
+function refreshEvalLocaleDynamic() {
+  document.querySelectorAll('[data-gloss-tip]').forEach((el) => {
+    const key = el.getAttribute('data-gloss-tip');
+    if (key) el.textContent = t(`eval.gloss.${key}.title`);
+  });
+  const btnPlay = document.getElementById('btnPlay');
+  if (btnPlay && typeof playing !== 'undefined') {
+    btnPlay.textContent = playing ? t('eval.btnPause') : t('eval.btnPlay');
+  }
+  if (!EVAL_LOCALE_STATE) return;
+  const st = EVAL_LOCALE_STATE;
+  rebuildMainStats(st.meta, st.robotCfg);
+  rebuildTcpStatsPanel(st);
+  if (st.safety) rebuildSafetyPanel(st.safety, st.stride);
+  const sub = document.getElementById('subtitle');
+  if (sub && st.meta && st.robotCfg) {
+    sub.textContent = t('eval.dyn.metaSubtitle', {
+      id: st.robotCfg.id,
+      source: st.meta.source,
+      frames: st.meta.n_frames,
+      at: st.meta.generated_at,
+    });
+  }
+  const guardEl = document.getElementById('robotGuard');
+  if (guardEl && st.guard) {
+    if (st.guard.warnings?.length) {
+      guardEl.className = 'robot-guard warn show';
+      guardEl.textContent = t('eval.dyn.guardWarn', {
+        id: st.robotCfg.id,
+        warnings: st.guard.warnings.join('；'),
+      });
+    } else if (st.mismatch) {
+      guardEl.className = 'robot-guard show';
+      guardEl.textContent = t('eval.dyn.guardMismatch', { mismatch: st.mismatch });
+    }
+  }
+  if (st.tcp && typeof frameIdx !== 'undefined') {
+    updateTcpFrameHint(st.tcp, frameIdx);
+  }
+}
+
 setupTermTips();
+evalLocaleRefresh = refreshEvalLocaleDynamic;
+
 
 async function loadData() {
   const qs = new URLSearchParams(location.search);
   const dataPath = qs.get('data') || '/data/20260819/episode_1.json';
   const res = await fetch(dataPath + (dataPath.includes('?') ? '&' : '?') + '_=' + Date.now());
-  if (!res.ok) throw new Error(`无法加载 ${dataPath}`);
+  if (!res.ok) throw new Error(t('eval.dyn.cannotLoad', { path: dataPath }));
   const json = await res.json();
   json.__data_path = dataPath;
   return json;
@@ -699,7 +899,7 @@ function loadRobot(urdfUrl, { onProgress, label, rootEulerDeg } = {}) {
     };
 
     const hardTimer = setTimeout(() => {
-      fail(new Error(`加载超时：${urdfUrl}`));
+      fail(new Error(t('eval.dyn.loadTimeout', { url: urdfUrl })));
     }, 45000);
 
     const retint = () => {
@@ -986,8 +1186,8 @@ async function initScene(container, frames, robotCfg) {
 
   setLoadProgress(
     0.02,
-    `加载 3× ${robotCfg.label} URDF…`,
-    `机型 ${robotCfg.id} · 解析模型与网格`,
+    t('eval.dyn.loadUrdf3', { label: robotCfg.label }),
+    t('eval.dyn.parseModelMesh', { id: robotCfg.id }),
   );
   const robotProgress = [0, 0, 0];
   const robotLabels = [t('eval.dyn.grayCur'), t('eval.dyn.redGt'), t('eval.dyn.bluePred')];
@@ -996,7 +1196,7 @@ async function initScene(container, frames, robotCfg) {
     const parts = robotLabels
       .map((name, i) => `${name} ${Math.round(robotProgress[i] * 100)}%`)
       .join(' · ');
-    setLoadProgress(0.02 + avg * 0.73, `加载 ${robotCfg.label} 模型…`, parts);
+    setLoadProgress(0.02 + avg * 0.73, t('eval.dyn.loadModel', { label: robotCfg.label }), parts);
   };
 
   const [armCur, armGT, armPred] = await Promise.all([
@@ -1040,7 +1240,7 @@ async function initScene(container, frames, robotCfg) {
   scene.add(armCur, armGT, armPred);
   fitEvalCamera(camera, controls, armGT, { fog: scene.fog });
 
-  setLoadProgress(0.78, t('eval.dyn.computeTcp'), `${robotCfg.id} · 正运动学采样`);
+  setLoadProgress(0.78, t('eval.dyn.computeTcp'), `${robotCfg.id} · ${t('eval.dyn.fkSample')}`);
   const paths = computeTcpPaths(armGT, frames);
   setLoadProgress(0.90, t('eval.dyn.buildScene'), t('eval.dyn.trajScatter'));
   const scatterCur = makeScatter(colorCur);
@@ -1110,7 +1310,7 @@ async function initScene(container, frames, robotCfg) {
   }
   window.addEventListener('resize', resize);
 
-  setLoadProgress(1, t('eval.dyn.loadDone'), `${robotCfg.label} · 进入评测视图`);
+  setLoadProgress(1, t('eval.dyn.loadDone'), t('eval.dyn.enterEvalView', { label: robotCfg.label }));
   return {
     robot: robotCfg,
     scene,
@@ -1300,10 +1500,7 @@ function setupTcpCharts(DATA, tcp) {
   const lagSign = tcp.temporal.lag_frames > 0
     ? t('eval.dyn.lagBehind')
     : (tcp.temporal.lag_frames < 0 ? t('eval.dyn.lagAhead') : t('eval.dyn.lagNone'));
-  document.getElementById('tcpTemporalHint').textContent =
-    `时序：最佳滞后 ${tcp.temporal.lag_frames} 帧 (${tcp.temporal.lag_s.toFixed(3)}s，${lagSign}) · `
-    + `该滞后下 mean e_p ${tcp.temporal.mean_ep_at_lag_mm.toFixed(2)} mm · `
-    + `DTW ${ (tcp.temporal.dtw_normalized_m * 1000).toFixed(2) } mm/步`;
+  document.getElementById('tcpTemporalHint').textContent = formatTemporalHint(tcp);
 
   const taskEl = document.getElementById('tcpTaskHint');
   if (tcp.task.available) {
@@ -1313,10 +1510,10 @@ function setupTcpCharts(DATA, tcp) {
       data: {
         labels,
         datasets: [
-          line('pred→goal e_p', tcp.task.series.pred.map((x) => x.ep_mm), '#60a5fa', 2),
-          line('GT→goal e_p', tcp.task.series.gt.map((x) => x.ep_mm), '#f87171', 1.5, [4, 3]),
-          line('pred approach', tcp.task.series.pred.map((x) => x.approach_deg), '#fbbf24', 2),
-          line('GT approach', tcp.task.series.gt.map((x) => x.approach_deg), '#a3e635', 1.5, [4, 3]),
+          line(t('eval.dyn.chartPredGoalEp'), tcp.task.series.pred.map((x) => x.ep_mm), '#60a5fa', 2),
+          line(t('eval.dyn.chartGtGoalEp'), tcp.task.series.gt.map((x) => x.ep_mm), '#f87171', 1.5, [4, 3]),
+          line(t('eval.dyn.chartPredApproach'), tcp.task.series.pred.map((x) => x.approach_deg), '#fbbf24', 2),
+          line(t('eval.dyn.chartGtApproach'), tcp.task.series.gt.map((x) => x.approach_deg), '#a3e635', 1.5, [4, 3]),
         ],
       },
       options: baseChartOpts(),
@@ -1324,14 +1521,9 @@ function setupTcpCharts(DATA, tcp) {
     const pf = tcp.task.pred.final;
     const gf = tcp.task.gt.final;
     const dlt = tcp.task.delta_final;
-    taskEl.textContent =
-      `任务（相对 goal）：pred e_p μ=${tcp.task.pred.ep_mm.mean.toFixed(2)} mm · `
-      + `approach μ=${tcp.task.pred.approach_deg.mean.toFixed(2)}° · `
-      + `末帧 pred e_p ${pf.ep_mm.toFixed(2)} mm / approach ${pf.approach_deg.toFixed(2)}° · `
-      + `末帧 Δ(pred−GT) e_p ${dlt.ep_mm.toFixed(2)} mm · approach ${dlt.approach_deg.toFixed(2)}° `
-      + `（GT 末帧 e_p ${gf.ep_mm.toFixed(2)} mm）`;
+    taskEl.textContent = formatTaskHint(tcp);
   } else {
-    taskEl.textContent = `任务误差：${tcp.task.reason}`;
+    taskEl.textContent = t('eval.dyn.taskErr', { reason: tcp.task.reason });
     const ctx = document.getElementById('tcpTaskChart');
     if (ctx) {
       charts.push(new Chart(ctx, {
@@ -1911,16 +2103,16 @@ function pickMimeType() {
 }
 
 try {
-  setLoadProgress(0.01, t('eval.dyn.loadEval'), '读取 episode JSON');
+  setLoadProgress(0.01, t('eval.dyn.loadEval'), t('eval.dyn.readEpisodeJson'));
   const DATA = await loadData();
   const meta = DATA.meta;
   const names = meta.joint_names;
 
-  setLoadProgress(0.04, '加载机械臂配置…', 'robots.json');
+  setLoadProgress(0.04, t('eval.dyn.loadRobotCfg'), 'robots.json');
   const robotRegistry = await loadRobotRegistry('/config/robots.json');
   const guard = validateEpisodeAgainstRegistry(DATA, robotRegistry);
   if (!guard.ok) {
-    throw new Error(`机型防呆校验失败：${guard.errors.join('；')}`);
+    throw new Error(t('eval.dyn.guardFail', { errors: guard.errors.join('；') }));
   }
   const robotCfg = guard.robot || resolveRobot(robotRegistry, meta, { allowDefault: false });
   applyActiveRobot(robotCfg, meta);
@@ -1928,17 +2120,17 @@ try {
   const guardEl = document.getElementById('robotGuard');
   if (guard.warnings.length && guardEl) {
     guardEl.className = 'robot-guard warn show';
-    guardEl.textContent = `机型提示（${robotCfg.id}）：${guard.warnings.join('；')}`;
+    guardEl.textContent = t('eval.dyn.guardWarn', { id: robotCfg.id, warnings: guard.warnings.join('；') });
   } else if (mismatch && guardEl) {
     // should already be in errors; keep as safety net
     guardEl.className = 'robot-guard show';
-    guardEl.textContent = `机型不匹配：${mismatch}`;
+    guardEl.textContent = t('eval.dyn.guardMismatch', { mismatch });
   }
 
   document.getElementById('title').textContent = `Embody · ${robotCfg.label}`;
   document.getElementById('subtitle').textContent =
     `${robotCfg.id} · ${meta.source} · ${meta.n_frames}帧 · ${meta.generated_at}`;
-  setLoadProgress(0.08, t('eval.dyn.initUi'), `${robotCfg.label} · ${meta.n_frames} 帧`);
+  setLoadProgress(0.08, t('eval.dyn.initUi'), t('eval.dyn.initUiFrames', { label: robotCfg.label, n: meta.n_frames }));
 
   const stats = document.getElementById('stats');
   for (const [label, value, tipKey] of [
@@ -1952,7 +2144,7 @@ try {
   }
 
   setupCharts(DATA);
-  setLoadProgress(0.12, `加载 ${robotCfg.label} 模型…`, t('eval.dyn.downloadUrdf'));
+  setLoadProgress(0.12, t('eval.dyn.loadModel', { label: robotCfg.label }), t('eval.dyn.downloadUrdf'));
 
   const world = await initScene(document.getElementById('arm3d'), DATA.frames, robotCfg);
   hideLoader(evalLoader, { remove: true });
@@ -1994,7 +2186,7 @@ try {
   for (const [label, value, tipKey] of [
     [`e_p<${thrEp}mm`, `${(passEp * 100).toFixed(1)}%`, 'pass_ep'],
     [`e_R<${thrEr}°`, `${(passEr * 100).toFixed(1)}%`, 'pass_er'],
-    ['双阈值达标', `${(passBoth * 100).toFixed(1)}%`, 'pass_both'],
+    [t('eval.dyn.passBoth'), `${(passBoth * 100).toFixed(1)}%`, 'pass_both'],
     ['action', String(meta.action_mode ?? '—'), 'action'],
   ]) {
     appendStat(document.getElementById('tcpStats'), label, value, tipKey);
@@ -2017,14 +2209,14 @@ try {
   if (gateEl) {
     const failed = gates.checks.filter((c) => !c.ok).map((c) => c.name);
     gateEl.textContent = gates.checks.length
-      ? `门禁 ${gates.passed ? 'PASS' : 'FAIL'} · ${gates.checks.length} 项`
-        + (failed.length ? ` · 未过: ${failed.join(', ')}` : '')
+      ? t('eval.dyn.gateResult', { status: gates.passed ? 'PASS' : 'FAIL', n: gates.checks.length })
+        + (failed.length ? t('eval.dyn.gateFailed', { items: failed.join(', ') }) : '')
       : t('eval.dyn.gateNone');
   }
   {
     appendStat(
       document.getElementById('tcpStats'),
-      '门禁',
+      t('eval.dyn.gateWord'),
       gates.checks.length ? (gates.passed ? 'PASS' : 'FAIL') : '—',
       'gate_stat',
     );
@@ -2620,7 +2812,7 @@ try {
         if (recTimerId) { clearInterval(recTimerId); recTimerId = null; }
         const sec = ((performance.now() - recStartedAt) / 1000).toFixed(1);
         const mb = (recBlob.size / (1024 * 1024)).toFixed(2);
-        recStatus.textContent = `已停止 · ${sec}s · ${mb} MB · 可保存`;
+        recStatus.textContent = t('eval.dyn.recStopped', { sec, mb });
         setRecUI('ready');
       };
       mediaRecorder.start(200);
@@ -2651,8 +2843,25 @@ try {
     a.download = `embody_model_eval_${stamp}.webm`;
     a.click();
     URL.revokeObjectURL(a.href);
-    recStatus.textContent = `已触发下载 · ${a.download}`;
+    recStatus.textContent = t('eval.dyn.recSaved', { name: a.download });
   });
+
+
+  EVAL_LOCALE_STATE = {
+    meta,
+    robotCfg,
+    tcp,
+    thrEp,
+    thrEr,
+    passEp,
+    passEr,
+    passBoth,
+    gates,
+    safety: typeof safety !== 'undefined' ? safety : null,
+    stride: typeof stride !== 'undefined' ? stride : 1,
+    guard,
+    mismatch,
+  };
 
   setRecUI('idle');
   applyVisibility();
@@ -2682,7 +2891,7 @@ try {
   requestAnimationFrame(loop);
 } catch (err) {
   document.getElementById('subtitle').textContent = t('eval.loadFail', { msg: err.message });
-  failLoader(evalLoader, '加载失败', err.message);
+  failLoader(evalLoader, t('eval.dyn.failLoadTitle'), err.message);
   const fill = document.getElementById('loadBarFill');
   if (fill) fill.style.background = 'linear-gradient(90deg, #7f1d1d, #f87171)';
   console.error(err);

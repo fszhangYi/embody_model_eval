@@ -3,6 +3,8 @@
  * Self-contained (no external graph lib) — wires on <canvas>, nodes as DOM.
  */
 
+import { t } from '../../i18n/runtime';
+
 const KIND_COLORS = {
   data: '#3b82f6',
   vision: '#a855f7',
@@ -443,8 +445,11 @@ export class FlowCanvas {
       this.titleEl.setAttribute('title', g.label);
     }
     if (this.blurbEl) {
-      this.blurbEl.textContent = g.blurb;
-      this.blurbEl.setAttribute('title', g.blurb);
+      const blurbKey = `pipeline.graph.${key}.blurb`;
+      const blurb = t(blurbKey);
+      const blurbText = blurb && blurb !== blurbKey ? blurb : (g.blurb || '');
+      this.blurbEl.textContent = blurbText;
+      this.blurbEl.setAttribute('title', blurbText);
     }
     this.selectedId = null;
     this.renderNodes();
@@ -536,16 +541,20 @@ export class FlowCanvas {
   showDetail(n) {
     if (!this.detailEl) return;
     if (!n) {
-      this.detailEl.innerHTML = '<p class="muted">点击节点查看说明；双击编辑；拖动画布空白处平移，滚轮缩放。</p>';
+      this.detailEl.innerHTML = `<p class="muted">${escapeHtml(t('pipeline.nodeEmpty'))}</p>`;
       return;
     }
+    const io = t('pipeline.nodeInputs', {
+      inputs: (n.inputs || []).join(', ') || '—',
+      outputs: (n.outputs || []).join(', ') || '—',
+    });
     this.detailEl.innerHTML = `
-      <div class="detail-kicker" style="color:${KIND_COLORS[n.kind] || '#94a3b8'}">${escapeHtml(n.kind)}</div>
+      <div class="detail-kicker" style="color:${KIND_COLORS[n.kind] || KIND_COLORS[n.kind] || '#94a3b8'}">${escapeHtml(n.kind)}</div>
       <h3>${escapeHtml(n.title)}</h3>
       <p>${escapeHtml(n.detail || '')}</p>
       ${n.file ? `<p class="mono">↪ ${escapeHtml(n.file)}</p>` : ''}
-      <p class="muted">输入：${(n.inputs || []).join(', ') || '—'} · 输出：${(n.outputs || []).join(', ') || '—'}</p>
-      <p class="muted" style="margin-top:10px">双击节点可编辑标题 / 类型 / 说明 / 文件路径。</p>
+      <p class="muted">${escapeHtml(io)}</p>
+      <p class="muted" style="margin-top:10px">${escapeHtml(t('pipeline.nodeEditHint'))}</p>
     `;
   }
 

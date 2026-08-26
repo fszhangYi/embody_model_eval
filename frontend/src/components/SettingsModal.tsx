@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { SettingOutlined } from '@ant-design/icons'
 import { useLocale } from '../i18n/LocaleContext'
 import type { DocsLocale, Locale } from '../i18n/types'
 import { useAppearance } from '../prefs/AppearanceContext'
@@ -7,24 +8,6 @@ import type { DensityPref, ThemePref } from '../prefs/appearance'
 import '../styles/settings.css'
 
 type SettingsTab = 'appearance' | 'language' | 'auth' | 'users' | 'about'
-
-function GearIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-      <path
-        d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-      />
-      <path
-        d="M19.4 13.5a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V19a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H5a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9.5a1.65 1.65 0 0 0 1-1.51V5a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9.5c.26.6.9 1 1.51 1H19a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
 
 function SettingRow({
   title,
@@ -381,7 +364,7 @@ export function SettingsGear() {
         title={m.common.settings}
         onClick={() => setOpen(true)}
       >
-        <GearIcon />
+        <SettingOutlined aria-hidden />
         <span className="settings-gear-label">{m.common.settings}</span>
       </button>
       <SettingsDialog open={open} onClose={() => setOpen(false)} />

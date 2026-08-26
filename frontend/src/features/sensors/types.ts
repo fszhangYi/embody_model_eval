@@ -1,4 +1,5 @@
 import type { ArmStatusResponse } from './armApi'
+import { sensorValue } from './sensorI18n'
 
 export type SensorStatus = 'offline' | 'unknown' | 'ok' | 'warn' | 'error'
 
@@ -56,8 +57,8 @@ export function applyArmStatus(base: SensorDevice, arm: ArmStatusResponse): Sens
       rows: [
         { label: '后端', value: cfg?.backend || 'arm_kin' },
         { label: '端点', value: arm.endpoint },
-        { label: '实机驱动', value: arm.hardwareLinked ? '已连接' : '未接入（运动学仿真）' },
-        { label: 'robot.xml', value: cfg?.robotXmlExists ? cfg.robotXml || '—' : '缺失' },
+        { label: '实机驱动', value: sensorValue(arm.hardwareLinked ? '已连接' : '未接入（运动学仿真）') },
+        { label: 'robot.xml', value: cfg?.robotXmlExists ? cfg.robotXml || '—' : sensorValue('缺失') },
         { label: 'arm_kin 根目录', value: cfg?.armKinRoot || '—' },
       ],
     },
@@ -67,7 +68,7 @@ export function applyArmStatus(base: SensorDevice, arm: ArmStatusResponse): Sens
         { label: '关节角 q1…q6 (°)', value: pose?.jointText || '—' },
         { label: 'TCP xyz (mm)', value: pose ? `${pose.tcpText}` : '—' },
         { label: '姿态 RX RY RZ (°)', value: pose?.rpyText || '—' },
-        { label: '软限位内', value: pose ? (pose.withinSoftLimits ? '是' : '否') : '—' },
+        { label: '软限位内', value: pose ? sensorValue(pose.withinSoftLimits ? '是' : '否') : '—' },
       ],
     },
     {
@@ -94,7 +95,7 @@ export function applyArmStatus(base: SensorDevice, arm: ArmStatusResponse): Sens
       title: '示教 FK 自检',
       rows: [
         { label: '样本数', value: String(teach.n) },
-        { label: '通过', value: teach.passed ? '是' : '否' },
+        { label: '通过', value: sensorValue(teach.passed ? '是' : '否') },
         { label: '门限', value: `${teach.thresholdMm} mm` },
         { label: 'max_err', value: `${teach.maxErrMm.toFixed(4)} mm` },
         { label: 'mean_err', value: `${teach.meanErrMm.toFixed(4)} mm` },
@@ -106,7 +107,7 @@ export function applyArmStatus(base: SensorDevice, arm: ArmStatusResponse): Sens
     sections.push({
       title: 'IK 回环',
       rows: [
-        { label: '成功', value: ik.success ? '是' : '否' },
+        { label: '成功', value: sensorValue(ik.success ? '是' : '否') },
         { label: 'nfev', value: String(ik.nfev) },
         { label: 'residual', value: ik.residualNorm.toExponential(2) },
         { label: '关节 L2 误差', value: `${ik.jointErrDegL2.toFixed(4)} °` },
@@ -118,7 +119,7 @@ export function applyArmStatus(base: SensorDevice, arm: ArmStatusResponse): Sens
   sections.push({
     title: '诊断',
     rows: [
-      { label: '使能', value: '仿真' },
+      { label: '使能', value: sensorValue('仿真') },
       { label: '错误码', value: '—' },
       { label: '温度 / 负载', value: '—' },
       { label: '状态消息', value: arm.message || '—' },
@@ -167,7 +168,7 @@ export const SENSOR_DEVICES: SensorDevice[] = [
     metrics: [
       { label: '关节', value: '—' },
       { label: 'TCP', value: '—' },
-      { label: '使能', value: '仿真' },
+      { label: '使能', value: sensorValue('仿真') },
     ],
     detail: {
       summary: '六轴机械臂运动学内置 arm_kin；点击「测试连接」跑示教 FK / IK 自检。',
@@ -191,7 +192,7 @@ export const SENSOR_DEVICES: SensorDevice[] = [
         {
           title: '诊断',
           rows: [
-            { label: '使能', value: '仿真' },
+            { label: '使能', value: sensorValue('仿真') },
             { label: '错误码', value: '—' },
             { label: '温度 / 负载', value: '—' },
           ],

@@ -88,15 +88,15 @@
       <div class="body">
         <p class="hint tip" id="obsAlignHint" data-tip="obs_align" style="margin-bottom:8px" tabindex="0" data-i18n="eval.obsLoading">加载观测对齐…</p>
         <div class="row-ctrl">
-          <label class="tip" data-tip="obs_cam" tabindex="0">流
+          <label class="tip" data-tip="obs_cam" tabindex="0"><span data-i18n="eval.obsStream">流</span>
             <select id="obsCamSelect"></select>
           </label>
         </div>
         <div class="obs-wrap tip" data-tip="obs_sync" tabindex="0"><canvas id="obsCanvas"></canvas></div>
         <div class="obs-toggles tip" data-tip="obs_overlay" tabindex="0">
-          <label><input type="checkbox" id="chkObsBox" checked /> 目标框</label>
-          <label><input type="checkbox" id="chkObsKp" checked /> 关键点</label>
-          <label><input type="checkbox" id="chkObsHeat" checked /> 注意力</label>
+          <label><input type="checkbox" id="chkObsBox" checked /> <span data-i18n="eval.obsTargetBox">目标框</span></label>
+          <label><input type="checkbox" id="chkObsKp" checked /> <span data-i18n="eval.obsKeypoints">关键点</span></label>
+          <label><input type="checkbox" id="chkObsHeat" checked /> <span data-i18n="eval.obsAttention">注意力</span></label>
         </div>
         <p class="hint" style="margin-top:6px" id="obsFrameHint" data-i18n="eval.obsSyncHint">与关节 / TCP 同帧同步</p>
       </div>
@@ -110,7 +110,7 @@
           <button id="btnRecStop" class="danger" type="button" disabled data-i18n-title="eval.recStopTitle" title="快捷键 T：停止录制" data-i18n="eval.recStop">停止</button>
           <button id="btnRecSave" type="button" disabled data-i18n-title="eval.recSaveTitle" title="快捷键 S：保存录制" data-i18n="eval.recSave">保存</button>
         </div>
-        <div class="rec-status" id="recStatus">未录制 · WebM · 快捷键 R/T/S</div>
+        <div class="rec-status" id="recStatus" data-i18n="eval.recStatus">未录制 · WebM · 快捷键 R/T/S</div>
       </div>
     </details>
 
@@ -122,7 +122,7 @@
           <button id="btnExportJson" type="button" class="tip" data-tip="export_json" data-i18n="eval.exportJson">导出 JSON</button>
         </div>
         <label class="hint tip" data-tip="export_shot" style="display:flex;gap:6px;align-items:center;margin-top:8px" tabindex="0">
-          <input id="chkExportShot" type="checkbox"/> 附带当前画布缩略图（更占内存）
+          <input id="chkExportShot" type="checkbox"/> <span data-i18n="eval.exportShot">附带当前画布缩略图（更占内存）</span>
         </label>
         <p class="hint tip" id="gateHint" data-tip="gate" style="margin-top:8px" tabindex="0" data-i18n="eval.gateLoading">门禁：加载 thresholds…</p>
       </div>

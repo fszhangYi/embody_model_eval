@@ -65,9 +65,15 @@ const btnTrain = document.getElementById('btnTrain');
 const btnInfer = document.getElementById('btnInfer');
 const btnAnim = document.getElementById('btnAnim');
 
-pipelineSelect.innerHTML = PIPELINES.map((p) =>
-  `<option value="${p.id}" title="${p.desc}">${p.label}</option>`
-).join('');
+pipelineSelect.innerHTML = PIPELINES.map((p) => {
+  const descKey = `pipeline.family.${p.id}`;
+  const labelKey = `pipeline.family.${p.id}.label`;
+  const desc = t(descKey);
+  const label = t(labelKey);
+  const descText = desc && desc !== descKey ? desc : p.desc;
+  const labelText = label && label !== labelKey ? label : p.label;
+  return `<option value="${p.id}" title="${descText}">${labelText}</option>`;
+}).join('');
 
 let mode = 'train';
 

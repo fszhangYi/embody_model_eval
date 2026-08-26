@@ -105,12 +105,17 @@ body:has(.act-pipeline-page),
   text-decoration: none;
   font: inherit;
   font-size: 0.72rem;
+  line-height: 1;
+  height: 30px;
+  min-height: 30px;
+  box-sizing: border-box;
   background: var(--chrome);
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
+  padding: 0 10px;
   border-radius: 999px;
   border: 1px solid var(--border);
+  vertical-align: middle;
 }
 
 .page-nav-btn:hover,

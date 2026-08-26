@@ -1,11 +1,9 @@
 import { PageNav } from './PageNav'
-import { SettingsGear } from './SettingsModal'
 
-/** Floating page chrome: settings (language) + page switcher. */
+/** Floating page chrome: page switcher only (settings live on the home overview). */
 export function PageChrome({ className = 'page-nav-floating' }: { className?: string }) {
   return (
     <div className={className}>
-      <SettingsGear />
       <PageNav />
     </div>
   )

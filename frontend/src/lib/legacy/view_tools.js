@@ -2,18 +2,23 @@
  * On-canvas view tools: switch OrbitControls left-drag between rotate / pan / zoom.
  */
 import * as THREE from 'three';
+import { t } from '../../i18n/runtime';
 
-const MODES = [
-  { id: 'rotate', label: '旋转', title: '左键拖动旋转视角' },
-  { id: 'pan', label: '平移', title: '左键拖动平移画面' },
-  { id: 'zoom', label: '缩放', title: '左键上下拖动缩放；滚轮仍可用' },
-];
+function viewModes() {
+  return [
+    { id: 'rotate', label: t('view.mode.rotate'), title: t('view.title.rotate') },
+    { id: 'pan', label: t('view.mode.pan'), title: t('view.title.pan') },
+    { id: 'zoom', label: t('view.mode.zoom'), title: t('view.title.zoom') },
+  ];
+}
 
-const HINTS = {
-  rotate: '旋转 · 左键拖动旋转 · 滚轮缩放 · 右键平移',
-  pan: '平移 · 左键拖动平移 · 滚轮缩放',
-  zoom: '缩放 · 左键上下拖动缩放 · 滚轮也可缩放',
-};
+function viewHints() {
+  return {
+    rotate: t('view.hint.rotate'),
+    pan: t('view.hint.pan'),
+    zoom: t('view.hint.zoom'),
+  };
+}
 
 /**
  * @param {HTMLElement} container
@@ -27,10 +32,10 @@ export function mountViewTools(container, controls, opts = {}) {
   const root = document.createElement('div');
   root.className = 'view-tools';
   root.setAttribute('role', 'toolbar');
-  root.setAttribute('aria-label', '视图操作');
+  root.setAttribute('aria-label', t('view.toolbarAria'));
 
   const btns = {};
-  for (const m of MODES) {
+  for (const m of viewModes()) {
     const b = document.createElement('button');
     b.type = 'button';
     b.dataset.mode = m.id;
@@ -48,8 +53,8 @@ export function mountViewTools(container, controls, opts = {}) {
     const fit = document.createElement('button');
     fit.type = 'button';
     fit.className = 'view-tools-fit';
-    fit.textContent = '适配';
-    fit.title = '按模型包围盒重置相机';
+    fit.textContent = t('view.mode.fit');
+    fit.title = t('view.title.fit');
     fit.addEventListener('click', (e) => {
       e.stopPropagation();
       opts.onFit();
@@ -98,7 +103,8 @@ export function mountViewTools(container, controls, opts = {}) {
       btns[id].classList.toggle('active', id === mode);
       btns[id].setAttribute('aria-pressed', id === mode ? 'true' : 'false');
     }
-    hint.textContent = HINTS[mode] || HINTS.rotate;
+    const hints = viewHints();
+    hint.textContent = hints[mode] || hints.rotate;
     container.dataset.viewMode = mode;
   }
 

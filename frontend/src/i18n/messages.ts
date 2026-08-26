@@ -457,7 +457,7 @@ export const messages: Record<Locale, MessageTree> = {
       blurb: 'Embodied eval · robots · pipelines · sensors in one console',
       kicker: 'Overview',
       heroTitleBefore: 'Bring policy replay, multi-robot assets, and training pipelines',
-      heroTitleAccent: 'into one workbench',
+      heroTitleAccent: ' into one workbench',
       heroLead:
         'Embody Model Eval targets functional evaluation of embodied policies and models: local static hosting plus a Python stdlib API, Cookie auth, offline Three.js visualization, and ACT / Skills Agent hooks. Eval sits alongside other modules — enter from the links below.',
       ctaEval: 'Open trajectory eval',

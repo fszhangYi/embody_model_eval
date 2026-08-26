@@ -52,7 +52,7 @@ function SensorCard({
         <div className="sensors-card-title">
           <span className="sensors-kind-tag">{t(`sensors.kind.${device.kind}`)}</span>
           <h3>{trText(device.name)}</h3>
-          <p className="muted">{device.model}</p>
+          <p className="muted">{trText(device.model)}</p>
         </div>
         <span className={`sensors-status ${statusClass(device.status)}`}>
           {t(`sensors.status.${device.status}`)}

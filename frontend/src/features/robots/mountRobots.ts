@@ -251,7 +251,12 @@ function readJointDeg(name) {
 
 function renderMeta(profile) {
   els.title.textContent = profile.label;
-  els.desc.textContent = profile.description || t('robots.modelId', { id: profile.id });
+  const descKey = `robots.desc.${profile.id}`;
+  const localized = t(descKey);
+  els.desc.textContent =
+    (localized && localized !== descKey ? localized : null)
+    || profile.description
+    || t('robots.modelId', { id: profile.id });
   const rows = [
     ['id', profile.id],
     ['URDF', profile.urdf.preview || profile.urdf.cur],

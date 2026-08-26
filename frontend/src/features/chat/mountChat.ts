@@ -416,7 +416,12 @@ function fillConfigForm(cfg) {
   $('#cfgBaseUrl').value = cfg.baseUrl || '';
   $('#cfgPath').value = cfg.path || '/chat/completions';
   $('#cfgModel').value = cfg.model || '';
-  $('#cfgSystem').value = cfg.systemPrompt || '';
+  {
+    const zhDefault = '你是评测助手。优先遵循用户选中的 Agent Skill 指令。';
+    const raw = cfg.systemPrompt || '';
+    const isDefault = !raw || raw === zhDefault || raw === t('chat.defaultSystem');
+    $('#cfgSystem').value = isDefault ? t('chat.defaultSystem') : raw;
+  }
   $('#cfgApiKey').value = '';
   $('#cfgApiKey').placeholder = cfg.apiKeySet
     ? t('chat.apiKeySaved', { masked: cfg.apiKeyMasked })

@@ -3,15 +3,20 @@
 .settings-gear-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   height: 30px;
+  min-height: 30px;
   padding: 0 10px;
+  box-sizing: border-box;
   border-radius: 999px;
   border: 1px solid var(--border);
   background: var(--chrome);
   color: var(--text);
   font: inherit;
   font-size: 0.72rem;
+  line-height: 1;
+  vertical-align: middle;
   cursor: pointer;
   transition:
     border-color 140ms ease,
@@ -27,7 +32,15 @@
 }
 
 .settings-gear-btn:active {
-  transform: rotate(18deg);
+  transform: none;
+}
+
+.settings-gear-btn .anticon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .settings-gear-btn svg {

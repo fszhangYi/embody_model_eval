@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { PathPickerModal } from '../components/PathPickerModal'
 import { PageChrome } from '../components/PageChrome'
 import { useLocale } from '../i18n/LocaleContext'
-import { t } from '../i18n/runtime'
+import { t, trText } from '../i18n/runtime'
 import { cancelJob, deleteJob, fetchJob, fetchJobs, fetchPipelineSpec, createActLink, removeActLink, runPipelineStep } from '../features/actPipeline/api'
 import { HyperparamBenchPanel } from '../features/actPipeline/HyperparamBenchPanel'
 import { TrainMemoryGuide } from '../features/actPipeline/TrainMemoryGuide'
@@ -45,6 +45,13 @@ function fieldIoRole(field: StepField, step: PipelineStep): 'input' | 'output' |
   if (step.outputs?.includes(field.key)) return 'output'
   if (field.type === 'path') return 'input'
   return 'neutral'
+}
+
+function localizeActHint(hint?: string): string {
+  if (!hint) return ''
+  if (hint === 'train.py（用于解析超参）' || hint.includes('用于解析超参')) return t('act.hint.trainParse')
+  if (hint === 'train.py') return t('act.hint.trainPy')
+  return trText(hint)
 }
 
 function FieldInput({
@@ -102,7 +109,7 @@ function FieldInput({
     )
   }
   if (field.type === 'path') {
-    const tip = field.hint ? t('act.scriptHint', { hint: field.hint }) : undefined
+    const tip = field.hint ? t('act.scriptHint', { hint: localizeActHint(field.hint) }) : undefined
     return (
       <label className={fieldClass}>
         <span className="act-field-label">
@@ -111,7 +118,7 @@ function FieldInput({
           <span>{label}</span>
           {field.hint ? (
             <span className="act-field-hint" title={tip}>
-              {field.hint}
+              {localizeActHint(field.hint)}
             </span>
           ) : null}
         </span>
