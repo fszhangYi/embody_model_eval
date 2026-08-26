@@ -16,13 +16,25 @@ html[data-theme='dark'] {
   --surface: rgba(18, 26, 38, 0.96);
   --surface-2: rgba(18, 26, 38, 0.88);
   --surface-3: rgba(26, 35, 50, 0.72);
-  --chrome: rgba(26, 35, 50, 0.7);
+  --chrome: rgba(26, 35, 50, 0.88);
   --input-bg: rgba(8, 12, 20, 0.85);
   --bg-spot: #1a2740;
   --bg-spot-2: rgba(26, 39, 64, 0.55);
   --bg-spot-3: rgba(20, 48, 52, 0.35);
   --scrollbar-thumb: rgba(61, 214, 198, 0.45);
   --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
+  --header-bg: linear-gradient(180deg, #0d131c 0%, #0b1018 100%);
+  --header-bg-soft: linear-gradient(
+    180deg,
+    rgba(11, 16, 24, 0.96) 0%,
+    rgba(11, 16, 24, 0.55) 65%,
+    transparent 100%
+  );
+  --header-bg-fade: linear-gradient(180deg, rgba(11, 16, 24, 0.92), rgba(11, 16, 24, 0.72));
+  --footer-bg: linear-gradient(180deg, rgba(11, 16, 24, 0.88), #0b1018);
+  --overlay-scrim: rgba(4, 8, 14, 0.72);
+  --active-chip: #1e3d3a;
+  --brand-title: linear-gradient(120deg, #e7ecf3 25%, #3dd6c6 70%, #f0b429 100%);
 }
 
 * {
@@ -93,7 +105,7 @@ body:has(.act-pipeline-page),
   text-decoration: none;
   font: inherit;
   font-size: 0.72rem;
-  background: rgba(26, 35, 50, 0.7);
+  background: var(--chrome);
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
@@ -116,7 +128,7 @@ body:has(.act-pipeline-page),
   position: fixed;
   min-width: 220px;
   padding: 6px;
-  background: rgba(18, 26, 38, 0.96);
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.4);

@@ -1,10 +1,5 @@
 :root {
-    --bg: #0b1018; --panel: #121a26; --border: #3a4d66;
-    --text: #e7ecf3; --muted: #8b9bb4; --accent: #3dd6c6;
-    --spark: #f0b429; --spark-dim: rgba(240, 180, 41, 0.14);
     --header-h: 56px;
-    --scrollbar-thumb: rgba(61, 214, 198, 0.45);
-    --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
     --scrollbar-size: 4px;
   }.pipeline-page * { box-sizing: border-box; }.pipeline-page * {
     scrollbar-width: thin;
@@ -14,17 +9,23 @@
   }.pipeline-page {
     font-family: "IBM Plex Sans", "Segoe UI", sans-serif;
     background: var(--bg); color: var(--text);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
   }.pipeline-page header {
     position: relative; z-index: 40;
     display: grid;
-    grid-template-columns: minmax(140px, 260px) minmax(0, 1fr) auto;
+    grid-template-columns: minmax(120px, 220px) minmax(0, 1fr);
     align-items: center;
-    column-gap: 14px;
-    height: var(--header-h);
-    padding: 0 16px;
-    background: linear-gradient(180deg, rgba(11,16,24,0.96), rgba(11,16,24,0.82));
-    border-bottom: 1px solid rgba(58,77,102,0.55);
-    /* overflow visible: page-nav dropdown must not be clipped / covered by .side */
+    column-gap: 12px;
+    row-gap: 8px;
+    min-height: var(--header-h);
+    height: auto;
+    padding: 8px 150px 8px 16px; /* reserve floating PageChrome */
+    background: var(--header-bg);
+    border-bottom: 1px solid var(--border);
     overflow: visible;
   }.pipeline-page .header-brand {
     min-width: 0;
@@ -43,25 +44,26 @@
   }.pipeline-page .header-blurb {
     margin: 0;
     color: var(--muted);
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     line-height: 1.25;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    max-width: 100%;
   }.pipeline-page .muted { color: var(--muted); font-size: 0.8rem; }.pipeline-page .pill {
     display: inline-flex; gap: 8px; align-items: center;
     padding: 4px 10px; border-radius: 999px;
-    border: 1px solid var(--border); background: rgba(26,35,50,0.7);
+    border: 1px solid var(--border); background: var(--chrome);
     font-size: 0.72rem; color: var(--muted); flex-shrink: 0;
   }.pipeline-page .page-nav { position: relative; flex-shrink: 0; z-index: 2147483000; }.pipeline-page .page-nav-btn {
     cursor: pointer; gap: 6px; color: var(--text); text-decoration: none;
-    font: inherit; font-size: 0.72rem; background: rgba(26,35,50,0.7);
+    font: inherit; font-size: 0.72rem; background: var(--chrome);
   }.pipeline-page .page-nav-btn:hover, .pipeline-page .page-nav.open .page-nav-btn {
     border-color: var(--accent); color: var(--accent);
   }.pipeline-page .page-nav-caret { opacity: 0.7; font-size: 0.65rem; }.pipeline-page .page-nav-menu {
     position: absolute; top: calc(100% + 6px); right: 0;
     min-width: 220px; padding: 6px;
-    background: rgba(18, 26, 38, 0.98);
+    background: var(--panel);
     border: 1px solid var(--border); border-radius: 10px;
     box-shadow: 0 12px 28px rgba(0,0,0,0.45); z-index: 2147483000;
   }.pipeline-page .page-nav-item {
@@ -71,47 +73,55 @@
     background: rgba(61,214,198,0.14);
     outline: 1px solid rgba(61,214,198,0.35);
   }.pipeline-page .page-nav-item-title { display: block; font-size: 0.8rem; font-weight: 560; }.pipeline-page .page-nav-item-desc { display: block; margin-top: 2px; font-size: 0.68rem; color: var(--muted); }.pipeline-page .toolbar {
-    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
     min-width: 0;
-    justify-self: start;
+    justify-self: stretch;
   }.pipeline-page .toolbar label.muted {
     font-size: 0.75rem;
     flex-shrink: 0;
   }.pipeline-page select.pipeline-select {
-    background: #243247; color: var(--text); border: 1px solid #354a66;
-    border-radius: 8px; padding: 7px 10px; font: inherit; font-size: 0.8rem;
-    width: 168px; flex-shrink: 0;
+    background: var(--input-bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 8px; font: inherit; font-size: 0.78rem;
+    width: min(168px, 36vw); flex-shrink: 1; min-width: 96px;
   }.pipeline-page select.pipeline-select:focus {
     outline: none; border-color: var(--accent);
   }.pipeline-page button, .pipeline-page .seg button {
-    background: #243247; color: var(--text); border: 1px solid #354a66;
-    border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 0.8rem; cursor: pointer;
+    background: var(--input-bg); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 10px; font: inherit; font-size: 0.75rem; cursor: pointer;
     flex-shrink: 0;
-  }.pipeline-page #btnAnim { min-width: 5.75rem; }.pipeline-page #btnFit { min-width: 4.5rem; }.pipeline-page button:hover { border-color: var(--accent); color: var(--accent); }.pipeline-page button.active {
-    background: #1e3d3a; border-color: var(--accent); color: var(--accent);
+    white-space: nowrap;
+  }.pipeline-page #btnAnim { min-width: 0; }.pipeline-page #btnFit { min-width: 0; }.pipeline-page button:hover { border-color: var(--accent); color: var(--accent); }.pipeline-page button.active {
+    background: var(--active-chip); border-color: var(--accent); color: var(--accent);
   }.pipeline-page .seg {
     display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden;
     flex-shrink: 0;
   }.pipeline-page .seg button {
     border: 0; border-radius: 0; border-right: 1px solid var(--border);
-    min-width: 3.25rem;
-  }.pipeline-page .seg button:last-child { border-right: 0; }.pipeline-page .layout {
+    min-width: 0; padding: 6px 10px;
+  }.pipeline-page .seg button:last-child { border-right: 0; }.pipeline-page .rec-group {
+    display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    min-width: 0;
+  }.pipeline-page .rec-status {
+    font-size: 0.68rem; color: var(--muted);
+    max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }.pipeline-page .layout {
     position: relative;
     z-index: 1;
     display: grid;
     grid-template-columns: 1fr min(320px, 34vw);
-    height: calc(100% - var(--header-h));
+    flex: 1;
+    min-height: 0;
     transition: grid-template-columns 0.2s ease;
   }.pipeline-page .layout.side-collapsed {
     grid-template-columns: 1fr;
   }.pipeline-page .layout.side-collapsed .side { display: none; }@media (max-width: 900px) {.pipeline-page .layout { grid-template-columns: 1fr; grid-template-rows: 1fr 220px; }.pipeline-page .layout.side-collapsed { grid-template-rows: 1fr; }.pipeline-page header {
-      grid-template-columns: minmax(100px, 1fr) auto;
-      grid-template-rows: var(--header-h);
+      grid-template-columns: minmax(0, 1fr);
+      padding-right: 150px;
     }.pipeline-page .header-brand { display: none; }}.pipeline-page .stage-wrap {
     position: relative; min-width: 0; min-height: 0;
     background:
       radial-gradient(900px 420px at 12% -8%, rgba(26,39,64,0.55), transparent 55%),
-      #0b1018;
+      var(--bg);
   }.pipeline-page #flowStage {
     position: absolute; inset: 0; overflow: hidden; cursor: grab;
   }.pipeline-page #flowStage:active { cursor: grabbing; }.pipeline-page #flowCanvas {
@@ -120,7 +130,7 @@
   }.pipeline-page .flow-node {
     position: absolute; left: 0; top: 0;
     width: 210px;
-    background: rgba(18, 26, 38, 0.96);
+    background: var(--panel);
     border: 1px solid rgba(58,77,102,0.85);
     border-radius: 10px;
     box-shadow: 0 10px 28px rgba(0,0,0,0.35);
@@ -159,7 +169,7 @@
     position: relative;
     z-index: 1;
     border-left: 1px solid rgba(58,77,102,0.55);
-    background: rgba(12,18,28,0.96);
+    background: var(--panel);
     padding: 14px 16px; overflow: auto;
   }.pipeline-page .side-head {
     display: flex; align-items: center; justify-content: space-between;
@@ -217,7 +227,7 @@
     display: flex; flex-direction: column; gap: 4px;
     font-size: 0.72rem; color: var(--muted);
   }.pipeline-page .node-edit-form input, .pipeline-page .node-edit-form select, .pipeline-page .node-edit-form textarea {
-    background: #1a2434; color: var(--text);
+    background: var(--input-bg); color: var(--text);
     border: 1px solid #354a66; border-radius: 8px;
     padding: 7px 9px; font: inherit; font-size: 0.8rem;
   }.pipeline-page .node-edit-form textarea {

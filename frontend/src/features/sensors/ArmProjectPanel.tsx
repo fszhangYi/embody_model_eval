@@ -1,4 +1,5 @@
 import type { ArmKinOverview } from './armApi'
+import { t } from '../../i18n/runtime'
 
 export function ArmProjectPanel({
   overview,
@@ -9,25 +10,31 @@ export function ArmProjectPanel({
   loading: boolean
   error: string | null
 }) {
-  if (loading) return <p className="muted">正在加载 arm_kin 模块信息…</p>
+  if (loading) return <p className="muted">{t('sensors.project.loading')}</p>
   if (error) return <p className="sensors-guide-error">{error}</p>
   if (!overview?.ok) {
-    return <p className="sensors-guide-error">{overview?.importError || 'arm_kin 模块不可用'}</p>
+    return (
+      <p className="sensors-guide-error">{overview?.importError || t('sensors.project.unavailable')}</p>
+    )
   }
 
   return (
     <div className="sensors-project">
       <section className="sensors-guide-card">
-        <h4>集成路径</h4>
+        <h4>{t('sensors.project.integration')}</h4>
         <table>
           <tbody>
             <tr>
-              <th>embody 根目录</th>
-              <td><code>{overview.embodyRoot}</code></td>
+              <th>{t('sensors.project.embodyRoot')}</th>
+              <td>
+                <code>{overview.embodyRoot}</code>
+              </td>
             </tr>
             <tr>
-              <th>arm_kin 根目录</th>
-              <td><code>{overview.armKinRoot}</code></td>
+              <th>{t('sensors.row.armKinRoot')}</th>
+              <td>
+                <code>{overview.armKinRoot}</code>
+              </td>
             </tr>
             <tr>
               <th>robot.xml</th>
@@ -37,15 +44,17 @@ export function ArmProjectPanel({
               </td>
             </tr>
             <tr>
-              <th>构建说明</th>
+              <th>{t('sensors.project.buildGuide')}</th>
               <td>
                 <code>{overview.paths?.buildGuide}</code>
                 {overview.paths?.buildGuideExists ? ' ✓' : ' ✗'}
               </td>
             </tr>
             <tr>
-              <th>回归测试</th>
-              <td><code>{overview.paths?.tests}</code></td>
+              <th>{t('sensors.project.regressionTests')}</th>
+              <td>
+                <code>{overview.paths?.tests}</code>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -56,7 +65,7 @@ export function ArmProjectPanel({
 
       {overview.dependencies?.length ? (
         <section className="sensors-guide-card">
-          <h4>Python 依赖（pyproject.toml）</h4>
+          <h4>{t('sensors.project.pyDeps')}</h4>
           <ul className="sensors-chip-list">
             {overview.dependencies.map((d) => (
               <li key={d.name + d.spec}>
@@ -71,7 +80,7 @@ export function ArmProjectPanel({
 
       {overview.packageFiles?.length ? (
         <section className="sensors-guide-card">
-          <h4>包内模块文件</h4>
+          <h4>{t('sensors.project.packageFiles')}</h4>
           <ul className="sensors-file-list">
             {overview.packageFiles.map((f) => (
               <li key={f.path}>
@@ -85,7 +94,7 @@ export function ArmProjectPanel({
 
       {overview.tree?.length ? (
         <section className="sensors-guide-card">
-          <h4>目录树（节选）</h4>
+          <h4>{t('sensors.project.tree')}</h4>
           <ul className="sensors-file-list sensors-file-tree">
             {overview.tree.map((n) => (
               <li key={n.path} className={n.type === 'dir' ? 'dir' : 'file'}>

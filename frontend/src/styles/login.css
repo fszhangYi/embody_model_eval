@@ -208,7 +208,7 @@
 }
 
 .login-lang-btn.active {
-  color: #0b1018;
+  color: var(--bg);
   background: linear-gradient(120deg, #3dd6c6, #7ae0d4);
 }
 
@@ -246,7 +246,7 @@
   padding: 22px 22px 20px;
   border-radius: 12px;
   border: 1px solid rgba(58, 77, 102, 0.85);
-  background: linear-gradient(165deg, rgba(18, 26, 38, 0.96), rgba(12, 18, 28, 0.92));
+  background: var(--panel);
   box-shadow:
     0 18px 48px rgba(0, 0, 0, 0.45),
     inset 0 1px 0 rgba(255, 255, 255, 0.04);
@@ -322,7 +322,7 @@
   padding: 9px 11px;
   border-radius: 8px;
   border: 1px solid rgba(58, 77, 102, 0.9);
-  background: rgba(8, 12, 20, 0.85);
+  background: var(--input-bg);
   color: var(--text, #e7ecf3);
   font: inherit;
   font-size: 0.88rem;
@@ -412,7 +412,7 @@
   padding: 14px 16px;
   border-radius: 12px;
   border: 1px solid rgba(58, 77, 102, 0.7);
-  background: rgba(18, 26, 38, 0.55);
+  background: var(--surface-3);
   font-size: 0.75rem;
   line-height: 1.5;
   color: var(--text, #e7ecf3);

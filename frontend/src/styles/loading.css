@@ -8,7 +8,7 @@
   justify-content: center;
   padding: 16px;
   color: var(--muted, #8b9bb4);
-  background: rgba(11, 16, 24, 0.72);
+  background: var(--chrome);
   z-index: 24;
   pointer-events: none;
   backdrop-filter: blur(8px);
@@ -30,7 +30,7 @@
   width: min(360px, 88vw);
   padding: 20px 22px 18px;
   border-radius: 14px;
-  background: rgba(18, 26, 38, 0.94);
+  background: var(--panel);
   border: 1px solid rgba(58, 77, 102, 0.72);
   box-shadow:
     0 12px 36px rgba(0, 0, 0, 0.42),

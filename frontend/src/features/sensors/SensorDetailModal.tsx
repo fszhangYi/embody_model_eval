@@ -44,6 +44,17 @@ export function SensorDetailModal({
   const arm = device.armLive
   const teachSamples = arm?.teachCheck?.samples
 
+  const previewHint =
+    device.kind === 'realsense'
+      ? t('sensors.modal.previewRs')
+      : device.kind === 'tactile'
+        ? t('sensors.modal.previewTactile')
+        : device.kind === 'ft'
+          ? t('sensors.modal.previewFt')
+          : device.kind === 'arm'
+            ? t('sensors.modal.previewArmLoading')
+            : t('sensors.modal.previewGeneric')
+
   return createPortal(
     <div
       className="sensors-modal-overlay"
@@ -67,34 +78,39 @@ export function SensorDetailModal({
               </span>
             </div>
             <h2 id="sensors-modal-title">{trText(device.name)}</h2>
-            <p className="muted">{device.model}</p>
+            <p className="muted">{trText(device.model)}</p>
           </div>
-          <button type="button" className="sensors-modal-close" onClick={onClose} aria-label="关闭">
+          <button
+            type="button"
+            className="sensors-modal-close"
+            onClick={onClose}
+            aria-label={t('sensors.modal.closeAria')}
+          >
             ×
           </button>
         </div>
 
         <div className="sensors-modal-body">
-          <p className="sensors-modal-summary">{detail.summary}</p>
+          <p className="sensors-modal-summary">{trText(detail.summary)}</p>
 
           <div className="sensors-modal-preview" aria-hidden={device.kind !== 'arm'}>
             {device.kind === 'arm' && arm?.pose ? (
               <div className="sensors-arm-preview">
                 <div className="sensors-arm-preview-row">
-                  <span className="muted">法兰 TCP (mm)</span>
+                  <span className="muted">{t('sensors.modal.tcpFlange')}</span>
                   <strong>{arm.pose.tcpText}</strong>
                 </div>
                 <div className="sensors-arm-preview-row">
-                  <span className="muted">姿态 XYZ (°)</span>
+                  <span className="muted">{t('sensors.modal.rpy')}</span>
                   <strong>{arm.pose.rpyText}</strong>
                 </div>
                 <div className="sensors-arm-preview-row">
-                  <span className="muted">关节 (°)</span>
+                  <span className="muted">{t('sensors.modal.joints')}</span>
                   <code>{arm.pose.jointText}</code>
                 </div>
                 {arm.config?.teachPoseCount ? (
                   <div className="sensors-arm-teach-btns">
-                    <span className="muted">示教点</span>
+                    <span className="muted">{t('sensors.modal.teachPoints')}</span>
                     {Array.from({ length: Math.min(arm.config.teachPoseCount, 9) }, (_, i) => i + 1).map(
                       (n) => (
                         <button
@@ -112,25 +128,15 @@ export function SensorDetailModal({
                 ) : null}
               </div>
             ) : (
-              <span className="muted">
-                {device.kind === 'realsense'
-                  ? '相机预览区（待接入彩色 / 深度流）'
-                  : device.kind === 'tactile'
-                    ? '触觉热力图（待接入阵列帧）'
-                    : device.kind === 'ft'
-                      ? '六维力波形（待接入 wrench）'
-                      : device.kind === 'arm'
-                        ? '机械臂位姿（加载中或后端不可用）'
-                        : '实时可视化区（待接入）'}
-              </span>
+              <span className="muted">{previewHint}</span>
             )}
           </div>
 
           <dl className="sensors-metrics sensors-metrics-lg">
             {device.metrics.map((m) => (
               <div key={m.label} className="sensors-metric">
-                <dt>{m.label}</dt>
-                <dd>{m.value}</dd>
+                <dt>{trText(m.label)}</dt>
+                <dd>{trText(m.value)}</dd>
               </div>
             ))}
           </dl>
@@ -155,7 +161,7 @@ export function SensorDetailModal({
 
           {teachSamples?.length ? (
             <section className="sensors-modal-section">
-              <h3>示教样本误差</h3>
+              <h3>{t('sensors.modal.teachSamples')}</h3>
               <div className="sensors-teach-table-wrap">
                 <table className="sensors-teach-table">
                   <thead>
@@ -163,7 +169,7 @@ export function SensorDetailModal({
                       <th>#</th>
                       <th>err (mm)</th>
                       <th>FK xyz</th>
-                      <th>示教 xyz</th>
+                      <th>{t('sensors.modal.teachXyz')}</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -189,7 +195,7 @@ export function SensorDetailModal({
                             disabled={busy || !onSelectTeach}
                             onClick={() => onSelectTeach?.(s.index)}
                           >
-                            加载
+                            {t('sensors.modal.btnLoad')}
                           </button>
                         </td>
                       </tr>
@@ -202,7 +208,7 @@ export function SensorDetailModal({
 
           {detail.channels?.length ? (
             <section className="sensors-modal-section">
-              <h3>数据通道</h3>
+              <h3>{t('sensors.modal.channels')}</h3>
               <ul className="sensors-chip-list">
                 {detail.channels.map((c) => (
                   <li key={c}>
@@ -215,7 +221,7 @@ export function SensorDetailModal({
 
           {detail.checklist?.length ? (
             <section className="sensors-modal-section">
-              <h3>上线检查</h3>
+              <h3>{t('sensors.modal.checklist')}</h3>
               <ul className="sensors-check-list">
                 {detail.checklist.map((item) => (
                   <li key={trText(item)}>
@@ -228,23 +234,23 @@ export function SensorDetailModal({
           ) : null}
 
           <section className="sensors-modal-section">
-            <h3>标识</h3>
+            <h3>{t('sensors.modal.identity')}</h3>
             <table>
               <tbody>
                 <tr>
-                  <th scope="row">设备 ID</th>
+                  <th scope="row">{t('sensors.modal.deviceId')}</th>
                   <td>
                     <code>{device.id}</code>
                   </td>
                 </tr>
                 <tr>
-                  <th scope="row">端点</th>
+                  <th scope="row">{t('sensors.endpoint')}</th>
                   <td>
                     <code>{device.endpoint}</code>
                   </td>
                 </tr>
                 <tr>
-                  <th scope="row">说明</th>
+                  <th scope="row">{t('sensors.modal.description')}</th>
                   <td>{trText(device.note)}</td>
                 </tr>
               </tbody>
@@ -259,10 +265,10 @@ export function SensorDetailModal({
             disabled={busy}
             onClick={() => onTest(device.id)}
           >
-            {busy ? '测试中…' : '测试连接'}
+            {busy ? t('sensors.btnTesting') : t('sensors.btnTest')}
           </button>
           <button type="button" className="sensors-btn primary" onClick={onClose}>
-            关闭
+            {t('sensors.modal.close')}
           </button>
         </div>
       </div>

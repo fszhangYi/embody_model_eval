@@ -160,8 +160,8 @@ function setupAutoCollapsingRails() {
       tab.classList.toggle('pinned', pinned);
       tab.setAttribute('aria-pressed', pinned ? 'true' : 'false');
       tab.title = pinned
-        ? '已钉住 · 再点取消钉住'
-        : '悬停展开 · 点击钉住侧栏';
+        ? t('eval.dyn.pinned')
+        : t('eval.dyn.unpinHover');
       if (pinned) {
         clearTimeout(closeTimer);
         setOpen(true);
@@ -275,11 +275,11 @@ const TERM_GLOSSARY = {
     body: 'meta.obs_alignment：frame_index 按帧号一一对应；nearest_timestamp 按 timestamp 最近邻。|skew| 超过 max_skew_ms 会告警。',
   },
   obs_cam: {
-    title: '观测流',
+    title: t('eval.dyn.obsStream'),
     body: '切换 wrist / front / depth 等相机 id。stream 可为 rgb、depth、attention。',
   },
   obs_sync: {
-    title: '同步画面',
+    title: t('eval.dyn.syncView'),
     body: '画布随帧滑条与播放器更新；角标显示该帧观测相对 action 时钟的 skew（ms）。',
   },
   obs_overlay: {
@@ -510,8 +510,8 @@ function setupTermTips() {
     if (activeEl && activeEl !== el) activeEl.classList.remove('is-active');
     activeEl = el;
     el.classList.add('is-active');
-    titleEl.textContent = entry.title;
-    bodyEl.textContent = entry.body;
+    titleEl.textContent = t(`eval.gloss.${key}.title`) || entry.title;
+    bodyEl.textContent = t(`eval.gloss.${key}.body`) || entry.body;
     tipEl.classList.add('show');
     tipEl.setAttribute('aria-hidden', 'false');
   };
@@ -547,9 +547,10 @@ function appendStat(box, label, value, tipKey) {
   if (!box) return;
   const d = document.createElement('div');
   d.className = 'stat';
+  const shown = trText(String(label));
   const labelHtml = tipKey
-    ? `<div class="label tip" data-tip="${tipKey}" tabindex="0">${label}</div>`
-    : `<div class="label">${label}</div>`;
+    ? `<div class="label tip" data-tip="${tipKey}" tabindex="0">${shown}</div>`
+    : `<div class="label">${shown}</div>`;
   d.innerHTML = `${labelHtml}<div class="value">${value}</div>`;
   box.appendChild(d);
 }
@@ -989,7 +990,7 @@ async function initScene(container, frames, robotCfg) {
     `机型 ${robotCfg.id} · 解析模型与网格`,
   );
   const robotProgress = [0, 0, 0];
-  const robotLabels = ['灰 cur', '红 GT', '蓝 pred'];
+  const robotLabels = [t('eval.dyn.grayCur'), t('eval.dyn.redGt'), t('eval.dyn.bluePred')];
   const bumpRobots = () => {
     const avg = (robotProgress[0] + robotProgress[1] + robotProgress[2]) / 3;
     const parts = robotLabels
@@ -1039,9 +1040,9 @@ async function initScene(container, frames, robotCfg) {
   scene.add(armCur, armGT, armPred);
   fitEvalCamera(camera, controls, armGT, { fog: scene.fog });
 
-  setLoadProgress(0.78, '计算 TCP 轨迹…', `${robotCfg.id} · 正运动学采样`);
+  setLoadProgress(0.78, t('eval.dyn.computeTcp'), `${robotCfg.id} · 正运动学采样`);
   const paths = computeTcpPaths(armGT, frames);
-  setLoadProgress(0.90, '构建场景对象…', '轨迹 / 散点 / TCP 轴');
+  setLoadProgress(0.90, t('eval.dyn.buildScene'), t('eval.dyn.trajScatter'));
   const scatterCur = makeScatter(colorCur);
   const scatterGT = makeScatter(colorGt);
   const scatterPred = makeScatter(colorPred);
@@ -1109,7 +1110,7 @@ async function initScene(container, frames, robotCfg) {
   }
   window.addEventListener('resize', resize);
 
-  setLoadProgress(1, '加载完成', `${robotCfg.label} · 进入评测视图`);
+  setLoadProgress(1, t('eval.dyn.loadDone'), `${robotCfg.label} · 进入评测视图`);
   return {
     robot: robotCfg,
     scene,
@@ -1262,7 +1263,7 @@ function setupTcpCharts(DATA, tcp) {
   }));
 
   const segNames = ['approach', 'contact', 'transport', 'retreat'];
-  const segLabels = ['接近', '接触', '搬运', '回撤'];
+  const segLabels = [t('eval.dyn.segApproach'), t('eval.dyn.segContact'), t('eval.dyn.segTransport'), t('eval.dyn.segRetract')];
   charts.push(new Chart(document.getElementById('tcpSegChart'), {
     type: 'bar',
     data: {
@@ -1297,8 +1298,8 @@ function setupTcpCharts(DATA, tcp) {
   }));
 
   const lagSign = tcp.temporal.lag_frames > 0
-    ? 'pred 滞后 GT'
-    : (tcp.temporal.lag_frames < 0 ? 'pred 超前 GT' : '无明显滞后');
+    ? t('eval.dyn.lagBehind')
+    : (tcp.temporal.lag_frames < 0 ? t('eval.dyn.lagAhead') : t('eval.dyn.lagNone'));
   document.getElementById('tcpTemporalHint').textContent =
     `时序：最佳滞后 ${tcp.temporal.lag_frames} 帧 (${tcp.temporal.lag_s.toFixed(3)}s，${lagSign}) · `
     + `该滞后下 mean e_p ${tcp.temporal.mean_ep_at_lag_mm.toFixed(2)} mm · `
@@ -1342,7 +1343,7 @@ function setupTcpCharts(DATA, tcp) {
             ...baseChartOpts().plugins,
             title: {
               display: true,
-              text: '需 meta.goal_pose = {pos, quat, approach?}',
+              text: t('eval.dyn.needGoalPose'),
               color: '#9db0c9',
               font: { size: 11 },
             },
@@ -1374,7 +1375,7 @@ function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
 
   if (hint) {
     if (!outcome.available) {
-      hint.innerHTML = '<span class="tag">无 task_outcome</span> 本条未标注任务成功/失败';
+      hint.innerHTML = `<span class="tag">${t('eval.dyn.tagNoTask')}</span> ${t('eval.dyn.noTaskOutcome')}`;
     } else {
       const cls = outcomeTagClass(outcome.outcome);
       const labels = (outcome.labels || []).map((l) => `<span class="tag">${l}</span>`).join('') || '—';
@@ -1388,11 +1389,11 @@ function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
   if (stats) {
     stats.innerHTML = '';
     for (const [label, value, tipKey] of [
-      ['结果', outcome.available ? outcome.outcome : '—', 'task_outcome'],
-      ['原因码', outcome.reason_code || '—', 'task_outcome'],
-      ['接触帧', String(analysis.contact.n_contact_frames), 'contact_events'],
-      ['事件', String(analysis.events.length), 'contact_events'],
-      ['物体', analysis.objects.ids.join(',') || '—', 'object_pose'],
+      [t('eval.dyn.result'), outcome.available ? outcome.outcome : '—', 'task_outcome'],
+      [t('eval.dyn.reasonCode'), outcome.reason_code || '—', 'task_outcome'],
+      [t('eval.dyn.contactFrame'), String(analysis.contact.n_contact_frames), 'contact_events'],
+      [t('eval.dyn.events'), String(analysis.events.length), 'contact_events'],
+      [t('eval.dyn.objects'), analysis.objects.ids.join(',') || '—', 'object_pose'],
     ]) {
       appendStat(stats, label, value, tipKey);
     }
@@ -1411,7 +1412,7 @@ function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
           : /place|success|grasp_force|contact_end/i.test(ev.type) ? '' : 'warn';
         return `<li class="${cls}" data-frame="${ev.frame}">${bits}</li>`;
       }).join('')
-      : '<li class="muted">无 events[]</li>';
+      : `<li class="muted">${t('eval.dyn.noEvents')}</li>`;
     list.onclick = (e) => {
       const li = e.target.closest('li[data-frame]');
       if (li && onJumpFrame) onJumpFrame(Number(li.dataset.frame));
@@ -1471,7 +1472,7 @@ function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
           ...baseChartOpts().plugins,
           title: datasets.length ? undefined : {
             display: true,
-            text: '需 frames[].objects',
+            text: t('eval.dyn.needObjects'),
             color: '#9db0c9',
             font: { size: 11 },
           },
@@ -1529,7 +1530,7 @@ function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
       const c = DATA.frames[frameIdx]?.contact;
       const parts = [];
       if (c) {
-        parts.push(c.in_contact ? '接触中' : '无接触');
+        parts.push(c.in_contact ? t('eval.dyn.inContact') : t('eval.dyn.noContact'));
         if (Number.isFinite(c.force_n)) parts.push(`F=${c.force_n.toFixed(1)}N`);
         if (Number.isFinite(c.slip_mm)) parts.push(`slip=${c.slip_mm.toFixed(1)}mm`);
       }
@@ -1541,7 +1542,7 @@ function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
         const dObj = dist.series[primary].to_object_mm[frameIdx];
         if (dObj != null) parts.push(`${primary}→TCP ${dObj.toFixed(1)}mm`);
       }
-      objHint.textContent = parts.join(' · ') || '本帧无物体/接触信息';
+      objHint.textContent = parts.join(' · ') || t('eval.dyn.noObjContact');
     }
   }
 
@@ -1910,7 +1911,7 @@ function pickMimeType() {
 }
 
 try {
-  setLoadProgress(0.01, '加载评测数据…', '读取 episode JSON');
+  setLoadProgress(0.01, t('eval.dyn.loadEval'), '读取 episode JSON');
   const DATA = await loadData();
   const meta = DATA.meta;
   const names = meta.joint_names;
@@ -1937,7 +1938,7 @@ try {
   document.getElementById('title').textContent = `Embody · ${robotCfg.label}`;
   document.getElementById('subtitle').textContent =
     `${robotCfg.id} · ${meta.source} · ${meta.n_frames}帧 · ${meta.generated_at}`;
-  setLoadProgress(0.08, '初始化界面…', `${robotCfg.label} · ${meta.n_frames} 帧`);
+  setLoadProgress(0.08, t('eval.dyn.initUi'), `${robotCfg.label} · ${meta.n_frames} 帧`);
 
   const stats = document.getElementById('stats');
   for (const [label, value, tipKey] of [
@@ -1951,7 +1952,7 @@ try {
   }
 
   setupCharts(DATA);
-  setLoadProgress(0.12, `加载 ${robotCfg.label} 模型…`, '开始下载 URDF / STL');
+  setLoadProgress(0.12, `加载 ${robotCfg.label} 模型…`, t('eval.dyn.downloadUrdf'));
 
   const world = await initScene(document.getElementById('arm3d'), DATA.frames, robotCfg);
   hideLoader(evalLoader, { remove: true });
@@ -1961,7 +1962,7 @@ try {
       world.applyCameraPreset('free');
       world.fitCamera();
       const camHintEl = document.getElementById('camHint');
-      if (camHintEl) camHintEl.textContent = '自由轨道 · 画布底栏切换旋转/平移/缩放';
+      if (camHintEl) camHintEl.textContent = t('eval.dyn.camFree');
     },
   });
 
@@ -2018,7 +2019,7 @@ try {
     gateEl.textContent = gates.checks.length
       ? `门禁 ${gates.passed ? 'PASS' : 'FAIL'} · ${gates.checks.length} 项`
         + (failed.length ? ` · 未过: ${failed.join(', ')}` : '')
-      : '门禁：未配置阈值';
+      : t('eval.dyn.gateNone');
   }
   {
     appendStat(
@@ -2190,24 +2191,24 @@ try {
   document.getElementById('btnCamSide').addEventListener('click', () => {
     world.applyCameraPreset('side');
     setCamButtons('btnCamSide');
-    camHint.textContent = '侧视 · 可用画布底栏继续操作';
+    camHint.textContent = t('eval.dyn.camSideHint');
   });
   document.getElementById('btnCamTop').addEventListener('click', () => {
     world.applyCameraPreset('top');
     setCamButtons('btnCamTop');
-    camHint.textContent = '顶视 · 可用画布底栏继续操作';
+    camHint.textContent = t('eval.dyn.camTopHint');
   });
   document.getElementById('btnCamFollow').addEventListener('click', () => {
     const on = world.getCamMode() !== 'follow';
     world.applyCameraPreset(on ? 'follow' : 'free');
     setCamButtons(on ? 'btnCamFollow' : '');
-    camHint.textContent = on ? '跟随 TCP（GT）中…' : '自由轨道 · 画布底栏切换旋转/平移/缩放';
+    camHint.textContent = on ? t('eval.dyn.camFollowHint') : t('eval.dyn.camFree');
   });
   world.controls.addEventListener('start', () => {
     if (world.getCamMode() === 'follow') {
       world.setCamMode('free');
       setCamButtons('');
-      camHint.textContent = '自由轨道 · 画布底栏切换旋转/平移/缩放';
+      camHint.textContent = t('eval.dyn.camFree');
     }
   });
 
@@ -2223,7 +2224,7 @@ try {
 
   if (obsAlignHint) {
     if (!obsAudit.available) {
-      obsAlignHint.innerHTML = '<span class="tag">无 cameras</span> 本条未声明观测流';
+      obsAlignHint.innerHTML = `<span class="tag">${t('eval.dyn.tagNoCameras')}</span> ${t('eval.dyn.noCameras')}`;
     } else {
       const issueTags = obsAudit.issues.slice(0, 4).map((x) => {
         const cls = x.level === 'error' ? 'bad' : x.level === 'warn' ? 'warn' : 'ok';
@@ -2251,8 +2252,8 @@ try {
       ctx.fillRect(0, 0, w, h);
       ctx.fillStyle = '#8b9bb4';
       ctx.font = '12px sans-serif';
-      ctx.fillText('无 frames[].obs', 12, 28);
-      if (obsFrameHint) obsFrameHint.textContent = '本条 episode 无观测媒体';
+      ctx.fillText(t('eval.dyn.noObsFrames'), 12, 28);
+      if (obsFrameHint) obsFrameHint.textContent = t('eval.dyn.noObsMedia');
       return;
     }
     const token = ++obsPaintToken;
@@ -2336,12 +2337,12 @@ try {
   const unitEl = document.getElementById('unitHint');
   if (unitEl) {
     const tags = [
-      `<span class="tag ${unitCheck.ok ? 'ok' : 'bad'}">${unitCheck.ok ? '校验通过' : '校验异常'}</span>`,
+      `<span class="tag ${unitCheck.ok ? 'ok' : 'bad'}">${unitCheck.ok ? t('eval.dyn.unitOk') : t('eval.dyn.unitBad')}</span>`,
       `<span class="tag">推断 ${unitCheck.inferred_unit}</span>`,
       `<span class="tag">声明 ${unitCheck.declared_unit || '—'}</span>`,
       `<span class="tag">mode ${unitCheck.action_mode || '—'}</span>`,
     ].join('');
-    const msgs = [...unitCheck.issues, ...unitCheck.warnings].map((x) => x.msg).join('；') || '无额外告警';
+    const msgs = [...unitCheck.issues, ...unitCheck.warnings].map((x) => x.msg).join('；') || t('eval.dyn.noExtraWarn');
     unitEl.innerHTML = `${tags}<br>${msgs}`;
   }
   const provEl = document.getElementById('provHint');
@@ -2365,7 +2366,7 @@ try {
       `<li data-frame="${f.i}" class="${f.reasons.includes('large_ep') ? 'bad' : 'warn'}">`
       + `t=${f.i} · e_p ${f.ep_mm.toFixed(1)} · e_R ${f.eR_deg.toFixed(1)} · ${f.reasons.join('+')}`
       + `</li>`
-    ).join('') || '<li class="hint">未触发失败阈值</li>';
+    ).join('') || `<li class="hint">${t('eval.dyn.noFailThresh')}</li>`;
     failList.addEventListener('click', (e) => {
       const li = e.target.closest('li[data-frame]');
       if (li) pauseJump(Number(li.dataset.frame));
@@ -2468,7 +2469,7 @@ try {
     }
     sList.innerHTML = items.map((x) =>
       `<li data-frame="${x.i}" class="${x.cls}">${x.text}</li>`
-    ).join('') || '<li>未发现明显安全/可执行告警</li>';
+    ).join('') || `<li>${t('eval.dyn.noSafetyAlert')}</li>`;
     sList.addEventListener('click', (e) => {
       const li = e.target.closest('li[data-frame]');
       if (li) pauseJump(Number(li.dataset.frame));
@@ -2480,11 +2481,11 @@ try {
     const sh = safety.collision.self_hits[0];
     const method = safety.collision.method || 'hull';
     colHint.textContent =
-      `碰撞(${method}) stride=${stride} · 桌面命中 ${safety.collision.n_table}`
+      `${trText('碰撞检测')}(${method}) stride=${stride} · ${trText('桌面碰')} ${safety.collision.n_table}`
       + (th ? `（例 t=${th.i} ${th.link} z=${th.z.toFixed(3)}）` : '')
-      + ` · 自碰 ${safety.collision.n_self}`
+      + ` · ${trText('自碰')} ${safety.collision.n_self}`
       + (sh ? `（例 t=${sh.i} ${sh.a}/${sh.b} ${sh.dist_mm.toFixed(1)}mm）` : '')
-      + ' · URDF collision 点云采样';
+      + t('eval.dyn.collisionSample');
   }
 
   // enrich export provenance into gates summary path already uses meta
@@ -2597,12 +2598,12 @@ try {
 
   btnRecStart.addEventListener('click', () => {
     if (!window.MediaRecorder) {
-      recStatus.textContent = '当前浏览器不支持 MediaRecorder';
+      recStatus.textContent = t('eval.dyn.recUnsupported');
       return;
     }
     const mime = pickMimeType();
     if (!mime) {
-      recStatus.textContent = '浏览器不支持 WebM 录制';
+      recStatus.textContent = t('eval.dyn.recNoWebm');
       return;
     }
     try {
@@ -2628,11 +2629,11 @@ try {
       recTimerId = setInterval(() => {
         recTimerEl.textContent = formatMMSS(performance.now() - recStartedAt);
       }, 250);
-      recStatus.textContent = '录制中…';
+      recStatus.textContent = t('eval.dyn.recRecording');
       setRecUI('recording');
     } catch (e) {
       console.error(e);
-      recStatus.textContent = '开始录制失败: ' + e.message;
+      recStatus.textContent = t('eval.dyn.recFail', { msg: e.message });
     }
   });
 

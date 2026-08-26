@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { BuildGuideResponse, ArmKinOverview } from './armApi'
 import { MarkdownLite } from './MarkdownLite'
+import { t, trText } from '../../i18n/runtime'
 
 const OVERVIEW_ID = '__overview__'
 
@@ -15,14 +16,14 @@ function OverviewPanel({
     <>
       {overview ? (
         <section className="sensors-guide-card">
-          <h4>模块依赖链（arm_kin）</h4>
+          <h4>{t('sensors.guide.depChain')}</h4>
           <div className="sensors-pipeline-flow">
             {overview.modules?.map((m, i) => (
               <div key={m.file} className="sensors-pipeline-node">
                 <span className="sensors-pipeline-idx">{i + 1}</span>
                 <strong>{m.file}</strong>
                 <span className="muted">{m.layer}</span>
-                <p>{m.role}</p>
+                <p>{trText(m.role)}</p>
               </div>
             ))}
           </div>
@@ -31,16 +32,16 @@ function OverviewPanel({
 
       {steps?.length ? (
         <section className="sensors-guide-card">
-          <h4>从 0 到可交付（12 步）</h4>
+          <h4>{t('sensors.guide.steps12')}</h4>
           <ol className="sensors-build-steps">
             {steps.map((s) => (
               <li key={s.step}>
                 <div className="sensors-build-step-head">
-                  <span className="sensors-build-step-num">步骤 {s.step}</span>
+                  <span className="sensors-build-step-num">{t('sensors.guide.stepN', { n: s.step })}</span>
                   <code>{s.module}</code>
-                  <strong>{s.title}</strong>
+                  <strong>{trText(s.title)}</strong>
                 </div>
-                <p className="muted">验收：{s.acceptance}</p>
+                <p className="muted">{t('sensors.guide.accept', { text: trText(s.acceptance) })}</p>
               </li>
             ))}
           </ol>
@@ -49,12 +50,12 @@ function OverviewPanel({
 
       {overview?.dhTable?.length ? (
         <section className="sensors-guide-card">
-          <h4>当前 DH 参数表（运行时）</h4>
+          <h4>{t('sensors.guide.dhTable')}</h4>
           <div className="sensors-md-table-wrap">
             <table className="sensors-md-table">
               <thead>
                 <tr>
-                  <th>关节</th>
+                  <th>{t('sensors.guide.joint')}</th>
                   <th>θ offset (rad)</th>
                   <th>d (m)</th>
                   <th>a (m)</th>
@@ -79,23 +80,27 @@ function OverviewPanel({
 
       {overview?.apiCatalog?.length ? (
         <section className="sensors-guide-card">
-          <h4>对外 API 速查</h4>
+          <h4>{t('sensors.guide.apiCatalog')}</h4>
           <div className="sensors-md-table-wrap">
             <table className="sensors-md-table">
               <thead>
                 <tr>
-                  <th>符号</th>
-                  <th>模块</th>
-                  <th>说明</th>
-                  <th>单位</th>
+                  <th>{t('sensors.guide.symbol')}</th>
+                  <th>{t('sensors.guide.module')}</th>
+                  <th>{t('sensors.guide.desc')}</th>
+                  <th>{t('sensors.guide.unit')}</th>
                 </tr>
               </thead>
               <tbody>
                 {overview.apiCatalog.map((a) => (
                   <tr key={a.symbol}>
-                    <td><code>{a.symbol}</code></td>
-                    <td><code>{a.module}</code></td>
-                    <td>{a.summary}</td>
+                    <td>
+                      <code>{a.symbol}</code>
+                    </td>
+                    <td>
+                      <code>{a.module}</code>
+                    </td>
+                    <td>{trText(a.summary)}</td>
                     <td>{a.unit}</td>
                   </tr>
                 ))}
@@ -107,10 +112,16 @@ function OverviewPanel({
 
       {overview?.install ? (
         <section className="sensors-guide-card">
-          <h4>安装与测试命令</h4>
-          <pre className="sensors-md-pre"><code>{overview.install.pipEditable}</code></pre>
-          <pre className="sensors-md-pre"><code>{overview.install.pytest}</code></pre>
-          <pre className="sensors-md-pre"><code>{overview.install.selfCheck}</code></pre>
+          <h4>{t('sensors.guide.install')}</h4>
+          <pre className="sensors-md-pre">
+            <code>{overview.install.pipEditable}</code>
+          </pre>
+          <pre className="sensors-md-pre">
+            <code>{overview.install.pytest}</code>
+          </pre>
+          <pre className="sensors-md-pre">
+            <code>{overview.install.selfCheck}</code>
+          </pre>
         </section>
       ) : null}
     </>
@@ -150,7 +161,7 @@ export function ArmFkIkBuildGuide({
   const steps = guide?.buildSteps || overview?.buildSteps || []
 
   if (loading) {
-    return <p className="muted sensors-guide-loading">正在加载 arm_kin 构建说明…</p>
+    return <p className="muted sensors-guide-loading">{t('sensors.guide.loading')}</p>
   }
   if (error && !guide?.ok) {
     return <p className="sensors-guide-error">{error}</p>
@@ -158,7 +169,7 @@ export function ArmFkIkBuildGuide({
   if (!guide?.ok) {
     return (
       <p className="sensors-guide-error">
-        {guide?.error || error || '构建说明不可用'}
+        {guide?.error || error || t('sensors.guide.unavailable')}
         {error ? <span className="muted"> · {error}</span> : null}
       </p>
     )
@@ -166,8 +177,8 @@ export function ArmFkIkBuildGuide({
 
   return (
     <div className="sensors-guide">
-      <aside className="sensors-guide-nav" aria-label="文档目录">
-        <p className="sensors-guide-nav-title">构建文档</p>
+      <aside className="sensors-guide-nav" aria-label={t('sensors.guide.tocAria')}>
+        <p className="sensors-guide-nav-title">{t('sensors.guide.docTitle')}</p>
         <ul>
           <li>
             <button
@@ -175,7 +186,7 @@ export function ArmFkIkBuildGuide({
               className={activeId === OVERVIEW_ID ? 'active' : ''}
               onClick={() => setActiveId(OVERVIEW_ID)}
             >
-              工程总览
+              {t('sensors.guide.overview')}
             </button>
           </li>
           {sections.map((s) => (
@@ -185,7 +196,7 @@ export function ArmFkIkBuildGuide({
                 className={s.id === activeId ? 'active' : ''}
                 onClick={() => setActiveId(s.id)}
               >
-                {s.title}
+                {trText(s.title)}
               </button>
             </li>
           ))}
@@ -196,12 +207,12 @@ export function ArmFkIkBuildGuide({
         <header className="sensors-guide-head">
           <h3>
             {activeId === OVERVIEW_ID
-              ? guide.title || 'FK / IK 搭建思路'
-              : activeSection?.title || guide.title}
+              ? trText(guide.title || '') || t('sensors.guide.fallbackTitle')
+              : trText(activeSection?.title || '') || trText(guide.title || '')}
           </h3>
           {guide.sourcePath ? (
             <p className="muted">
-              源文件 <code>{guide.sourcePath}</code>
+              {t('sensors.guide.sourceFile')} <code>{guide.sourcePath}</code>
             </p>
           ) : null}
           {error ? <p className="muted sensors-guide-warn">{error}</p> : null}
@@ -214,7 +225,7 @@ export function ArmFkIkBuildGuide({
             <MarkdownLite source={activeSection.body} />
           </section>
         ) : (
-          <p className="muted">未找到对应章节</p>
+          <p className="muted">{t('sensors.guide.sectionMissing')}</p>
         )}
       </div>
     </div>

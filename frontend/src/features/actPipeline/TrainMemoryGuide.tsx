@@ -96,15 +96,11 @@ export function TrainMemoryGuide({
 
       {open ? (
         <div className="act-train-mem-body">
-          <p className="act-train-mem-lead muted">
-            基于 <code>EpisodicDataset</code> + PyTorch DataLoader（<code>persistent_workers</code>、
-            <code>prefetch=2</code>）的经验公式，用于调整 batch-size / num-workers / 相机数时预判资源。
-            SAM2 特征模式张量形状不同，仅供参考。
-          </p>
+          <p className="act-train-mem-lead muted">{t('act.mem.lead')}</p>
 
           <div className="act-train-mem-res">
             <label>
-              图像高 H
+              {t('act.mem.height')}
               <input
                 type="number"
                 min={1}
@@ -113,7 +109,7 @@ export function TrainMemoryGuide({
               />
             </label>
             <label>
-              图像宽 W
+              {t('act.mem.width')}
               <input
                 type="number"
                 min={1}
@@ -130,32 +126,43 @@ export function TrainMemoryGuide({
               <div>
                 <dt>{t('act.mem.sample')}</dt>
                 <dd>
-                  {est.K} 相机 × {height}×{width} ≈ {fmtGb(est.sampleGb)}
+                  {t('act.mem.sampleVal', {
+                    cameras: est.K,
+                    h: height,
+                    w: width,
+                    size: fmtGb(est.sampleGb),
+                  })}
                 </dd>
               </div>
               <div>
                 <dt>{t('act.mem.batch')}</dt>
-                <dd>
-                  B={est.B} → ≈ {fmtGb(est.batchGb)}
-                </dd>
+                <dd>{t('act.mem.batchVal', { b: est.B, size: fmtGb(est.batchGb) })}</dd>
               </div>
               <div>
-                <dt>DataLoader workers</dt>
+                <dt>{t('act.mem.workers')}</dt>
                 <dd>
-                  训练 {est.W_train} + 验证 {est.W_val} → ≈ {fmtGb(est.workersGb)}
+                  {t('act.mem.workersVal', {
+                    train: est.W_train,
+                    val: est.W_val,
+                    size: fmtGb(est.workersGb),
+                  })}
                 </dd>
               </div>
               <div>
                 <dt>{t('act.mem.cpuTotal')}</dt>
                 <dd className={highCpu ? 'warn' : ''}>
-                  主进程 {MAIN_GB} GB + workers {fmtGb(est.workersGb)} + 杂项 {MISC_GB} GB ≈{' '}
-                  <strong>{fmtGb(est.cpuGb)}</strong>
+                  {t('act.mem.cpuVal', {
+                    main: MAIN_GB,
+                    workers: fmtGb(est.workersGb),
+                    misc: MISC_GB,
+                    total: fmtGb(est.cpuGb),
+                  })}
                 </dd>
               </div>
               <div>
                 <dt>{t('act.mem.gpu')}</dt>
                 <dd className={highGpu ? 'warn' : ''}>
-                  batch 激活 ×5 + 模型/优化器 ≈ <strong>{fmtGb(est.gpuGb)}</strong>（需实测校准）
+                  {t('act.mem.gpuVal', { size: fmtGb(est.gpuGb) })}
                 </dd>
               </div>
             </dl>
@@ -165,30 +172,28 @@ export function TrainMemoryGuide({
             <summary>{t('act.mem.formulas')}</summary>
             <div className="act-train-mem-formulas">
               <p>
-                <strong>单样本（float32）：</strong>
+                <strong>{t('act.mem.formulaSample')}</strong>
                 <code>M_sample = K × 3 × H × W × 4</code>（bytes）
               </p>
               <p>
-                <strong>单 batch：</strong>
-                <code>M_batch = B × M_sample</code>（qpos / action 等辅助项通常可忽略）
+                <strong>{t('act.mem.formulaBatch')}</strong>
+                <code>M_batch = B × M_sample</code>（{t('act.mem.formulaBatchNote')}）
               </p>
               <p>
-                <strong>Workers CPU：</strong>
+                <strong>{t('act.mem.formulaWorkers')}</strong>
                 <code>
                   M_workers = W_train×α_train×prefetch×M_batch + W_val×α_val×prefetch×M_batch
                 </code>
                 <br />
-                <span className="muted">
-                  W_train = num-workers；W_val = min(2, num-workers)；prefetch=2；α_train≈28；α_val≈4
-                </span>
+                <span className="muted">{t('act.mem.formulaWorkersNote')}</span>
               </p>
               <p>
-                <strong>CPU 合计：</strong>
+                <strong>{t('act.mem.formulaCpu')}</strong>
                 <code>M_CPU ≈ M_main(2–5 GB) + M_workers + M_misc(~1 GB)</code>
               </p>
               <p>
-                <strong>GPU：</strong>
-                <code>M_GPU ≈ M_model + M_opt + B×M_sample×β</code>，β（激活倍数）常见 3–8
+                <strong>{t('act.mem.formulaGpu')}</strong>
+                <code>M_GPU ≈ M_model + M_opt + B×M_sample×β</code>，{t('act.mem.formulaGpuNote')}
               </p>
             </div>
           </details>
@@ -204,53 +209,50 @@ export function TrainMemoryGuide({
             <tbody>
               <tr>
                 <td>{t('act.mem.reduceWorkers')}</td>
-                <td>W_train / W_val 下降，M_workers 近似线性减少</td>
+                <td>{t('act.mem.reduceWorkersEffect')}</td>
               </tr>
               <tr>
                 <td>{t('act.mem.reduceBatch')}</td>
-                <td>M_batch 下降，worker 与 GPU batch 项同步减少</td>
+                <td>{t('act.mem.reduceBatchEffect')}</td>
               </tr>
               <tr>
-                <td>num-workers = 0</td>
-                <td>M_workers ≈ 0，但数据加载成为瓶颈</td>
+                <td>{t('act.mem.workersZero')}</td>
+                <td>{t('act.mem.workersZeroEffect')}</td>
               </tr>
               <tr>
                 <td>{t('act.mem.reduceCameras')}</td>
-                <td>M_sample 线性减少</td>
+                <td>{t('act.mem.reduceCamerasEffect')}</td>
               </tr>
             </tbody>
           </table>
 
           <details className="act-train-mem-details">
-            <summary>实测参考（batch=32, workers=4, 3×480×640）</summary>
+            <summary>{t('act.mem.benchmark')}</summary>
             <table className="act-train-mem-table compact">
               <tbody>
                 <tr>
-                  <th>单个训练 worker RSS</th>
+                  <th>{t('act.mem.workerRss')}</th>
                   <td>19–22 GB</td>
                 </tr>
                 <tr>
-                  <th>验证 worker RSS</th>
+                  <th>{t('act.mem.valWorkerRss')}</th>
                   <td>~2.7 GB</td>
                 </tr>
                 <tr>
-                  <th>主进程 RSS</th>
+                  <th>{t('act.mem.mainRss')}</th>
                   <td>~4 GB</td>
                 </tr>
                 <tr>
-                  <th>worker 合计</th>
+                  <th>{t('act.mem.workersTotal')}</th>
                   <td>~87 GB</td>
                 </tr>
                 <tr>
-                  <th>GPU 显存</th>
+                  <th>{t('act.mem.gpuMem')}</th>
                   <td>~24 GB</td>
                 </tr>
               </tbody>
             </table>
-            <p className="muted act-train-mem-foot">
-              公式估算与 ps / nvidia-smi 实测应在同一数量级；精确值以实测为准。详见{' '}
-              <code>act_robot/docs/training_memory_estimation.md</code>
-            </p>
+            <p className="muted act-train-mem-foot">{t('act.mem.footnote')}</p>
           </details>
         </div>
       ) : null}

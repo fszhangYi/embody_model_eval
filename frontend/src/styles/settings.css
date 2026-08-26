@@ -7,9 +7,9 @@
   height: 30px;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid rgba(58, 77, 102, 0.85);
-  background: rgba(26, 35, 50, 0.72);
-  color: var(--text, #e7ecf3);
+  border: 1px solid var(--border);
+  background: var(--chrome);
+  color: var(--text);
   font: inherit;
   font-size: 0.72rem;
   cursor: pointer;
@@ -21,9 +21,9 @@
 }
 
 .settings-gear-btn:hover {
-  border-color: rgba(61, 214, 198, 0.55);
-  color: var(--accent, #3dd6c6);
-  background: rgba(22, 34, 48, 0.95);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface-3);
 }
 
 .settings-gear-btn:active {
@@ -47,7 +47,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
-  background: rgba(4, 8, 14, 0.72);
+  background: var(--overlay-scrim);
   backdrop-filter: blur(6px);
   animation: settings-fade 160ms ease both;
 }
@@ -236,7 +236,7 @@
   padding: 0;
   border-radius: 999px;
   border: 1px solid rgba(58, 77, 102, 0.9);
-  background: rgba(18, 26, 38, 0.95);
+  background: var(--panel);
   cursor: pointer;
   transition: background 140ms ease, border-color 140ms ease;
 }

@@ -185,15 +185,13 @@ export function HyperparamBenchPanel({
       <div className="act-hp-bench-head">
         <div>
           <h3>{t('act.hp.title')}</h3>
-          <p className="muted">
-            从 train 脚本解析 CLI 参数。勾选参与搜索的项并填写候选值（逗号分隔）；未勾选的作为固定基线。
-          </p>
+          <p className="muted">{t('act.hp.desc')}</p>
         </div>
         <div className="act-hp-bench-meta">
           {loading ? <span className="muted">{t('act.hp.parsing')}</span> : null}
           {!loading && rows.length ? (
             <span className="act-hp-pill">
-              搜索 {selectedCount} 维 · 组合 {comboCount}
+              {t('act.hp.meta', { dims: selectedCount, combos: comboCount })}
             </span>
           ) : null}
         </div>
@@ -270,8 +268,7 @@ export function HyperparamBenchPanel({
       ) : null}
       {comboCount > 0 ? (
         <p className="act-hp-hint muted">
-          将尝试 <strong>{comboCount}</strong> 组短测（每组 train/val 微基准），完成后日志与结果 JSON
-          中会给出最快组合。
+          {t('act.hp.hint', { combos: comboCount })}
         </p>
       ) : null}
     </section>

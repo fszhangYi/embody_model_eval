@@ -46,13 +46,25 @@ html[data-theme='light'] {
   --surface: rgba(255, 255, 255, 0.96);
   --surface-2: rgba(248, 250, 252, 0.95);
   --surface-3: rgba(241, 245, 249, 0.92);
-  --chrome: rgba(255, 255, 255, 0.9);
+  --chrome: rgba(255, 255, 255, 0.92);
   --input-bg: #f8fafc;
   --bg-spot: #c5d4e4;
   --bg-spot-2: rgba(197, 212, 228, 0.75);
   --bg-spot-3: rgba(11, 154, 143, 0.1);
   --scrollbar-thumb: rgba(11, 154, 143, 0.35);
   --scrollbar-thumb-hover: rgba(11, 154, 143, 0.55);
+  --header-bg: linear-gradient(180deg, #ffffff 0%, #f3f6fa 100%);
+  --header-bg-soft: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.96) 0%,
+    rgba(232, 237, 244, 0.72) 65%,
+    transparent 100%
+  );
+  --header-bg-fade: linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(243, 246, 250, 0.9));
+  --footer-bg: linear-gradient(180deg, rgba(243, 246, 250, 0.92), #e8edf4);
+  --overlay-scrim: rgba(15, 23, 42, 0.35);
+  --active-chip: rgba(11, 154, 143, 0.16);
+  --brand-title: linear-gradient(120deg, #0f172a 20%, #0b9a8f 65%, #b45309 100%);
   color-scheme: light;
 }
 
@@ -384,6 +396,72 @@ html[data-theme='light'] .hub-page .drawer {
   color: var(--text);
 }
 
+/* Headers / footers follow theme (no hardcoded near-black bars) */
+html[data-theme='light'] .home-header,
+html[data-theme='light'] .sensors-header,
+html[data-theme='light'] .act-header,
+html[data-theme='light'] .chat-page header,
+html[data-theme='light'] .robots-page header,
+html[data-theme='light'] .pipeline-page header,
+html[data-theme='light'] .hub-page header {
+  background: var(--header-bg);
+  border-bottom-color: var(--border);
+  color: var(--text);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+}
+
+html[data-theme='light'] .act-footer {
+  background: var(--footer-bg);
+  border-top-color: var(--border);
+}
+
+html[data-theme='light'] .eval-page .topbar {
+  background: var(--header-bg-soft);
+}
+
+html[data-theme='light'] .home-header-brand h1 {
+  background: var(--brand-title);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+html[data-theme='dark'] .home-header,
+html[data-theme='dark'] .sensors-header,
+html[data-theme='dark'] .act-header,
+html[data-theme='dark'] .chat-page header,
+html[data-theme='dark'] .robots-page header,
+html[data-theme='dark'] .pipeline-page header {
+  background: var(--header-bg);
+  border-bottom-color: var(--border);
+}
+
+html[data-theme='dark'] .eval-page .topbar {
+  background: var(--header-bg-soft);
+}
+
+html[data-theme='dark'] .act-footer {
+  background: var(--footer-bg);
+}
+
+/* Shared chrome contrast on headers */
+.home-header .page-nav-btn,
+.home-header .settings-gear-btn,
+.sensors-header .page-nav-btn,
+.sensors-header .settings-gear-btn,
+.act-header .page-nav-btn,
+.act-header .settings-gear-btn,
+.chat-page header .page-nav-btn,
+.robots-page header .page-nav-btn,
+.pipeline-page header .page-nav-btn,
+.hub-page header .page-nav-btn,
+.eval-page .topbar .page-nav-btn {
+  background: var(--chrome);
+  border-color: var(--border);
+  color: var(--text);
+  backdrop-filter: blur(8px);
+}
+
 /* Act pipeline IO labels */
 html[data-theme='light'] .act-pipeline-page {
   --act-in-label: #0b7a71;
@@ -450,3 +528,324 @@ html[data-compact='1'] .settings-gear-label,
 html[data-density='dense'] .settings-gear-label {
   display: none;
 }
+
+/* ── Light: remaining dark hardcodes / contrast ── */
+
+html[data-theme='light'] .settings-gear-btn {
+  background: var(--chrome);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html[data-theme='light'] .settings-gear-btn:hover {
+  background: var(--surface-3);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+html[data-theme='light'] .settings-overlay,
+html[data-theme='light'] .sensors-modal-overlay,
+html[data-theme='light'] .act-picker-overlay {
+  background: rgba(15, 23, 42, 0.35);
+}
+
+html[data-theme='light'] .hub-page input,
+html[data-theme='light'] .hub-page button,
+html[data-theme='light'] .hub-page select,
+html[data-theme='light'] .eval-page button,
+html[data-theme='light'] .eval-page select,
+html[data-theme='light'] .eval-page input,
+html[data-theme='light'] .robots-page input,
+html[data-theme='light'] .robots-page button,
+html[data-theme='light'] .robots-page select,
+html[data-theme='light'] .pipeline-page input,
+html[data-theme='light'] .pipeline-page button,
+html[data-theme='light'] .pipeline-page select,
+html[data-theme='light'] .sensors-btn,
+html[data-theme='light'] .act-pipeline-page input,
+html[data-theme='light'] .act-pipeline-page select,
+html[data-theme='light'] .act-pipeline-page button,
+html[data-theme='light'] .act-pipeline-page textarea {
+  background: var(--input-bg);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html[data-theme='light'] .eval-page button.active,
+html[data-theme='light'] .chat-page .btn-primary,
+html[data-theme='light'] .pipeline-page button.active,
+html[data-theme='light'] .sensors-btn.primary,
+html[data-theme='light'] .act-step.active,
+html[data-theme='light'] .act-job.active {
+  background: var(--accent-dim);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+html[data-theme='light'] .eval-page button.toggle.cur.on {
+  background: #e2e8f0;
+  color: #334155;
+  border-color: var(--cur);
+}
+
+html[data-theme='light'] .eval-page button.toggle.gt.on {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: var(--gt);
+}
+
+html[data-theme='light'] .eval-page button.toggle.pred.on {
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-color: var(--pred);
+}
+
+html[data-theme='light'] .home-cta.primary,
+html[data-theme='light'] .login-submit {
+  background: linear-gradient(180deg, #0d9488 0%, #0b7a71 100%);
+  border-color: rgba(11, 154, 143, 0.55);
+  color: #f0fdfa;
+}
+
+html[data-theme='light'] .home-pillar h3,
+html[data-theme='light'] .home-module-card h3,
+html[data-theme='light'] .home-module-card p,
+html[data-theme='light'] .login-card,
+html[data-theme='light'] .login-card label,
+html[data-theme='light'] .sensors-card,
+html[data-theme='light'] .sensors-card h3,
+html[data-theme='light'] .sensors-modal,
+html[data-theme='light'] .sensors-guide-card,
+html[data-theme='light'] .sensors-guide-card h3,
+html[data-theme='light'] .sensors-guide-card h4,
+html[data-theme='light'] .act-steps,
+html[data-theme='light'] .act-jobs,
+html[data-theme='light'] .act-log,
+html[data-theme='light'] .hub-page .stat .v,
+html[data-theme='light'] .hub-page th,
+html[data-theme='light'] .hub-page td,
+html[data-theme='light'] .eval-page .hud,
+html[data-theme='light'] .eval-page .drawer,
+html[data-theme='light'] .eval-page .muted,
+html[data-theme='light'] .chat-page,
+html[data-theme='light'] .robots-page,
+html[data-theme='light'] .pipeline-page {
+  color: var(--text);
+}
+
+html[data-theme='light'] .muted,
+html[data-theme='light'] .home-page .muted,
+html[data-theme='light'] .login-page .muted,
+html[data-theme='light'] .sensors-page .muted,
+html[data-theme='light'] .hub-page .muted,
+html[data-theme='light'] .hub-page .stat .l,
+html[data-theme='light'] .page-nav-item-desc,
+html[data-theme='light'] .page-nav-hint {
+  color: var(--muted);
+}
+
+html[data-theme='light'] .sensors-modal,
+html[data-theme='light'] .sensors-guide-card,
+html[data-theme='light'] .sensors-guide-nav,
+html[data-theme='light'] .act-log,
+html[data-theme='light'] .act-hp-bench,
+html[data-theme='light'] .hub-page .stat,
+html[data-theme='light'] .robots-page #viewer,
+html[data-theme='light'] .pipeline-page .stage-wrap,
+html[data-theme='light'] .chat-page .sidebar,
+html[data-theme='light'] .chat-page .panel {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html[data-theme='light'] .sensors-modal table th,
+html[data-theme='light'] .sensors-teach-table th,
+html[data-theme='light'] .sensors-md-table th,
+html[data-theme='light'] .act-train-mem-table th {
+  background: var(--surface-3);
+  color: var(--muted);
+}
+
+html[data-theme='light'] .sensors-modal table td,
+html[data-theme='light'] .sensors-teach-table td,
+html[data-theme='light'] .sensors-md-table td,
+html[data-theme='light'] code {
+  color: var(--text);
+}
+
+html[data-theme='light'] .hub-page {
+  background:
+    radial-gradient(900px 480px at 10% -10%, var(--bg-spot), var(--bg) 55%),
+    radial-gradient(480px 280px at 95% 0%, var(--spark-dim), transparent 65%);
+}
+
+html[data-theme='light'] .robots-page #viewer,
+html[data-theme='light'] .pipeline-page .stage-wrap {
+  background: radial-gradient(720px 420px at 50% 20%, var(--bg-spot), var(--bg) 70%);
+}
+
+html[data-theme='light'] .eval-page #arm3d {
+  background:
+    radial-gradient(900px 500px at 20% 0%, var(--bg-spot) 0%, var(--bg) 55%),
+    radial-gradient(620px 380px at 90% 6%, var(--spark-dim), transparent 68%);
+}
+
+html[data-theme='light'] .term-tip,
+html[data-theme='light'] #termTip,
+html[data-theme='light'] .eval-page .term-tip {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.12);
+}
+
+/* Active teal chips that were #1e3d3a */
+html[data-theme='light'] .sensors-btn:not(.ghost):not(.primary):hover,
+html[data-theme='light'] .sensors-kind-tag {
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+/* ── English layout: longer labels must wrap, not overflow ── */
+
+html[lang='en'] .page-nav-btn {
+  max-width: min(46vw, 240px);
+}
+
+html[lang='en'] .page-nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+html[lang='en'] .page-nav-menu {
+  min-width: 280px;
+  max-width: min(92vw, 380px);
+}
+
+html[lang='en'] .page-nav-item-title,
+html[lang='en'] .page-nav-item-desc,
+html[lang='en'] .settings-row-desc,
+html[lang='en'] .settings-nav-hint,
+html[lang='en'] .home-pillar p,
+html[lang='en'] .home-module-card p,
+html[lang='en'] .sensors-card-note,
+html[lang='en'] .sensors-modal-summary,
+html[lang='en'] .hub-page .muted {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+html[lang='en'] .settings-nav-item {
+  align-items: flex-start;
+}
+
+html[lang='en'] .settings-nav-item .settings-nav-label {
+  white-space: normal;
+  line-height: 1.25;
+}
+
+html[lang='en'] .settings-row {
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+html[lang='en'] .settings-row-main {
+  min-width: min(100%, 220px);
+  flex: 1 1 220px;
+}
+
+html[lang='en'] .settings-row-control {
+  flex: 1 1 auto;
+  max-width: 100%;
+}
+
+html[lang='en'] .home-cta,
+html[lang='en'] .sensors-btn,
+html[lang='en'] .sensors-card-actions,
+html[lang='en'] .act-header-actions,
+html[lang='en'] .hub-page .row {
+  flex-wrap: wrap;
+}
+
+html[lang='en'] .home-cta,
+html[lang='en'] .sensors-btn,
+html[lang='en'] .login-submit,
+html[lang='en'] .settings-primary-btn,
+html[lang='en'] .settings-ghost-btn {
+  white-space: normal;
+  line-height: 1.3;
+  text-align: center;
+  height: auto;
+  min-height: 30px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+html[lang='en'] .home-hero-actions,
+html[lang='en'] .sensors-card-actions,
+html[lang='en'] .sensors-modal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+html[lang='en'] .sensors-kind-tag,
+html[lang='en'] .pill {
+  white-space: normal;
+  line-height: 1.25;
+  max-width: 100%;
+}
+
+html[lang='en'] .sensors-status {
+  white-space: nowrap;
+  max-width: none;
+}
+
+html[lang='en'] .robots-page .header-blurb,
+html[lang='en'] .chat-page .header-blurb,
+html[lang='en'] .pipeline-page .header-blurb {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+html[lang='en'] .pipeline-page .toolbar {
+  row-gap: 6px;
+}
+
+html[lang='en'] .pipeline-page button,
+html[lang='en'] .pipeline-page .seg button {
+  white-space: nowrap;
+  height: auto;
+  min-height: 28px;
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+
+html[lang='en'] .home-pillars {
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+}
+
+html[lang='en'] .sensors-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
+html[lang='en'] .eval-page .ctrl-label,
+html[lang='en'] .eval-page .chart-head .name,
+html[lang='en'] .eval-page summary {
+  overflow-wrap: anywhere;
+}
+
+html[lang='en'] .settings-seg {
+  flex-wrap: wrap;
+}
+
+html[lang='en'] .settings-seg-btn {
+  white-space: normal;
+  line-height: 1.25;
+  height: auto;
+  min-height: 28px;
+}
+
