@@ -3,6 +3,7 @@ import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-route
 import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
 import { LocaleProvider } from './i18n/LocaleContext'
+import { AppearanceProvider } from './prefs/AppearanceContext'
 import { HomePage } from './pages/HomePage'
 import { EvalPage } from './pages/EvalPage'
 import { HubPage } from './pages/HubPage'
@@ -40,6 +41,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <LocaleProvider>
+        <AppearanceProvider>
         <AuthProvider>
           <Routes>
           <Route path="/login" element={<LoginPage />} />
@@ -111,6 +113,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </AuthProvider>
+        </AppearanceProvider>
       </LocaleProvider>
     </BrowserRouter>
   )

@@ -1,16 +1,4 @@
 .sensors-page {
-  --bg: #0b1018;
-  --panel: rgba(18, 26, 38, 0.92);
-  --border: rgba(58, 77, 102, 0.55);
-  --text: #e7ecf3;
-  --muted: #8b9bb4;
-  --accent: #3dd6c6;
-  --accent-dim: rgba(61, 214, 198, 0.14);
-  --spark: #f0b429;
-  --danger: #f87171;
-  --ok: #4ade80;
-  --warn: #fbbf24;
-  --off: #6b7a90;
   --font: 'IBM Plex Sans', 'Segoe UI', 'PingFang SC', 'Noto Sans SC', sans-serif;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
@@ -18,8 +6,8 @@
   font-family: var(--font);
   color: var(--text);
   background:
-    radial-gradient(900px 420px at 8% -10%, rgba(26, 39, 64, 0.55), transparent 55%),
-    radial-gradient(700px 380px at 92% 0%, rgba(20, 48, 52, 0.35), transparent 50%),
+    radial-gradient(900px 420px at 8% -10%, var(--bg-spot-2), transparent 55%),
+    radial-gradient(700px 380px at 92% 0%, var(--bg-spot-3), transparent 50%),
     var(--bg);
 }
 
@@ -369,16 +357,6 @@
   padding: 20px;
   background: rgba(4, 8, 14, 0.72);
   backdrop-filter: blur(4px);
-  /* CSS vars from .sensors-page are lost after portal — redeclare here. */
-  --text: #e7ecf3;
-  --muted: #8b9bb4;
-  --accent: #3dd6c6;
-  --accent-dim: rgba(61, 214, 198, 0.14);
-  --danger: #f87171;
-  --ok: #4ade80;
-  --warn: #fbbf24;
-  --off: #6b7a90;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   color: var(--text);
   font-family: 'IBM Plex Sans', 'Segoe UI', 'PingFang SC', 'Noto Sans SC', sans-serif;
 }
@@ -727,7 +705,7 @@
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid rgba(58, 77, 102, 0.4);
-  background: rgba(18, 26, 38, 0.8);
+  background: var(--surface-2);
   font-size: 0.72rem;
 }
 

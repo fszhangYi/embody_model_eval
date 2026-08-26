@@ -2,6 +2,8 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocale } from '../i18n/LocaleContext'
 import type { DocsLocale, Locale } from '../i18n/types'
+import { useAppearance } from '../prefs/AppearanceContext'
+import type { DensityPref, ThemePref } from '../prefs/appearance'
 import '../styles/settings.css'
 
 type SettingsTab = 'appearance' | 'language' | 'auth' | 'users' | 'about'
@@ -94,25 +96,32 @@ function Segmented({
 
 function PanelAppearance() {
   const { m } = useLocale()
+  const { theme, compact, density, setTheme, setCompact, setDensity } = useAppearance()
   const a = m.settings.appearance
-  const badge = m.common.placeholder
-  const [dark, setDark] = useState(true)
-  const [compact, setCompact] = useState(false)
-  const [density, setDensity] = useState('comfortable')
+  const live = m.common.live
 
   return (
     <>
-      <SettingRow title={a.dark} desc={a.darkDesc} badge={badge}>
-        <Toggle checked={dark} onChange={() => setDark((v) => !v)} label={a.dark} />
+      <SettingRow title={a.theme} desc={a.themeDesc} badge={live}>
+        <Segmented
+          ariaLabel={a.theme}
+          value={theme}
+          onChange={(id) => setTheme(id as ThemePref)}
+          options={[
+            { id: 'system', label: a.themeSystem },
+            { id: 'dark', label: a.themeDark },
+            { id: 'light', label: a.themeLight },
+          ]}
+        />
       </SettingRow>
-      <SettingRow title={a.compact} desc={a.compactDesc} badge={badge}>
-        <Toggle checked={compact} onChange={() => setCompact((v) => !v)} label={a.compact} />
+      <SettingRow title={a.compact} desc={a.compactDesc} badge={live}>
+        <Toggle checked={compact} onChange={() => setCompact(!compact)} label={a.compact} />
       </SettingRow>
-      <SettingRow title={a.density} desc={a.densityDesc} badge={badge}>
+      <SettingRow title={a.density} desc={a.densityDesc} badge={live}>
         <Segmented
           ariaLabel={a.density}
           value={density}
-          onChange={setDensity}
+          onChange={(id) => setDensity(id as DensityPref)}
           options={[
             { id: 'comfortable', label: a.densityComfortable },
             { id: 'compact', label: a.densityCompact },
@@ -341,7 +350,11 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
 
         <footer className="settings-foot">
           <span className="muted">
-            {tab === 'language' ? m.common.escHintSaved : m.common.escHint}
+            {tab === 'language'
+              ? m.common.escHintSaved
+              : tab === 'appearance'
+                ? m.common.escHintAppearance
+                : m.common.escHint}
           </span>
           <button type="button" className="settings-primary-btn" onClick={onClose}>
             {m.common.done}
@@ -353,7 +366,7 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
   )
 }
 
-/** Classic gear entry + preferences modal (language live; other tabs placeholders). */
+/** Classic gear entry + preferences modal (appearance + language live; other tabs placeholders). */
 export function SettingsGear() {
   const [open, setOpen] = useState(false)
   const { m } = useLocale()

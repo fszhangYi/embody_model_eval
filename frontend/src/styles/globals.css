@@ -1,12 +1,28 @@
-:root {
+:root,
+html[data-theme='dark'] {
   --bg: #0b1018;
   --panel: rgba(18, 26, 38, 0.9);
   --border: rgba(58, 77, 102, 0.75);
   --text: #e7ecf3;
   --muted: #8b9bb4;
   --accent: #3dd6c6;
+  --accent-dim: rgba(61, 214, 198, 0.14);
   --spark: #f0b429;
+  --spark-dim: rgba(240, 180, 41, 0.14);
   --danger: #f87171;
+  --ok: #4ade80;
+  --warn: #fbbf24;
+  --off: #6b7a90;
+  --surface: rgba(18, 26, 38, 0.96);
+  --surface-2: rgba(18, 26, 38, 0.88);
+  --surface-3: rgba(26, 35, 50, 0.72);
+  --chrome: rgba(26, 35, 50, 0.7);
+  --input-bg: rgba(8, 12, 20, 0.85);
+  --bg-spot: #1a2740;
+  --bg-spot-2: rgba(26, 39, 64, 0.55);
+  --bg-spot-3: rgba(20, 48, 52, 0.35);
+  --scrollbar-thumb: rgba(61, 214, 198, 0.45);
+  --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
 }
 
 * {

@@ -1,10 +1,15 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
+import { applyAppearance, readStoredAppearance } from './prefs/appearance'
 import './styles/globals.css'
+import './styles/appearance.css'
 import './styles/loading.css'
 import './styles/scoped-pages.css'
 import './styles/login.css'
+
+/** Apply theme/density before first paint to avoid FOUC. */
+applyAppearance(readStoredAppearance())
 
 /** On API 401, send the user to /login (session expired). */
 const _fetch = window.fetch.bind(window)

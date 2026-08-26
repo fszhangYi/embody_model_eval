@@ -43,3 +43,7 @@ dist/
 # ACT
 act_robot
 act_robot/
+
+# Large local ACT eval datasets (do not commit)
+data/act_1002/
+data/act_1002_chunk/

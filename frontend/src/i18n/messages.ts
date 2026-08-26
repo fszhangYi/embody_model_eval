@@ -10,6 +10,7 @@ export type MessageTree = {
     live: string
     escHint: string
     escHintSaved: string
+    escHintAppearance: string
   }
   nav: {
     switchPages: string
@@ -31,8 +32,11 @@ export type MessageTree = {
       { label: string; hint: string }
     >
     appearance: {
-      dark: string
-      darkDesc: string
+      theme: string
+      themeDesc: string
+      themeSystem: string
+      themeDark: string
+      themeLight: string
       compact: string
       compactDesc: string
       density: string
@@ -140,6 +144,7 @@ export const messages: Record<Locale, MessageTree> = {
       live: '已生效',
       escHint: '更改不会保存 · Esc 关闭',
       escHintSaved: '语言偏好已写入本地 · Esc 关闭',
+      escHintAppearance: '外观偏好已写入本地 · Esc 关闭',
     },
     nav: {
       switchPages: '切换页面 · Alt+1–{n} 直达 · Alt+←/→ 上/下页',
@@ -202,12 +207,15 @@ export const messages: Record<Locale, MessageTree> = {
         about: { label: '关于', hint: '版本与说明' },
       },
       appearance: {
-        dark: '暗黑模式',
-        darkDesc: '跟随系统或强制深色 / 浅色。当前仅 UI 演示，不会写入本地偏好。',
+        theme: '主题',
+        themeDesc: '跟随系统，或强制深色 / 浅色。偏好保存在本机，立即生效。',
+        themeSystem: '跟随系统',
+        themeDark: '深色',
+        themeLight: '浅色',
         compact: '紧凑布局',
         compactDesc: '缩小顶栏与模块卡片间距，适合小屏或密集操作。',
         density: '界面密度',
-        densityDesc: '参考 VS Code / Linear 的密度档位。',
+        densityDesc: '参考 VS Code / Linear 的密度档位，调整字号与间距。',
         densityComfortable: '舒适',
         densityCompact: '紧凑',
         densityDense: '密集',
@@ -252,9 +260,9 @@ export const messages: Record<Locale, MessageTree> = {
         statusPlaceholder: '占位',
       },
       about: {
-        p1: '设置面板：语言偏好会写入 localStorage；其余开关仍为 UI 占位。',
+        p1: '设置面板：语言与外观偏好会写入 localStorage；鉴权 / 用户管理仍为 UI 占位。',
         li1: '布局参考：VS Code / Cursor Settings、Linear Preferences、GitHub Settings',
-        li2: '界面语言与文档语言可在「语言」分类中切换',
+        li2: '可在「外观」切换主题 / 紧凑布局 / 密度，「语言」切换界面与文档语言',
         li3: '当前生产鉴权仍以 Cookie 会话为准',
       },
     },
@@ -323,6 +331,7 @@ export const messages: Record<Locale, MessageTree> = {
       live: 'Live',
       escHint: 'Changes are not saved · Esc to close',
       escHintSaved: 'Language preference saved locally · Esc to close',
+      escHintAppearance: 'Appearance preference saved locally · Esc to close',
     },
     nav: {
       switchPages: 'Switch page · Alt+1–{n} jump · Alt+←/→ prev/next',
@@ -385,12 +394,15 @@ export const messages: Record<Locale, MessageTree> = {
         about: { label: 'About', hint: 'Version and notes' },
       },
       appearance: {
-        dark: 'Dark mode',
-        darkDesc: 'Follow system or force dark / light. Demo only — not persisted yet.',
+        theme: 'Theme',
+        themeDesc: 'Follow the system, or force dark / light. Saved on this device and applied immediately.',
+        themeSystem: 'System',
+        themeDark: 'Dark',
+        themeLight: 'Light',
         compact: 'Compact layout',
         compactDesc: 'Tighten header and module card spacing for smaller screens.',
         density: 'UI density',
-        densityDesc: 'Density steps inspired by VS Code / Linear.',
+        densityDesc: 'Density steps inspired by VS Code / Linear — scales type and spacing.',
         densityComfortable: 'Comfort',
         densityCompact: 'Compact',
         densityDense: 'Dense',
@@ -435,9 +447,9 @@ export const messages: Record<Locale, MessageTree> = {
         statusPlaceholder: 'Placeholder',
       },
       about: {
-        p1: 'Settings: language preference is written to localStorage; other toggles remain UI placeholders.',
+        p1: 'Settings: language and appearance preferences are written to localStorage; auth / users remain UI placeholders.',
         li1: 'Layout inspired by VS Code / Cursor Settings, Linear Preferences, GitHub Settings',
-        li2: 'Switch UI and docs language under the Language category',
+        li2: 'Use Appearance for theme / compact / density, and Language for UI & docs locale',
         li3: 'Production auth still uses Cookie sessions',
       },
     },
