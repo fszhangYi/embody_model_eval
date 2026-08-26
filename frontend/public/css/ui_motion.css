@@ -20,7 +20,7 @@
 
 /* —— Page switcher: never covered —— */
 .hud.topbar,
-header {
+header:not(.login-brand) {
   position: relative;
   z-index: var(--z-page-nav) !important;
   overflow: visible !important;
@@ -141,7 +141,7 @@ body::after {
   to   { opacity: 1; transform: translate(-50%, 0); }
 }
 
-header,
+header:not(.login-brand),
 .hud.topbar {
   animation: ui-rise var(--motion-slow) var(--motion-ease) both;
   border-bottom-color: rgba(58, 77, 102, 0.55);
@@ -151,12 +151,12 @@ header,
     0 10px 28px rgba(0, 0, 0, 0.18);
 }
 
-header h1,
+header:not(.login-brand) h1,
 .hud.topbar h1,
 .topbar h1 {
   position: relative;
 }
-header h1::after,
+header:not(.login-brand) h1::after,
 .hud.topbar h1::after,
 .topbar h1::after {
   content: "";
@@ -502,7 +502,7 @@ canvas,
     animation: none !important;
     opacity: 0.5;
   }
-  header h1::after,
+  header:not(.login-brand) h1::after,
   .hud.topbar h1::after,
   .topbar h1::after {
     animation: none !important;
