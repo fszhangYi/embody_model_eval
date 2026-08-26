@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useEffect } from 'react'
 import chatShell from '../features/chat/chatShell.html?raw'
 import { mountChat } from '../features/chat/mountChat'
 import { PageChrome } from '../components/PageChrome'
@@ -10,8 +10,11 @@ import '../styles/chat.css'
 export function ChatPage() {
   const { locale } = useLocale()
   const onMount = useCallback(() => {
-    applyDomI18n(document.querySelector('.chat-page') || document)
     mountChat()
+  }, [])
+
+  useEffect(() => {
+    applyDomI18n(document.querySelector('.chat-page') || document)
   }, [locale])
 
   return (

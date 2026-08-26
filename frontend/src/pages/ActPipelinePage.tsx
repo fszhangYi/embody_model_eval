@@ -7,6 +7,7 @@ import { cancelJob, deleteJob, fetchJob, fetchJobs, fetchPipelineSpec, createAct
 import { HyperparamBenchPanel } from '../features/actPipeline/HyperparamBenchPanel'
 import { TrainMemoryGuide } from '../features/actPipeline/TrainMemoryGuide'
 import type { BrowseRoot, PipelineJob, PipelineSpec, PipelineStep, StepField } from '../features/actPipeline/types'
+import { stepDescription, stepTitle, fieldLabel } from '../features/actPipeline/stepI18n'
 import '../styles/act-pipeline.css'
 
 const FLOW_KEYS = [
@@ -48,6 +49,7 @@ function fieldIoRole(field: StepField, step: PipelineStep): 'input' | 'output' |
 
 function FieldInput({
   field,
+  stepId,
   value,
   browseRoots,
   onChange,
@@ -56,6 +58,7 @@ function FieldInput({
   ioRole = 'neutral',
 }: {
   field: StepField
+  stepId: string
   value: string | number | boolean
   browseRoots: Record<BrowseRoot, string>
   onChange: (v: string | number | boolean) => void
@@ -66,6 +69,7 @@ function FieldInput({
   const id = `act-field-${field.key}`
   const wide = field.key === 'scriptPath'
   const fieldClass = `act-field act-field-${ioRole}${wide ? ' act-field-wide' : ''}`
+  const label = fieldLabel(stepId, field)
 
   if (field.type === 'checkbox') {
     return (
@@ -78,7 +82,7 @@ function FieldInput({
             disabled={disabled}
             onChange={(e) => onChange(e.target.checked)}
           />
-          <span>{field.label}</span>
+          <span>{label}</span>
         </label>
       </div>
     )
@@ -86,7 +90,7 @@ function FieldInput({
   if (field.type === 'select') {
     return (
       <label className={fieldClass}>
-        <span>{field.label}</span>
+        <span>{label}</span>
         <select id={id} value={String(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
           {(field.options || []).map((o) => (
             <option key={o} value={o}>
@@ -102,9 +106,9 @@ function FieldInput({
     return (
       <label className={fieldClass}>
         <span className="act-field-label">
-          {ioRole === 'input' ? <span className="act-io-tag in">IN</span> : null}
-          {ioRole === 'output' ? <span className="act-io-tag out">OUT</span> : null}
-          <span>{field.label}</span>
+          {ioRole === 'input' ? <span className="act-io-tag in">{t('act.io.in')}</span> : null}
+          {ioRole === 'output' ? <span className="act-io-tag out">{t('act.io.out')}</span> : null}
+          <span>{label}</span>
           {field.hint ? (
             <span className="act-field-hint" title={tip}>
               {field.hint}
@@ -137,9 +141,9 @@ function FieldInput({
   return (
     <label className={fieldClass}>
       <span className="act-field-label">
-        {ioRole === 'input' ? <span className="act-io-tag in">IN</span> : null}
-        {ioRole === 'output' ? <span className="act-io-tag out">OUT</span> : null}
-        <span>{field.label}</span>
+        {ioRole === 'input' ? <span className="act-io-tag in">{t('act.io.in')}</span> : null}
+        {ioRole === 'output' ? <span className="act-io-tag out">{t('act.io.out')}</span> : null}
+        <span>{label}</span>
       </span>
       <input
         id={id}
@@ -211,6 +215,14 @@ export function ActPipelinePage() {
   const step = useMemo(
     () => spec?.steps.find((s) => s.id === stepId) ?? null,
     [spec, stepId],
+  )
+
+  const stepLabelForId = useCallback(
+    (id: string) => {
+      const s = spec?.steps.find((x) => x.id === id)
+      return s ? stepTitle(s) : id
+    },
+    [spec, locale],
   )
 
   const currentParams = step ? params[step.id] ?? defaultParams(step) : {}
@@ -330,7 +342,7 @@ export function ActPipelinePage() {
   const onDeleteJob = useCallback(
     async (job: PipelineJob) => {
       if (!job.id || job.id === 'local') return
-      const label = `${job.stepId} (${job.status})`
+      const label = `${stepLabelForId(job.stepId)} (${job.status})`
       if (!confirm(t('act.confirmDeleteJob', { label }))) return
       setDeletingJobId(job.id)
       try {
@@ -537,7 +549,7 @@ export function ActPipelinePage() {
               title={s.subtitle ? t('act.scriptHint', { hint: s.subtitle }) : undefined}
             >
               <span className="act-step-num">{s.step}{s.variant ? '·' : ''}</span>
-              <span className="act-step-title">{s.title}</span>
+              <span className="act-step-title">{stepTitle(s)}</span>
               <span className="act-step-sub">{s.subtitle}</span>
             </button>
           ))}
@@ -549,8 +561,8 @@ export function ActPipelinePage() {
               <div className={`act-config${linkReady ? '' : ' locked'}`}>
                 <div className="act-step-head">
                   <div>
-                    <h2>{step.title}</h2>
-                    <p className="muted">{step.description}</p>
+                    <h2>{stepTitle(step)}</h2>
+                    <p className="muted">{stepDescription(step)}</p>
                     {!linkReady ? (
                       <p className="act-config-hint muted">{t('act.configLocked')}</p>
                     ) : null}
@@ -574,6 +586,7 @@ export function ActPipelinePage() {
                     .map((f) => (
                     <FieldInput
                       key={f.key}
+                      stepId={step.id}
                       field={f}
                       value={currentParams[f.key] ?? ''}
                       browseRoots={browseRoots}
@@ -679,7 +692,7 @@ export function ActPipelinePage() {
                   }}
                 >
                   <span className={`dot ${statusClass(j.status)}`} />
-                  <span className="act-job-id">{j.stepId}</span>
+                  <span className="act-job-id">{stepLabelForId(j.stepId)}</span>
                   <span className="act-job-st">{j.status}</span>
                 </button>
                 <button
@@ -726,7 +739,7 @@ export function ActPipelinePage() {
           ) : null}
         </div>
         <div className="act-footer-meta">
-          {step ? <span className="act-footer-step">{step.title}</span> : null}
+          {step ? <span className="act-footer-step">{stepTitle(step)}</span> : null}
           {jobs.length > 0 ? <span>{t('act.jobsCount', { n: jobs.length })}</span> : null}
         </div>
       </footer>
@@ -739,7 +752,7 @@ export function ActPipelinePage() {
               ? picker.root === 'act'
                 ? t('act.pickerActRoot')
                 : t('act.pickerEmbodyRoot')
-              : picker.field.label
+              : fieldLabel(stepId, picker.field)
           }
           value={pickerValue}
           browseRoot={picker.kind === 'root' ? picker.root : picker.field.browseRoot || 'act'}

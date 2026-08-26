@@ -11,8 +11,12 @@ import {
   inlineLoadingHtml,
 } from '../../lib/legacy/loading.js';
 
-export function mountChat(): void {
-const $ = (sel) => document.querySelector(sel);
+export function mountChat(): void | (() => void) {
+const shellRoot = document.querySelector('.chat-page .legacy-shell');
+if (!shellRoot) return;
+const $ = (sel) => shellRoot.querySelector(sel);
+const mountAc = new AbortController();
+const ls = { signal: mountAc.signal };
 const STORAGE_KEY = 'embody_chat_v1';
 const pageLoader = createLoader(document.querySelector('.chat-page'), { mode: 'page', id: 'chatPageLoader' });
 hideLoader(pageLoader);
@@ -35,6 +39,7 @@ const state = {
 
 function api(path, opts = {}) {
   return fetch(path, {
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
     ...opts,
   }).then(async (res) => {
@@ -45,7 +50,13 @@ function api(path, opts = {}) {
       if (opts.signal?.aborted || (err && err.name === 'AbortError')) throw err;
       data = { ok: false, error: `HTTP ${res.status}` };
     }
-    if (!res.ok && data && data.ok === undefined) data.ok = false;
+    if (!res.ok) {
+      if (data && data.ok === undefined) data.ok = false;
+      if (res.status === 401 && data && !data.error) {
+        data.error = 'unauthorized';
+        data.authRequired = true;
+      }
+    }
     return data;
   });
 }
@@ -149,6 +160,7 @@ function cancelChat() {
 
 function appendBubble(role, text, { meta, receipt, skillIds, persist = true } = {}) {
   const log = $('#chatLog');
+  if (!log) return;
   const div = document.createElement('div');
   div.className = `bubble bubble-${role}`;
   const who = role === 'user' ? t('chat.whoYou') : role === 'assistant' ? 'Agent' : t('chat.whoSystem');
@@ -499,7 +511,9 @@ async function sendChat() {
     skillIds,
   });
   $('#chatInput').value = '';
-  appendBubble('system', t('chat.sending'), { persist: false });
+  const sendingHint =
+    configOverride.mode === 'dsh_agent' ? t('chat.sendingDsh') : t('chat.sending');
+  appendBubble('system', sendingHint, { persist: false });
 
   try {
     const body = {
@@ -535,8 +549,12 @@ async function sendChat() {
     if (last && last.classList.contains('bubble-system')) last.remove();
 
     if (!out.ok) {
-      appendBubble('system', t('chat.failPrefix', { msg: out.error || JSON.stringify(out.detail || out) }), { persist: false });
-      toast(out.error || t('chat.callFail'), 'err');
+      const errMsg =
+        out.authRequired
+          ? t('chat.authRequired')
+          : out.error || JSON.stringify(out.detail || out);
+      appendBubble('system', t('chat.failPrefix', { msg: errMsg }), { persist: false });
+      toast(errMsg, 'err');
     } else {
       if (out.meta?.sessionId) {
         try {
@@ -570,8 +588,8 @@ async function sendChat() {
   }
 }
 
-$('#cfgMode').addEventListener('change', toggleLinkFields);
-$('#btnSaveConfig').addEventListener('click', () => saveConfig());
+$('#cfgMode').addEventListener('change', toggleLinkFields, ls);
+$('#btnSaveConfig').addEventListener('click', () => saveConfig(), ls);
 $('#btnRefresh').addEventListener('click', async () => {
   try {
     await withLoader(pageLoader, async (progress) => {
@@ -583,20 +601,20 @@ $('#btnRefresh').addEventListener('click', async () => {
   } catch (e) {
     toast(String(e.message || e), 'err');
   }
-});
+}, ls);
 $('#btnSend').addEventListener('click', () => {
   if (state.busy) cancelChat();
   else sendChat();
-});
-$('#btnClearChat').addEventListener('click', () => clearChat());
-$('#btnExportChat').addEventListener('click', () => exportChatMd());
-$('#btnClosePreview').addEventListener('click', () => hideSkillPreview());
+}, ls);
+$('#btnClearChat').addEventListener('click', () => clearChat(), ls);
+$('#btnExportChat').addEventListener('click', () => exportChatMd(), ls);
+$('#btnClosePreview').addEventListener('click', () => hideSkillPreview(), ls);
 $('#chatInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault();
     if (!state.busy) sendChat();
   }
-});
+}, ls);
 
 (async function boot() {
   restoreTurns();
@@ -621,4 +639,9 @@ $('#chatInput').addEventListener('keydown', (e) => {
     appendBubble('system', String(e.message || e) + '\n' + t('chat.staticServerHint'), { persist: false });
   }
 })();
+
+return () => {
+  mountAc.abort();
+  if (state.abort) state.abort.abort();
+};
 }

@@ -22,7 +22,12 @@ window.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
       : input instanceof URL
         ? input.href
         : input.url
-  if (url.includes('/api/auth/') || window.location.pathname.startsWith('/login')) {
+  if (
+    url.includes('/api/auth/') ||
+    url.includes('/api/chat') ||
+    url.includes('/api/agent/') ||
+    window.location.pathname.startsWith('/login')
+  ) {
     return res
   }
   if (!window.location.pathname.startsWith('/login')) {
