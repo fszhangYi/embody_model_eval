@@ -141,12 +141,15 @@
     padding: 7px 12px; cursor: pointer; font: inherit; font-size: 0.8rem;
   }.eval-page button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }.eval-page button:disabled { opacity: 0.35; cursor: not-allowed; }.eval-page button.active { background: var(--active-chip); border-color: var(--accent); color: var(--accent); }.eval-page button.danger { border-color: rgba(248,113,113,0.55); }.eval-page button.danger.active, .eval-page button.danger.recording {
     background: rgba(90, 22, 30, 0.9); border-color: var(--danger); color: #fecaca;
-  }.eval-page button.toggle.on { opacity: 1; }.eval-page button.toggle.off { opacity: 0.4; text-decoration: line-through; border-style: dashed; }.eval-page button.toggle.cur.on { border-color: var(--cur); color: #d1d5db; background: #2a3038; }.eval-page button.toggle.gt.on { border-color: var(--gt); color: #fecaca; background: #3a1f24; }.eval-page button.toggle.pred.on { border-color: var(--pred); color: #bfdbfe; background: #1e2a44; }.eval-page .drawer-rail {
+  }.eval-page button.toggle.on { opacity: 1; }.eval-page button.toggle.off { opacity: 0.4; text-decoration: line-through; border-style: dashed; }.eval-page button.toggle.cur.on { border-color: var(--cur); color: #d1d5db; background: #2a3038; }.eval-page button.toggle.gt.on { border-color: var(--gt); color: #fecaca; background: #3a1f24; }.eval-page button.toggle.pred.on { border-color: var(--pred); color: #bfdbfe; background: #1e2a44;   }.eval-page .drawer-rail {
     top: 56px; bottom: 14px;
     display: flex; align-items: flex-start;
     width: 36px; /* 收起时只占侧边标签宽度，不挡画布 */
     max-width: none;
     pointer-events: none;
+    background: transparent;
+    border: none;
+    box-shadow: none;
   }.eval-page .drawer-rail > * { pointer-events: auto; }.eval-page .drawer-rail.is-open, .eval-page .drawer-rail.is-pinned { width: auto; max-width: calc(100vw - 24px); }.eval-page .drawer-rail.left { left: 8px; flex-direction: row; }.eval-page .drawer-rail.right { right: 8px; flex-direction: row-reverse; }.eval-page .rail-tab {
     flex: 0 0 auto;
     width: 28px;

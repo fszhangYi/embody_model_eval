@@ -378,7 +378,7 @@ html[data-theme='light'] .pipeline-page .side,
 html[data-theme='light'] .sensors-card,
 html[data-theme='light'] .act-steps,
 html[data-theme='light'] .act-jobs,
-html[data-theme='light'] .eval-page .hud,
+html[data-theme='light'] .eval-page .hud.topbar,
 html[data-theme='light'] .eval-page .drawer {
   background: var(--panel);
   border-color: var(--border);
@@ -389,7 +389,7 @@ html[data-theme='light'] .hub-page .card,
 html[data-theme='light'] .chat-page .panel,
 html[data-theme='light'] .robots-page .side,
 html[data-theme='light'] .pipeline-page .side,
-html[data-theme='light'] .eval-page .hud,
+html[data-theme='light'] .eval-page .hud.topbar,
 html[data-theme='light'] .eval-page .drawer,
 html[data-theme='light'] .sensors-card,
 html[data-theme='light'] .act-steps,
@@ -686,7 +686,7 @@ html[data-theme='light'] .act-log,
 html[data-theme='light'] .hub-page .stat .v,
 html[data-theme='light'] .hub-page th,
 html[data-theme='light'] .hub-page td,
-html[data-theme='light'] .eval-page .hud,
+html[data-theme='light'] .eval-page .hud.topbar,
 html[data-theme='light'] .eval-page .drawer,
 html[data-theme='light'] .eval-page .muted,
 html[data-theme='light'] .chat-page,
@@ -921,6 +921,15 @@ html[lang='en'] .eval-page summary {
   overflow-wrap: anywhere;
 }
 
+html[lang='en'] .eval-page .rail-tab {
+  min-height: 120px;
+  letter-spacing: 0.06em;
+}
+
+html[lang='en'] .eval-page .drawer-rail:not(.is-open):not(.is-pinned) {
+  width: 40px;
+}
+
 html[lang='en'] .settings-seg {
   flex-wrap: wrap;
 }
@@ -935,16 +944,22 @@ html[lang='en'] .settings-seg-btn {
 
 /* Eval rails + login — light theme polish */
 
+html[data-theme='light'] .eval-page .hud.drawer-rail {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
 html[data-theme='light'] .eval-page .rail-tab {
-  background: rgba(255, 255, 255, 0.68);
-  border-color: rgba(15, 23, 42, 0.09);
-  color: var(--muted);
+  background: var(--chrome);
+  border-color: var(--border);
+  color: #475569;
   backdrop-filter: blur(10px);
   box-shadow: var(--shadow-sm);
 }
 
 html[data-theme='light'] .eval-page .rail-tab:hover {
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.88);
   color: var(--accent);
   border-color: rgba(13, 148, 136, 0.4);
 }
@@ -1149,10 +1164,6 @@ html[data-theme='light'] .act-pipeline-page {
 }
 
 /* Light: secondary copy readability (small labels, toggles, tags) */
-html[data-theme='light'] .eval-page .rail-tab {
-  color: #475569;
-}
-
 html[data-theme='light'] .eval-page button.toggle.off {
   opacity: 0.68;
   color: var(--muted);
