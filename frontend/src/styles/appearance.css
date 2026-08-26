@@ -31,18 +31,18 @@ html[data-compact='1'] {
 
 html[data-theme='light'] {
   --bg: #dfe6ef;
-  --panel: rgba(255, 255, 255, 0.86);
-  --border: rgba(15, 23, 42, 0.1);
+  --panel: rgba(255, 255, 255, 0.94);
+  --border: rgba(15, 23, 42, 0.12);
   --text: #0f172a;
-  --muted: #5c6b7e;
-  --accent: #0d9488;
-  --accent-dim: rgba(13, 148, 136, 0.11);
-  --spark: #c27803;
-  --spark-dim: rgba(194, 120, 3, 0.1);
+  --muted: #334155;
+  --accent: #0f766e;
+  --accent-dim: rgba(15, 118, 110, 0.12);
+  --spark: #b45309;
+  --spark-dim: rgba(180, 83, 9, 0.1);
   --danger: #dc2626;
   --ok: #15803d;
   --warn: #b45309;
-  --off: #94a3b8;
+  --off: #64748b;
   --surface: rgba(255, 255, 255, 0.94);
   --surface-2: rgba(248, 250, 252, 0.88);
   --surface-3: rgba(241, 245, 249, 0.92);
@@ -143,7 +143,7 @@ html[data-theme='light'] .page-nav-item.active {
 html[data-theme='light'] .page-nav-item-key {
   background: var(--surface-3);
   border-color: var(--border);
-  color: var(--muted);
+  color: #475569;
 }
 
 html[data-theme='light'] .page-nav-auth {
@@ -154,7 +154,7 @@ html[data-theme='light'] .pill,
 html[data-theme='light'] .hub-page .pill {
   background: var(--chrome);
   border-color: var(--border);
-  color: var(--muted);
+  color: #475569;
 }
 
 /* Settings modal */
@@ -702,7 +702,28 @@ html[data-theme='light'] .sensors-page .muted,
 html[data-theme='light'] .hub-page .muted,
 html[data-theme='light'] .hub-page .stat .l,
 html[data-theme='light'] .page-nav-item-desc,
-html[data-theme='light'] .page-nav-hint {
+html[data-theme='light'] .page-nav-hint,
+html[data-theme='light'] .settings-row-desc,
+html[data-theme='light'] .settings-nav-hint,
+html[data-theme='light'] .home-header-blurb,
+html[data-theme='light'] .home-hero-lead,
+html[data-theme='light'] .home-pillar p,
+html[data-theme='light'] .eval-page .stat .label,
+html[data-theme='light'] .eval-page .hint,
+html[data-theme='light'] .eval-page .chart-head .sub,
+html[data-theme='light'] .eval-page .ctrl-label,
+html[data-theme='light'] .eval-page th,
+html[data-theme='light'] .pipeline-page .hint-list,
+html[data-theme='light'] .pipeline-page .muted,
+html[data-theme='light'] .chat-page .field label,
+html[data-theme='light'] .chat-page .bubble-who,
+html[data-theme='light'] .chat-page .bubble-meta,
+html[data-theme='light'] .chat-page .skill-desc,
+html[data-theme='light'] .chat-page .skill-id,
+html[data-theme='light'] .robots-page .meta-item .k,
+html[data-theme='light'] .robots-page .header-blurb,
+html[data-theme='light'] .sensors-card-note,
+html[data-theme='light'] .act-pipeline-page .muted {
   color: var(--muted);
 }
 
@@ -1044,7 +1065,7 @@ html[data-theme='light'] .login-ghost {
 }
 
 html[data-theme='light'] .login-field > span {
-  color: #334155;
+  color: var(--muted);
 }
 
 html[data-theme='light'] .login-error {
@@ -1116,4 +1137,52 @@ html[data-theme='light'] .sensors-modal {
 html[data-theme='light'] .act-pipeline-page {
   --act-in-label: #0f766e;
   --act-out-label: #92400e;
+}
+
+/* Light: secondary copy readability (small labels, toggles, tags) */
+html[data-theme='light'] .eval-page .rail-tab {
+  color: #475569;
+}
+
+html[data-theme='light'] .eval-page button.toggle.off {
+  opacity: 0.68;
+  color: var(--muted);
+}
+
+html[data-theme='light'] .eval-page .tag,
+html[data-theme='light'] .pipeline-page .pill {
+  color: #475569;
+}
+
+html[data-theme='light'] .hub-page th {
+  color: #475569;
+}
+
+html[data-theme='light'] .settings-nav-hint,
+html[data-theme='light'] .settings-row-desc {
+  color: #475569;
+}
+
+html[data-theme='light'] .act-pipeline-page .act-step:not(.active) .act-step-label,
+html[data-theme='light'] .act-pipeline-page .act-job:not(.active) {
+  color: #475569;
+}
+
+html[data-theme='light'] .act-pipeline-page .act-step:not(.active) {
+  opacity: 0.92;
+}
+
+html[data-theme='light'] .act-footer-sep {
+  opacity: 0.55;
+}
+
+html[data-theme='light'] .act-footer-path {
+  background: var(--surface-3);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html[data-theme='light'] .act-pipeline-page .act-step-btn:disabled,
+html[data-theme='light'] .act-pipeline-page .act-path-browse:disabled {
+  opacity: 0.72;
 }
