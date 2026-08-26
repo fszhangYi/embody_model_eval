@@ -978,10 +978,19 @@ html[data-theme='light'] .login-scan {
 }
 
 html[data-theme='light'] .login-brand-name {
-  background: var(--brand-title);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  background: none;
+  -webkit-background-clip: unset;
+  background-clip: unset;
+  -webkit-text-fill-color: unset;
+  color: var(--text);
+}
+
+html[data-theme='light'] .login-logo {
+  box-shadow: var(--shadow-md);
+}
+
+html[data-theme='light'] .login-brand:hover .login-logo {
+  box-shadow: var(--shadow-lg);
 }
 
 html[data-theme='light'] .login-lang {
@@ -1044,12 +1053,6 @@ html[data-theme='light'] .login-card input:focus {
 
 html[data-theme='light'] .login-submit {
   border: none;
-}
-
-html[data-theme='light'] .login-logo {
-  box-shadow:
-    0 0 0 1px rgba(13, 148, 136, 0.22),
-    var(--shadow-md);
 }
 
 html[data-theme='light'] .auth-boot-mark {

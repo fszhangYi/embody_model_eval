@@ -213,13 +213,17 @@
 }
 
 .login-brand-name {
+  display: inline-block;
   font-size: 1.35rem;
   font-weight: 650;
   letter-spacing: 0.02em;
   background: linear-gradient(120deg, #e7ecf3 20%, #3dd6c6 55%, #f0b429 95%);
   -webkit-background-clip: text;
   background-clip: text;
+  -webkit-text-fill-color: transparent;
   color: transparent;
+  border: none;
+  box-shadow: none;
 }
 
 .login-main {
