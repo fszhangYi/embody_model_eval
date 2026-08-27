@@ -20,6 +20,7 @@ function resolvePageId(pathname: string): PageId {
   if (pathname.startsWith('/chat')) return 'chat'
   if (pathname.startsWith('/robots')) return 'robots'
   if (pathname.startsWith('/act-pipeline')) return 'actPipeline'
+  if (pathname.startsWith('/model-analysis')) return 'modelAnalysis'
   if (pathname.startsWith('/sensors')) return 'sensors'
   return 'home'
 }

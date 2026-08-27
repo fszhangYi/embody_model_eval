@@ -11,6 +11,7 @@ import { ChatPage } from './pages/ChatPage'
 import { RobotsPage } from './pages/RobotsPage'
 import { PipelinePage } from './pages/PipelinePage'
 import { ActPipelinePage } from './pages/ActPipelinePage'
+import { ModelAnalysisPage } from './pages/ModelAnalysisPage'
 import { SensorsPage } from './pages/SensorsPage'
 import { LoginPage } from './pages/LoginPage'
 
@@ -95,6 +96,14 @@ export default function App() {
             }
           />
           <Route
+            path="/model-analysis"
+            element={
+              <Protected>
+                <ModelAnalysisPage />
+              </Protected>
+            }
+          />
+          <Route
             path="/sensors"
             element={
               <Protected>
@@ -108,6 +117,7 @@ export default function App() {
           <Route path="/chat.html" element={<Navigate to="/chat" replace />} />
           <Route path="/robots.html" element={<Navigate to="/robots" replace />} />
           <Route path="/act-pipeline.html" element={<Navigate to="/act-pipeline" replace />} />
+          <Route path="/model-analysis.html" element={<Navigate to="/model-analysis" replace />} />
           <Route path="/sensors.html" element={<Navigate to="/sensors" replace />} />
           <Route path="/login.html" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

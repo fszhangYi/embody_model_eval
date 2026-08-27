@@ -318,6 +318,7 @@ html[data-theme='light'] .settings-table-row {
 html[data-theme='light'] .home-page,
 html[data-theme='light'] .login-page,
 html[data-theme='light'] .sensors-page,
+html[data-theme='light'] .model-analysis-page,
 html[data-theme='light'] .act-pipeline-page,
 html[data-theme='light'] .chat-page,
 html[data-theme='light'] .robots-page,
@@ -744,6 +745,7 @@ html[data-theme='light'] .muted,
 html[data-theme='light'] .home-page .muted,
 html[data-theme='light'] .login-page .muted,
 html[data-theme='light'] .sensors-page .muted,
+html[data-theme='light'] .model-analysis-page .muted,
 html[data-theme='light'] .hub-page .muted,
 html[data-theme='light'] .hub-page .stat .l,
 html[data-theme='light'] .page-nav-item-desc,
@@ -767,12 +769,14 @@ html[data-theme='light'] .chat-page .skill-desc,
 html[data-theme='light'] .chat-page .skill-id,
 html[data-theme='light'] .robots-page .meta-item .k,
 html[data-theme='light'] .robots-page .header-blurb,
+html[data-theme='light'] .ma-header-blurb,
 html[data-theme='light'] .sensors-card-note,
 html[data-theme='light'] .act-pipeline-page .muted {
   color: var(--muted);
 }
 
 html[data-theme='light'] .sensors-modal,
+html[data-theme='light'] .model-analysis-page .card,
 html[data-theme='light'] .sensors-guide-card,
 html[data-theme='light'] .sensors-guide-nav,
 html[data-theme='light'] .act-log,
@@ -1160,6 +1164,9 @@ html[data-theme='light'] .eval-page .topbar {
 }
 
 html[data-theme='light'] .sensors-card,
+html[data-theme='light'] .model-analysis-page .ma-artifact-item,
+html[data-theme='light'] .model-analysis-page .ma-stat,
+html[data-theme='light'] .model-analysis-page .ma-status-chip,
 html[data-theme='light'] .sensors-modal,
 html[data-theme='light'] .sensors-guide-card {
   backdrop-filter: blur(10px);

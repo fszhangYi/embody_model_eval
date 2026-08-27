@@ -20,7 +20,7 @@ export type MessageTree = {
     loggingOut: string
   }
   pages: Record<
-    'home' | 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline' | 'sensors',
+    'home' | 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline' | 'modelAnalysis' | 'sensors',
     { label: string; short: string; desc: string }
   >
   settings: {
@@ -205,6 +205,11 @@ export const messages: Record<Locale, MessageTree> = {
         label: 'ACT 数据流水线',
         short: 'ACT',
         desc: 'raw → HDF5 → 训练 → 推理 → embody JSON',
+      },
+      modelAnalysis: {
+        label: 'ACT 模型分析',
+        short: '分析',
+        desc: '解析 ckpt 目录：stats / 优化器 / 权重 / 配置 / 曲线',
       },
       sensors: {
         label: '传感器状态',
@@ -409,6 +414,11 @@ export const messages: Record<Locale, MessageTree> = {
         label: 'ACT data pipeline',
         short: 'ACT',
         desc: 'raw → HDF5 → train → infer → embody JSON',
+      },
+      modelAnalysis: {
+        label: 'ACT model analysis',
+        short: 'Analyze',
+        desc: 'Inspect ckpt dir: stats / optimizer / weights / config / curves',
       },
       sensors: {
         label: 'Sensor status',

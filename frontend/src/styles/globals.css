@@ -62,7 +62,8 @@ body {
 .hub-page,
 .chat-page,
 .robots-page,
-.sensors-page {
+.sensors-page,
+.model-analysis-page {
   min-height: 100vh;
 }
 

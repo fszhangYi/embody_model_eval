@@ -13,6 +13,7 @@ const MODULE_IDS: PageId[] = [
   'chat',
   'robots',
   'actPipeline',
+  'modelAnalysis',
   'sensors',
 ]
 

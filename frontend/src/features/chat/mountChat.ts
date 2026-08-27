@@ -10,6 +10,7 @@ import {
   hideLoader,
   inlineLoadingHtml,
 } from '../../lib/legacy/loading.js';
+import { consumeChatPendingPrompt, CHAT_DSH_SESSION_KEY, CHAT_STORAGE_KEY, resetChatSession } from './pendingPrompt';
 
 export function mountChat(): void | (() => void) {
 const shellRoot = document.querySelector('.chat-page .legacy-shell');
@@ -17,7 +18,7 @@ if (!shellRoot) return;
 const $ = (sel) => shellRoot.querySelector(sel);
 const mountAc = new AbortController();
 const ls = { signal: mountAc.signal };
-const STORAGE_KEY = 'embody_chat_v1';
+const STORAGE_KEY = CHAT_STORAGE_KEY;
 const pageLoader = createLoader(document.querySelector('.chat-page'), { mode: 'page', id: 'chatPageLoader' });
 hideLoader(pageLoader);
 
@@ -600,14 +601,14 @@ async function sendChat() {
     if (configOverride.mode === 'dsh_agent') {
       let sid = '';
       try {
-        sid = localStorage.getItem('embody_dsh_session') || '';
+        sid = localStorage.getItem(CHAT_DSH_SESSION_KEY) || '';
       } catch (_) {
         /* ignore */
       }
       if (!sid) {
         sid = `chat-${Date.now().toString(36)}`;
         try {
-          localStorage.setItem('embody_dsh_session', sid);
+          localStorage.setItem(CHAT_DSH_SESSION_KEY, sid);
         } catch (_) {
           /* ignore */
         }
@@ -633,7 +634,7 @@ async function sendChat() {
     } else {
       if (out.meta?.sessionId) {
         try {
-          localStorage.setItem('embody_dsh_session', out.meta.sessionId);
+          localStorage.setItem(CHAT_DSH_SESSION_KEY, out.meta.sessionId);
         } catch (_) {
           /* ignore */
         }
@@ -704,7 +705,13 @@ $('#chatInput').addEventListener('keydown', (e) => {
 }, ls);
 
 (async function boot() {
-  restoreTurns();
+  const pending = consumeChatPendingPrompt();
+  if (pending?.newSession) {
+    resetChatSession();
+    state.turns = [];
+  } else {
+    restoreTurns();
+  }
   setApiStatus(null, t('chat.apiUnknown'));
   setAgentStatus('unknown');
   try {
@@ -722,6 +729,20 @@ $('#chatInput').addEventListener('keydown', (e) => {
     setApiStatus(false);
     renderChatFromState();
     appendBubble('system', String(e.message || e) + '\n' + t('chat.staticServerHint'), { persist: false });
+  }
+
+  if (pending?.message) {
+    const input = $('#chatInput');
+    if (input) input.value = pending.message;
+    if (pending.autoSend) {
+      // Defer so boot UI settles and skills/config are applied.
+      setTimeout(() => {
+        if (!state.busy && $('#chatInput')?.value.trim()) sendChat();
+      }, 80);
+    } else {
+      toast(t('chat.pendingPromptReady'), 'ok');
+      input?.focus();
+    }
   }
 })();
 

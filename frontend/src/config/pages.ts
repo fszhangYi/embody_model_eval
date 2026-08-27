@@ -6,6 +6,7 @@ export type PageId =
   | 'chat'
   | 'robots'
   | 'actPipeline'
+  | 'modelAnalysis'
   | 'sensors'
 
 export interface PageDef {
@@ -65,6 +66,13 @@ export const PAGES: PageDef[] = [
     label: 'ACT 数据流水线',
     short: 'ACT',
     desc: 'raw → HDF5 → 训练 → 推理 → embody JSON',
+  },
+  {
+    id: 'modelAnalysis',
+    path: '/model-analysis',
+    label: 'ACT 模型分析',
+    short: '分析',
+    desc: '解析 ckpt 目录：stats / 优化器 / 权重 / 配置 / 曲线',
   },
   {
     id: 'sensors',

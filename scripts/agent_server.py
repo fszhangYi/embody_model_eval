@@ -31,6 +31,7 @@ Endpoints:
   POST   /api/act-pipeline/jobs/<id>/cancel
   DELETE /api/act-pipeline/jobs/<id>
   POST   /api/act-pipeline/run
+  POST   /api/model-analysis/compare
   GET    /api/fs/children?root=act|embody&path=<abs>&rootPath=<override>
   GET    /api/fs/roots
   GET    /api/sensors/arm
@@ -108,6 +109,7 @@ from users import (
     update_user,
 )
 from fs_browse import browse_roots, list_children
+from model_analysis import compare_ckpt_dirs
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
@@ -1487,6 +1489,22 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json(create_act_link(str(embody_root), str(act_root)))
             except ValueError as e:
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/model-analysis/compare":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            ckpt_dirs = body.get("ckptDirs") or body.get("ckpt_dirs") or []
+            if not isinstance(ckpt_dirs, list):
+                self._send_json({"ok": False, "error": "ckptDirs must be array"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(compare_ckpt_dirs([str(d) for d in ckpt_dirs if d]))
+            except (ValueError, PermissionError) as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
             return
 
         if path == "/api/act-pipeline/run":
