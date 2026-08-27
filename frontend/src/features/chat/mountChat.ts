@@ -12,6 +12,7 @@ import {
 } from '../../lib/legacy/loading.js';
 import { consumeChatPendingPrompt, CHAT_DSH_SESSION_KEY, CHAT_STORAGE_KEY, resetChatSession } from './pendingPrompt';
 import { bubbleMarkdown, downloadMarkdown, downloadMarkdownAsPdf } from './bubbleExport';
+import { renderMarkdownHtml } from './renderMarkdown';
 
 export function mountChat(): void | (() => void) {
 const shellRoot = document.querySelector('.chat-page .legacy-shell');
@@ -209,8 +210,14 @@ function appendBubble(role, text, { meta, receipt, skillIds, persist = true } = 
   const div = document.createElement('div');
   div.className = `bubble bubble-${role}`;
   const who = role === 'user' ? t('chat.whoYou') : role === 'assistant' ? 'Agent' : t('chat.whoSystem');
-  div.innerHTML = `<div class="bubble-who">${who}</div><pre class="bubble-text"></pre>`;
-  div.querySelector('.bubble-text').textContent = text;
+  div.innerHTML = `<div class="bubble-who">${who}</div><div class="bubble-text"></div>`;
+  const body = div.querySelector('.bubble-text');
+  if (role === 'user' || role === 'assistant') {
+    body.classList.add('bubble-md');
+    body.innerHTML = renderMarkdownHtml(text);
+  } else {
+    body.textContent = text;
+  }
 
   if (meta) {
     const m = document.createElement('div');

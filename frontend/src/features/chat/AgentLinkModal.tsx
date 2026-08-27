@@ -100,7 +100,7 @@ export function AgentLinkModal({
       model: form.model.trim(),
       systemPrompt: form.systemPrompt,
     }
-    const key = form.apiKey.trim()
+    const key = (form.apiKey ?? '').trim()
     if (key) payload.apiKey = key
     return payload
   }
