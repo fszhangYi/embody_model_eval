@@ -410,6 +410,83 @@ function escAttr(s) {
   return escHtml(s).replace(/'/g, '&#39;');
 }
 
+function setApiStatus(ok, text) {
+  const el = $('#apiStatus');
+  if (!el) return;
+  el.textContent = text ?? (ok ? t('chat.apiConnected') : t('chat.apiDisconnected'));
+  if (ok === null || ok === undefined) {
+    delete el.dataset.ok;
+  } else {
+    el.dataset.ok = ok ? '1' : '0';
+  }
+}
+
+function setAgentStatus(state, detail) {
+  const el = $('#agentStatus');
+  if (!el) return;
+  el.dataset.state = state;
+  const labels = {
+    unknown: t('chat.agentStatusUnknown'),
+    checking: t('chat.agentStatusChecking'),
+    ok: t('chat.agentStatusOk'),
+    fail: t('chat.agentStatusFail'),
+  };
+  el.textContent = detail || labels[state] || labels.unknown;
+  if (state === 'ok') el.dataset.ok = '1';
+  else if (state === 'fail') el.dataset.ok = '0';
+  else delete el.dataset.ok;
+}
+
+async function checkApiHealth() {
+  setApiStatus(null, t('chat.apiChecking'));
+  const health = await api('/api/health');
+  if (!health.ok) throw new Error(t('chat.apiUnavailable'));
+  setApiStatus(true);
+  return health;
+}
+
+function readConfigOverride() {
+  const configOverride = {
+    mode: $('#cfgMode').value,
+    baseUrl: $('#cfgBaseUrl').value.trim(),
+    path: $('#cfgPath').value.trim(),
+    model: $('#cfgModel').value.trim(),
+    systemPrompt: $('#cfgSystem').value,
+  };
+  const key = $('#cfgApiKey').value.trim();
+  if (key) configOverride.apiKey = key;
+  return configOverride;
+}
+
+async function probeAgentConnection() {
+  const btn = $('#btnProbeAgent');
+  if (btn) btn.disabled = true;
+  setAgentStatus('checking');
+  try {
+    const out = await api('/api/agent/probe', {
+      method: 'POST',
+      body: JSON.stringify({ config: readConfigOverride() }),
+    });
+    if (!out.ok) {
+      const msg = out.message || out.error || t('chat.probeFail');
+      setAgentStatus('fail', msg);
+      toast(msg, 'err');
+      return false;
+    }
+    const msg = out.message || t('chat.probeOk');
+    setAgentStatus('ok', msg);
+    toast(msg, out.authWarning ? 'info' : 'ok');
+    return true;
+  } catch (err) {
+    const msg = String(err?.message || err);
+    setAgentStatus('fail', msg);
+    toast(msg, 'err');
+    return false;
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function fillConfigForm(cfg) {
   state.config = cfg;
   $('#cfgMode').value = cfg.mode || 'dry_run';
@@ -427,6 +504,7 @@ function fillConfigForm(cfg) {
     ? t('chat.apiKeySaved', { masked: cfg.apiKeyMasked })
     : t('chat.apiKeyPlaceholder');
   toggleLinkFields();
+  setAgentStatus('unknown');
 }
 
 function toggleLinkFields() {
@@ -485,6 +563,7 @@ async function saveConfig() {
   if (!out.ok) return toast(out.error || t('chat.saveFail'), 'err');
   fillConfigForm(out.config);
   toast(t('chat.configSaved'), 'ok');
+  setAgentStatus('unknown');
 }
 
 async function sendChat() {
@@ -492,16 +571,7 @@ async function sendChat() {
   const message = $('#chatInput').value.trim();
   if (!message) return toast(t('chat.needInput'), 'err');
 
-  const configOverride = {
-    mode: $('#cfgMode').value,
-    baseUrl: $('#cfgBaseUrl').value.trim(),
-    path: $('#cfgPath').value.trim(),
-    model: $('#cfgModel').value.trim(),
-    systemPrompt: $('#cfgSystem').value,
-  };
-  const key = $('#cfgApiKey').value.trim();
-  if (key) configOverride.apiKey = key;
-
+  const configOverride = readConfigOverride();
   const skillIds = [...state.selected];
   const history = historyForApi();
 
@@ -593,8 +663,20 @@ async function sendChat() {
   }
 }
 
-$('#cfgMode').addEventListener('change', toggleLinkFields, ls);
+$('#cfgMode').addEventListener('change', () => {
+  toggleLinkFields();
+  setAgentStatus('unknown');
+}, ls);
 $('#btnSaveConfig').addEventListener('click', () => saveConfig(), ls);
+$('#btnCheckApi').addEventListener('click', async () => {
+  try {
+    await checkApiHealth();
+    toast(t('chat.apiConnected'), 'ok');
+  } catch (e) {
+    toast(String(e.message || e), 'err');
+  }
+}, ls);
+$('#btnProbeAgent').addEventListener('click', () => probeAgentConnection(), ls);
 $('#btnRefresh').addEventListener('click', async () => {
   try {
     await withLoader(pageLoader, async (progress) => {
@@ -623,13 +705,12 @@ $('#chatInput').addEventListener('keydown', (e) => {
 
 (async function boot() {
   restoreTurns();
+  setApiStatus(null, t('chat.apiUnknown'));
+  setAgentStatus('unknown');
   try {
     await withLoader(pageLoader, async (progress) => {
       progress(0.15, t('chat.bootConnect'), '/api/health');
-      const health = await api('/api/health');
-      if (!health.ok) throw new Error(t('chat.apiUnavailable'));
-      $('#apiStatus').textContent = t('chat.apiConnected');
-      $('#apiStatus').dataset.ok = '1';
+      await checkApiHealth();
       progress(0.45, t('chat.bootSkills'), 'agent_skills/');
       await refreshSkills();
       progress(0.8, t('chat.bootConfig'), t('chat.agentTitle'));
@@ -638,8 +719,7 @@ $('#chatInput').addEventListener('keydown', (e) => {
     }, { text: t('chat.bootTitle'), detail: t('chat.bootDetail') });
     renderChatFromState();
   } catch (e) {
-    $('#apiStatus').textContent = t('chat.apiDisconnected');
-    $('#apiStatus').dataset.ok = '0';
+    setApiStatus(false);
     renderChatFromState();
     appendBubble('system', String(e.message || e) + '\n' + t('chat.staticServerHint'), { persist: false });
   }

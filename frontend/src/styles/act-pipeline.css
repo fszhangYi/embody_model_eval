@@ -253,9 +253,9 @@
 
 .act-train-mem {
   margin-bottom: 16px;
-  border: 1px solid rgba(58, 77, 102, 0.45);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  background: rgba(12, 18, 28, 0.55);
+  background: var(--surface-2);
   overflow: hidden;
 }
 
@@ -274,7 +274,7 @@
 }
 
 .act-train-mem-toggle:hover {
-  background: rgba(61, 214, 198, 0.05);
+  background: var(--accent-dim);
 }
 
 .act-train-mem-title {
@@ -310,7 +310,8 @@
 
 .act-train-mem-body {
   padding: 0 12px 12px;
-  border-top: 1px solid rgba(58, 77, 102, 0.35);
+  border-top: 1px solid var(--border);
+  background: var(--panel);
 }
 
 .act-train-mem-lead {
@@ -342,10 +343,10 @@
 .act-train-mem-res input {
   width: 88px;
   padding: 5px 8px;
-  border: 1px solid rgba(58, 77, 102, 0.55);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: var(--surface-2);
-  color: var(--text, #e7ecf3);
+  background: var(--input-bg);
+  color: var(--text);
   font: inherit;
   font-size: 0.75rem;
 }
@@ -441,7 +442,7 @@
 .act-train-mem-table th,
 .act-train-mem-table td {
   padding: 6px 8px;
-  border: 1px solid rgba(58, 77, 102, 0.35);
+  border: 1px solid var(--border);
   text-align: left;
   vertical-align: top;
 }

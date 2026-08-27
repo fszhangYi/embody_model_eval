@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import { applyDomI18n, onLocaleChange, t, trText } from '../../i18n/runtime';
+import { getThreeSceneTheme, watchThreeSceneTheme } from '../../lib/threeTheme';
 /** Auto-extracted from legacy/index.html */
 
 import * as THREE from 'three';
@@ -1160,7 +1161,8 @@ async function initScene(container, frames, robotCfg) {
   const w = container.clientWidth || window.innerWidth;
   const h = container.clientHeight || window.innerHeight;
   const scene = new THREE.Scene();
-  scene.fog = new THREE.Fog(0x0b1018, 1.8, 5.5);
+  const theme = getThreeSceneTheme();
+  scene.fog = new THREE.Fog(theme.fog, 1.8, 5.5);
 
   const camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 20);
   camera.position.set(0.7, 0.42, 0.9);
@@ -1168,8 +1170,10 @@ async function initScene(container, frames, robotCfg) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(w, h);
-  renderer.setClearColor(0x0b1018, 1);
+  renderer.setClearColor(theme.background, 1);
   container.appendChild(renderer.domElement);
+  const grid = new THREE.GridHelper(1.6, 16, theme.gridCenter, theme.gridEdge);
+  watchThreeSceneTheme(scene, renderer, { fog: scene.fog, grid });
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.target.set(0, 0.16, 0);
@@ -1180,8 +1184,6 @@ async function initScene(container, frames, robotCfg) {
   key.position.set(1.5, 2.5, 1.2); scene.add(key);
   const fill = new THREE.DirectionalLight(0x88aaff, 0.35);
   fill.position.set(-1.5, 1.0, -1.0); scene.add(fill);
-  // Industrial arms (EC616) are visually scaled to SO-100 size via model_scale.
-  const grid = new THREE.GridHelper(1.6, 16, 0x3a4d66, 0x243247);
   scene.add(grid);
 
   setLoadProgress(

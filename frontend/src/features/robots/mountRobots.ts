@@ -13,6 +13,7 @@ import {
   normalizeRobotProfile,
 } from '../../lib/legacy/robots_registry.js';
 import { mountViewTools } from '../../lib/legacy/view_tools.js';
+import { watchThreeSceneTheme, getThreeSceneTheme } from '../../lib/threeTheme';
 import {
   bindLoader,
   setLoadProgress as updateLoadProgress,
@@ -47,12 +48,14 @@ let arm = null;
 let loadToken = 0;
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x0b1018);
+const theme = getThreeSceneTheme();
+scene.background = new THREE.Color(theme.background);
 const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 40);
 camera.position.set(0.85, 0.55, 0.95);
 const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.setClearColor(theme.background, 1);
 els.viewer.appendChild(renderer.domElement);
 
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -71,9 +74,10 @@ const fill = new THREE.DirectionalLight(0xa8c4ff, 0.35);
 fill.position.set(-2, 1.2, -1.5);
 scene.add(fill);
 
-const grid = new THREE.GridHelper(2.4, 24, 0x3a4d66, 0x1e2a3c);
+const grid = new THREE.GridHelper(2.4, 24, theme.gridCenter, theme.gridEdge);
 grid.position.y = 0;
 scene.add(grid);
+watchThreeSceneTheme(scene, renderer, { grid });
 const axes = new THREE.AxesHelper(0.18);
 scene.add(axes);
 

@@ -14,6 +14,7 @@ Endpoints:
   DELETE /api/skills/<id>
   GET    /api/agent/config
   PUT    /api/agent/config
+  POST   /api/agent/probe
   GET    /api/pipeline/graphs
   PUT    /api/pipeline/graphs
   GET    /api/act-pipeline/spec
@@ -422,6 +423,187 @@ def http_json(url: str, payload: dict[str, Any], api_key: str, timeout: float = 
         return {"ok": False, "status": 0, "message": str(e)}
 
 
+def http_get(url: str, api_key: str, timeout: float = 8.0) -> dict[str, Any]:
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "embody-model-eval-agent-chat/1.0",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            body = resp.read().decode("utf-8", errors="replace")
+            try:
+                parsed = json.loads(body)
+            except json.JSONDecodeError:
+                parsed = {"raw": body}
+            return {"ok": True, "status": resp.status, "data": parsed}
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        try:
+            parsed = json.loads(err_body)
+        except json.JSONDecodeError:
+            parsed = {"raw": err_body}
+        return {"ok": False, "status": e.code, "error": parsed, "message": str(e)}
+    except Exception as e:
+        return {"ok": False, "status": 0, "message": str(e)}
+
+
+def merge_config_override(cfg: dict[str, Any], override: dict[str, Any] | None) -> dict[str, Any]:
+    merged = dict(cfg)
+    if not isinstance(override, dict):
+        return merged
+    for k in default_config():
+        if k not in override or override[k] is None:
+            continue
+        if k == "apiKey" and override[k] == "":
+            continue
+        merged[k] = override[k]
+    return merged
+
+
+def probe_agent(cfg: dict[str, Any]) -> dict[str, Any]:
+    """Lightweight connectivity check for the configured agent mode."""
+    mode = (cfg.get("mode") or "dry_run").strip()
+    api_key = cfg.get("apiKey") or ""
+
+    if mode == "dry_run":
+        return {
+            "ok": True,
+            "mode": mode,
+            "message": "dry_run：本地回执模式，无需外部 Agent",
+        }
+
+    if mode == "cursor_sdk":
+        try:
+            import cursor_sdk  # type: ignore  # noqa: F401
+        except Exception as e:
+            return {"ok": False, "mode": mode, "message": f"cursor_sdk 不可用：{e}"}
+        key = api_key or os.environ.get("CURSOR_API_KEY") or ""
+        if not key:
+            return {
+                "ok": False,
+                "mode": mode,
+                "message": "缺少 CURSOR_API_KEY 或 API Key",
+            }
+        return {
+            "ok": True,
+            "mode": mode,
+            "message": "cursor_sdk 已安装，API Key 已配置",
+        }
+
+    if mode == "dsh_agent":
+        base = (
+            (cfg.get("baseUrl") or "").strip()
+            or os.environ.get("DSH_BRIDGE_URL", "").strip()
+            or "http://127.0.0.1:8790"
+        ).rstrip("/")
+        health_url = base + "/health"
+        resp = http_get(health_url, api_key, timeout=8.0)
+        if not resp.get("ok"):
+            msg = resp.get("message") or "无法连接 embody_dsh_agent bridge"
+            return {
+                "ok": False,
+                "mode": mode,
+                "message": msg,
+                "url": health_url,
+                "httpStatus": resp.get("status"),
+                "detail": resp.get("error") or resp,
+            }
+        data = resp.get("data")
+        if isinstance(data, dict) and data.get("ok") is False:
+            return {
+                "ok": False,
+                "mode": mode,
+                "message": data.get("error") or "dsh bridge /health 返回失败",
+                "url": health_url,
+                "httpStatus": resp.get("status"),
+                "detail": data,
+            }
+        return {
+            "ok": True,
+            "mode": mode,
+            "message": f"dsh bridge 可达 ({health_url})",
+            "url": health_url,
+            "httpStatus": resp.get("status"),
+        }
+
+    base = (cfg.get("baseUrl") or "").rstrip("/")
+    if not base:
+        return {"ok": False, "mode": mode, "message": "请填写 Base URL"}
+
+    path = (cfg.get("path") or "").strip()
+    if not path.startswith("/"):
+        path = "/" + path if path else ""
+
+    if mode == "openai":
+        probe_url = base + "/models"
+        resp = http_get(probe_url, api_key, timeout=12.0)
+        status = resp.get("status") or 0
+        if resp.get("ok"):
+            return {
+                "ok": True,
+                "mode": mode,
+                "message": f"OpenAI 兼容端点可达 ({probe_url})",
+                "url": probe_url,
+                "httpStatus": status,
+            }
+        if status in (401, 403):
+            return {
+                "ok": True,
+                "mode": mode,
+                "message": f"端点可达但鉴权失败 (HTTP {status})，请检查 API Key",
+                "url": probe_url,
+                "httpStatus": status,
+                "authWarning": True,
+            }
+        msg = resp.get("message") or f"无法连接 {probe_url}"
+        return {
+            "ok": False,
+            "mode": mode,
+            "message": msg,
+            "url": probe_url,
+            "httpStatus": status,
+            "detail": resp.get("error") or resp,
+        }
+
+    if mode == "webhook":
+        webhook_path = path or "/"
+        probe_url = base + webhook_path
+        resp = http_json(
+            probe_url,
+            {"probe": True, "message": "connectivity check"},
+            api_key,
+            timeout=12.0,
+        )
+        status = resp.get("status") or 0
+        if resp.get("ok") or status in (400, 401, 403, 404, 405, 422):
+            note = ""
+            if status in (401, 403):
+                note = "（鉴权可能未通过，但网络可达）"
+            elif not resp.get("ok"):
+                note = f"（HTTP {status}，但网络可达）"
+            return {
+                "ok": True,
+                "mode": mode,
+                "message": f"Webhook 可达{note} ({probe_url})",
+                "url": probe_url,
+                "httpStatus": status,
+            }
+        msg = resp.get("message") or f"无法连接 {probe_url}"
+        return {
+            "ok": False,
+            "mode": mode,
+            "message": msg,
+            "url": probe_url,
+            "httpStatus": status,
+            "detail": resp.get("error") or resp,
+        }
+
+    return {"ok": False, "mode": mode, "message": f"未知模式: {mode}"}
+
+
 def try_dsh_agent(
     message: str,
     skills: list[dict[str, Any]],
@@ -605,15 +787,7 @@ def run_chat(payload: dict[str, Any]) -> dict[str, Any]:
     if missing:
         return {"ok": False, "error": f"unknown skills: {', '.join(missing)}"}
 
-    cfg = load_config()
-    override = payload.get("config") or {}
-    if isinstance(override, dict):
-        for k in default_config():
-            if k in override and override[k] is not None:
-                # empty apiKey in override means "keep stored"
-                if k == "apiKey" and override[k] == "":
-                    continue
-                cfg[k] = override[k]
+    cfg = merge_config_override(load_config(), payload.get("config"))
 
     messages = build_messages(message, skills, cfg.get("systemPrompt") or "", history)
     mode = (cfg.get("mode") or "dry_run").strip()
@@ -1186,6 +1360,14 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/chat":
             result = run_chat(body if isinstance(body, dict) else {})
             status = 200 if result.get("ok") else HTTPStatus.BAD_REQUEST
+            self._send_json(result, status)
+            return
+
+        if path == "/api/agent/probe":
+            payload = body if isinstance(body, dict) else {}
+            cfg = merge_config_override(load_config(), payload.get("config"))
+            result = probe_agent(cfg)
+            status = 200 if result.get("ok") else HTTPStatus.BAD_GATEWAY
             self._send_json(result, status)
             return
 

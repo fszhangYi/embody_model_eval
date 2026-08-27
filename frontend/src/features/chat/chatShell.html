@@ -3,7 +3,10 @@
     <h1>AI Chat</h1>
     <p class="header-blurb" data-i18n="chat.subtitle">选择托管 Skill → 配置 Agent 链接 → 发送诉求并查看回执</p>
   </div>
-  <div class="header-status" id="apiStatus" data-i18n="chat.apiChecking">检测 API…</div>
+  <div class="header-status-row">
+    <span class="header-status" id="apiStatus" data-i18n="chat.apiUnknown">后端未检测</span>
+    <button type="button" class="btn-sm" id="btnCheckApi" data-i18n="chat.btnCheckApi" data-i18n-title="chat.btnCheckApiTitle">检测 API</button>
+  </div>
 </header>
 
 <div class="layout">
@@ -44,6 +47,10 @@
 
   <aside class="panel" data-i18n-aria="chat.agentAria" aria-label="Agent 链接">
     <h2 data-i18n="chat.agentTitle">Agent 链接</h2>
+    <div class="agent-probe-row">
+      <span class="agent-status" id="agentStatus" data-state="unknown" data-i18n="chat.agentStatusUnknown">未检测</span>
+      <button type="button" class="btn-sm" id="btnProbeAgent" data-i18n="chat.btnProbeAgent" data-i18n-title="chat.btnProbeAgentTitle">检测连接</button>
+    </div>
     <div class="field">
       <label for="cfgMode" data-i18n="chat.modeLabel">模式</label>
       <select id="cfgMode">
