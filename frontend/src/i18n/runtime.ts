@@ -1,4 +1,5 @@
 import { formatMessage, lookupMessage } from './messages'
+import { formatInlineCode } from './inlineCode'
 import { pageStrings } from './pageStrings'
 import { readStoredLocale, type Locale } from './types'
 
@@ -48,6 +49,13 @@ export function t(path: string, vars?: Record<string, string | number>): string 
   return formatMessage(raw, vars)
 }
 
+/** Same as `t()` but converts `` `inline code` `` markers to `<code>`. */
+export function tHtml(path: string, vars?: Record<string, string | number>): string {
+  return formatInlineCode(t(path, vars))
+}
+
+export { formatInlineCode } from './inlineCode'
+
 /**
  * Translate a Chinese UI string that exists in pageStrings.
  * Returns the input unchanged when no catalog match (or already Chinese locale).
@@ -66,9 +74,13 @@ export function applyDomI18n(root: ParentNode = document): void {
     if (!key) return
     const attr = el.getAttribute('data-i18n-attr')
     const text = t(key)
-    if (attr) el.setAttribute(attr, text)
-    else if (el.hasAttribute('data-i18n-html')) el.innerHTML = text
-    else el.textContent = text
+    if (attr) {
+      el.setAttribute(attr, text)
+    } else if (el.hasAttribute('data-i18n-html') || text.includes('`')) {
+      el.innerHTML = formatInlineCode(text)
+    } else {
+      el.textContent = text
+    }
   })
   root.querySelectorAll<HTMLElement>('[data-i18n-title]').forEach((el) => {
     const key = el.getAttribute('data-i18n-title')

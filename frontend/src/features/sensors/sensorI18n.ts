@@ -11,8 +11,98 @@ const VALUE_KEYS: Record<string, string> = {
   '—（未接实机）': 'sensors.row.noHardware',
 }
 
+const SECTION_KEYS: Record<string, string> = {
+  连接: 'sensors.section.connection',
+  运动学: 'sensors.section.kinematics',
+  几何参数: 'sensors.section.geometry',
+  '示教 FK 自检': 'sensors.section.teachFk',
+  'IK 回环': 'sensors.section.ikRoundtrip',
+  诊断: 'sensors.section.diagnostics',
+  执行器: 'sensors.section.actuator',
+  设备: 'sensors.section.device',
+  链路: 'sensors.section.link',
+  '力 / 电流': 'sensors.section.forceCurrent',
+  阵列: 'sensors.section.array',
+  '接触统计': 'sensors.section.contactStats',
+  '流配置': 'sensors.section.streamConfig',
+  '标定 / 保护': 'sensors.section.calibProtect',
+  主臂: 'sensors.section.leaderArm',
+}
+
+const ROW_KEYS: Record<string, string> = {
+  后端: 'sensors.row.backend',
+  端点: 'sensors.row.endpoint',
+  实机驱动: 'sensors.row.hardware',
+  'robot.xml': 'sensors.row.robotXml',
+  'arm_kin 根目录': 'sensors.row.armKinRoot',
+  '关节角 q1…q6 (°)': 'sensors.row.jointsDeg',
+  '关节角 q1…q6': 'sensors.row.jointsShort',
+  'TCP xyz (mm)': 'sensors.row.tcpMm',
+  'TCP xyzrpy': 'sensors.row.tcpXyzrpy',
+  '姿态 RX RY RZ (°)': 'sensors.row.rpyDeg',
+  软限位内: 'sensors.row.withinSoftLimits',
+  软限位: 'sensors.row.softLimitShort',
+  '软限位 (°)': 'sensors.row.softLimits',
+  型号: 'sensors.row.model',
+  ManipulatorType: 'sensors.row.manipulatorType',
+  '连杆长度 (mm)': 'sensors.row.linkLength',
+  '零位偏置 (°)': 'sensors.row.jointOffset',
+  关节方向: 'sensors.row.jointDirection',
+  样本数: 'sensors.row.sampleCount',
+  通过: 'sensors.row.passed',
+  门限: 'sensors.row.threshold',
+  成功: 'sensors.row.ikSuccess',
+  '关节 L2 误差': 'sensors.row.jointErrL2',
+  求解器: 'sensors.row.solver',
+  使能: 'sensors.row.enabled',
+  错误码: 'sensors.row.errorCode',
+  '温度 / 负载': 'sensors.row.tempLoad',
+  状态消息: 'sensors.row.statusMsg',
+  控制器地址: 'sensors.row.controllerAddr',
+  最近心跳: 'sensors.row.lastHeartbeat',
+  关节: 'sensors.metric.joints',
+  TCP: 'sensors.metric.tcp',
+}
+
+const CHECK_KEYS: Record<string, string> = {
+  'arm_kin 可导入': 'sensors.check.armKinImport',
+  'robot.xml 可读': 'sensors.check.robotXml',
+  '示教 FK 对表通过': 'sensors.check.teachPass',
+  '示教 FK 对表失败': 'sensors.check.teachFail',
+  '示教 FK 待测': 'sensors.check.teachPending',
+  'IK 回环通过': 'sensors.check.ikPass',
+  'IK 回环失败': 'sensors.check.ikFail',
+  'IK 回环待测': 'sensors.check.ikPending',
+  '实机驱动（待接入）': 'sensors.check.hardwarePending',
+}
+
+const SUMMARY_KEYS: Record<string, string> = {
+  '六轴机械臂运动学内置 arm_kin；点击「测试连接」跑示教 FK / IK 自检。': 'sensors.summary.armDefault',
+  '六轴机械臂已内置 arm_kin：状态页跑 FK/IK 自检；双击打开「FK/IK 搭建说明」查看完整构建文档。': 'sensors.summary.armLive',
+}
+
 export function sensorValue(text: string): string {
   if (!text || text === '—') return text
   const key = VALUE_KEYS[text]
+  return key ? t(key) : trText(text)
+}
+
+export function sensorSection(title: string): string {
+  const key = SECTION_KEYS[title]
+  return key ? t(key) : trText(title)
+}
+
+export function sensorRow(label: string): string {
+  const key = ROW_KEYS[label]
+  return key ? t(key) : trText(label)
+}
+
+export function sensorCheck(item: string): string {
+  const key = CHECK_KEYS[item]
+  return key ? t(key) : trText(item)
+}
+
+export function sensorSummary(text: string): string {
+  const key = SUMMARY_KEYS[text]
   return key ? t(key) : trText(text)
 }

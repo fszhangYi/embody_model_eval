@@ -142,6 +142,7 @@ export function SensorsPage() {
   }, [patchArm])
 
   useEffect(() => {
+    setDevices(SENSOR_DEVICES.map((d) => ({ ...d })))
     setToast(t('sensors.toastLoading'))
     void loadArm()
   }, [locale, loadArm])

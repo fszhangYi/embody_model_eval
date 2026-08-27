@@ -37,25 +37,29 @@ header:not(.login-brand) {
   position: fixed !important;
   min-width: 220px;
   padding: 6px;
-  background: rgba(18, 26, 38, 0.98);
-  border: 1px solid rgba(58, 77, 102, 0.75);
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  color: var(--text);
 }
 .page-nav-menu-portal .page-nav-item {
-  display: block;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
   padding: 8px 10px;
   border-radius: 8px;
   text-decoration: none;
-  color: #e7ecf3;
+  color: var(--text);
 }
 .page-nav-menu-portal .page-nav-item:hover {
-  background: rgba(61, 214, 198, 0.1);
+  background: var(--accent-dim);
 }
 .page-nav-menu-portal .page-nav-item.active {
-  background: linear-gradient(90deg, var(--spark-dim), rgba(61, 214, 198, 0.12));
+  background: linear-gradient(90deg, var(--spark-dim), var(--accent-dim));
   outline: 1px solid rgba(61, 214, 198, 0.35);
   box-shadow: inset 3px 0 0 var(--spark);
 }
@@ -63,16 +67,29 @@ header:not(.login-brand) {
   display: block;
   font-size: 0.8rem;
   font-weight: 560;
+  color: var(--text);
 }
 .page-nav-menu-portal .page-nav-item-desc {
   display: block;
   margin-top: 2px;
   font-size: 0.68rem;
-  color: #8b9bb4;
+  color: var(--muted);
 }
 .page-nav-menu-portal .page-nav-item-key {
-  border-color: rgba(240, 180, 41, 0.35) !important;
-  color: #e8c878 !important;
+  border-color: var(--border) !important;
+  color: var(--muted) !important;
+}
+.page-nav-menu-portal .page-nav-hint {
+  color: var(--muted);
+}
+.page-nav-menu-portal .page-nav-auth {
+  border-top-color: var(--border);
+}
+.page-nav-menu-portal .page-nav-auth-user {
+  color: var(--muted);
+}
+.page-nav-menu-portal .page-nav-logout {
+  color: var(--text);
 }
 
 /* —— Ambient wash (very soft, matches existing radial bg) —— */
@@ -389,7 +406,7 @@ header .pill,
   box-shadow:
     0 0 0 1px rgba(240, 180, 41, 0.18),
     0 0 18px rgba(240, 180, 41, 0.12);
-  color: #f5d78a !important;
+  color: var(--spark) !important;
 }
 
 button:hover:not(:disabled):not(.danger):not(.toggle),

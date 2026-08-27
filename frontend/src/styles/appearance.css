@@ -57,6 +57,8 @@ html[data-theme='light'] {
   --shadow-glow: 0 0 0 1px rgba(13, 148, 136, 0.14);
   --scrollbar-thumb: rgba(13, 148, 136, 0.32);
   --scrollbar-thumb-hover: rgba(13, 148, 136, 0.52);
+  --code-inline-bg: rgba(15, 118, 110, 0.08);
+  --code-inline-border: rgba(15, 118, 110, 0.2);
   --header-bg: linear-gradient(
     180deg,
     rgba(255, 255, 255, 0.92) 0%,
@@ -148,6 +150,49 @@ html[data-theme='light'] .page-nav-item-key {
 
 html[data-theme='light'] .page-nav-auth {
   border-top-color: var(--border);
+}
+
+/* Page nav portal: unify colors across all tabs (beats page-scoped overrides) */
+html[data-theme='light'] .page-nav-menu-portal {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow-lg);
+  color: var(--text);
+}
+
+html[data-theme='light'] .page-nav-menu-portal .page-nav-item,
+html[data-theme='light'] .page-nav-menu-portal .page-nav-item-title {
+  color: var(--text);
+}
+
+html[data-theme='light'] .page-nav-menu-portal .page-nav-item-desc,
+html[data-theme='light'] .page-nav-menu-portal .page-nav-hint,
+html[data-theme='light'] .page-nav-menu-portal .page-nav-auth-user {
+  color: var(--muted);
+}
+
+html[data-theme='light'] .page-nav-menu-portal .page-nav-item-key {
+  background: var(--surface-3);
+  border-color: var(--border) !important;
+  color: #475569 !important;
+}
+
+html[data-theme='light'] .page-nav-menu-portal .page-nav-item:hover {
+  background: var(--accent-dim);
+}
+
+html[data-theme='light'] .page-nav-menu-portal .page-nav-item.active {
+  background: rgba(13, 148, 136, 0.12);
+  outline-color: rgba(13, 148, 136, 0.32);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+html[data-theme='light'] .page-nav-btn.pill:hover,
+html[data-theme='light'] .page-nav.open .page-nav-btn.pill {
+  color: var(--accent) !important;
+  border-color: var(--accent);
+  background: var(--surface-3);
+  box-shadow: var(--shadow-glow);
 }
 
 html[data-theme='light'] .pill,
@@ -1296,6 +1341,41 @@ html[data-theme='light'] .eval-page #arm3d .loading-bar {
 html[data-theme='light'] .eval-page #arm3d .loading-card {
   border-color: var(--border);
   box-shadow: var(--shadow-lg);
+}
+
+/* 3D view toolbar (eval + robots) */
+html[data-theme='light'] .eval-page #arm3d .view-tools,
+html[data-theme='light'] .robots-page #viewer .view-tools {
+  background: var(--chrome);
+  border-color: var(--border);
+  box-shadow: var(--shadow-md);
+  backdrop-filter: blur(12px);
+}
+
+html[data-theme='light'] .eval-page #arm3d .view-tools button,
+html[data-theme='light'] .robots-page #viewer .view-tools button {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+html[data-theme='light'] .eval-page #arm3d .view-tools button:hover,
+html[data-theme='light'] .robots-page #viewer .view-tools button:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--surface-3);
+}
+
+html[data-theme='light'] .eval-page #arm3d .view-tools button.active,
+html[data-theme='light'] .robots-page #viewer .view-tools button.active {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+  color: var(--accent);
+}
+
+html[data-theme='light'] .eval-page #arm3d .view-tools-hint,
+html[data-theme='light'] .robots-page #viewer .view-tools-hint {
+  color: var(--muted);
 }
 
 /* Light: secondary copy readability (small labels, toggles, tags) */

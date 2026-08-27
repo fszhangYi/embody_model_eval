@@ -107,7 +107,9 @@
   }.chat-page .panel:last-child { border-right: 0; border-left: 1px solid var(--border); }.chat-page .panel h2 {
     margin: 0 0 8px; font-size: 0.92rem; font-weight: 600;
     display: flex; align-items: center; justify-content: space-between; gap: 8px;
-  }.chat-page .panel h3 { margin: 14px 0 8px; font-size: 0.78rem; color: var(--muted); font-weight: 600; }.chat-page .muted { color: var(--muted); font-size: 0.75rem; line-height: 1.45; }.chat-page .empty { margin: 8px 0; }.chat-page code { font-family: var(--mono); font-size: 0.72rem; color: var(--accent); }.chat-page button, .chat-page .btn-sm {
+  }.chat-page .panel h3 { margin: 14px 0 8px; font-size: 0.78rem; color: var(--muted); font-weight: 600; }.chat-page #managedSkills {
+    min-width: 0;
+  }.chat-page .muted { color: var(--muted); font-size: 0.75rem; line-height: 1.45; }.chat-page .empty { margin: 8px 0; }.chat-page code { font-family: var(--mono); font-size: 0.72rem; color: var(--accent); }.chat-page button, .chat-page .btn-sm {
     background: var(--input-bg); color: var(--text); border: 1px solid #354a66;
     border-radius: 8px; padding: 7px 12px; font: inherit; font-size: 0.8rem; cursor: pointer;
   }.chat-page button:hover, .chat-page .btn-sm:hover { border-color: var(--accent); color: var(--accent); }.chat-page button:disabled, .chat-page .btn-sm:disabled { opacity: 0.45; cursor: not-allowed; }.chat-page .btn-sm { padding: 4px 10px; font-size: 0.72rem; }.chat-page .btn-primary {
@@ -122,9 +124,10 @@
     color: #fecaca;
   }.chat-page .skill-card {
     display: grid;
-    grid-template-columns: auto 1fr auto;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     gap: 8px;
     align-items: start;
+    min-width: 0;
     padding: 8px 10px;
     margin-bottom: 8px;
     border: 1px solid var(--border);
@@ -134,10 +137,31 @@
   }.chat-page .skill-card:has(input:checked) {
     border-color: rgba(61,214,198,0.55);
     background: var(--accent-dim);
-  }.chat-page .skill-card input { margin-top: 3px; }.chat-page .skill-name { display: block; font-size: 0.82rem; font-weight: 600; }.chat-page .skill-id { display: block; font-family: var(--mono); font-size: 0.65rem; color: var(--muted); margin-top: 2px; }.chat-page .skill-desc {
+  }.chat-page .skill-card input { margin-top: 3px; flex-shrink: 0; }.chat-page .skill-card-body {
+    min-width: 0;
+    overflow: hidden;
+  }.chat-page .skill-name {
+    display: block;
+    font-size: 0.82rem;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }.chat-page .skill-id {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.65rem;
+    color: var(--muted);
+    margin-top: 2px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }.chat-page .skill-desc {
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
     overflow: hidden; margin-top: 4px; font-size: 0.7rem; color: #b7c3d6; line-height: 1.4;
+    word-break: break-word;
   }.chat-page .skill-del {
+    flex-shrink: 0;
     padding: 0 6px; line-height: 1.2; border: 0; background: transparent;
     color: var(--muted); font-size: 1rem;
   }.chat-page .skill-del:hover { color: var(--danger); border: 0; }.chat-page .source-block { margin-bottom: 12px; }.chat-page .source-group {

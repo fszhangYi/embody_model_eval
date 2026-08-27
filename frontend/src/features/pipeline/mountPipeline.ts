@@ -1,6 +1,6 @@
 // @ts-nocheck
 
-import { t } from '../../i18n/runtime';
+import { t, onLocaleChange } from '../../i18n/runtime';
 
 /** Auto-ported from pipeline.html */
 
@@ -325,5 +325,6 @@ setRecUI('idle');
 
 await loadServerGraphs();
 refresh();
+onLocaleChange(() => refresh());
 
 }

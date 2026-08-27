@@ -23,6 +23,8 @@ html[data-theme='dark'] {
   --bg-spot-3: rgba(20, 48, 52, 0.35);
   --scrollbar-thumb: rgba(61, 214, 198, 0.45);
   --scrollbar-thumb-hover: rgba(61, 214, 198, 0.7);
+  --code-inline-bg: rgba(61, 214, 198, 0.1);
+  --code-inline-border: rgba(61, 214, 198, 0.22);
   --header-bg: linear-gradient(180deg, #0d131c 0%, #0b1018 100%);
   --header-bg-soft: linear-gradient(
     180deg,
@@ -258,4 +260,21 @@ body:has(.act-pipeline-page),
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+/* Inline code from i18n backtick markers (`…` → <code>) */
+.hub-page code,
+.chat-page code,
+.muted code,
+p code,
+span code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+  font-weight: 560;
+  color: var(--accent);
+  background: var(--code-inline-bg);
+  border: 1px solid var(--code-inline-border);
+  padding: 0.06em 0.38em;
+  border-radius: 4px;
+  white-space: nowrap;
 }

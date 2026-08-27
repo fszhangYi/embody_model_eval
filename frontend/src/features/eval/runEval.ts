@@ -1,6 +1,7 @@
 // @ts-nocheck
 
 import { applyDomI18n, onLocaleChange, t, trText } from '../../i18n/runtime';
+import { trEvalData, trUnitMsg } from '../../i18n/evalContentI18n';
 import { getThreeSceneTheme, watchThreeSceneTheme } from '../../lib/threeTheme';
 /** Auto-extracted from legacy/index.html */
 
@@ -654,12 +655,12 @@ function rebuildSafetyPanel(safety, stride) {
   if (sBox) {
     sBox.innerHTML = '';
     for (const [label, value, tipKey] of [
-      ['越限', String(safety.limits.n_over), 'limit_over'],
-      ['近限位', String(safety.limits.n_near), 'limit_near'],
-      ['近奇异', String(safety.limits.n_sing), 'sing'],
-      ['超速事件', String(safety.smooth.n_over_speed), 'overspeed'],
-      ['桌面碰', String(safety.collision.n_table), 'table_hit'],
-      ['自碰', String(safety.collision.n_self), 'self_hit'],
+      [t('eval.kw.limitOver'), String(safety.limits.n_over), 'limit_over'],
+      [t('eval.gloss.limit_near.title'), String(safety.limits.n_near), 'limit_near'],
+      [t('eval.kw.nearSingular'), String(safety.limits.n_sing), 'sing'],
+      [t('eval.gloss.overspeed.title'), String(safety.smooth.n_over_speed), 'overspeed'],
+      [t('eval.collisionTable'), String(safety.collision.n_table), 'table_hit'],
+      [t('eval.collisionSelf'), String(safety.collision.n_self), 'self_hit'],
     ]) {
       appendStat(sBox, label, value, tipKey);
     }
@@ -713,6 +714,65 @@ function rebuildSafetyPanel(safety, stride) {
   }
 }
 
+function refreshUnitHint(unitCheck) {
+  const unitEl = document.getElementById('unitHint');
+  if (!unitEl || !unitCheck) return;
+  const tags = [
+    `<span class="tag ${unitCheck.ok ? 'ok' : 'bad'}">${unitCheck.ok ? t('eval.dyn.unitOk') : t('eval.dyn.unitBad')}</span>`,
+    `<span class="tag">${t('eval.dyn.inferred', { unit: unitCheck.inferred_unit })}</span>`,
+    `<span class="tag">${t('eval.dyn.declared', { unit: unitCheck.declared_unit || '—' })}</span>`,
+    `<span class="tag">mode ${unitCheck.action_mode || '—'}</span>`,
+  ].join('');
+  const msgs = [...unitCheck.issues, ...unitCheck.warnings].map((x) => trUnitMsg(x)).join('；') || t('eval.dyn.noExtraWarn');
+  unitEl.innerHTML = `${tags}<br>${msgs}`;
+}
+
+function refreshTaskOutcomeHint(outcome, analysis) {
+  const hint = document.getElementById('taskOutcomeHint');
+  if (!hint) return;
+  if (!outcome.available) {
+    hint.innerHTML = `<span class="tag">${t('eval.dyn.tagNoTask')}</span> ${t('eval.dyn.noTaskOutcome')}`;
+    return;
+  }
+  const cls = outcomeTagClass(outcome.outcome);
+  const labels = (outcome.labels || []).map((l) => `<span class="tag">${l}</span>`).join('') || '—';
+  hint.innerHTML =
+    `<span class="tag ${cls}">${outcome.outcome}</span>`
+    + `<span class="tag">${outcome.reason_code || '—'}</span>`
+    + ` ${outcome.task || 'task'} · score ${outcome.score ?? '—'}<br>`
+    + `labels: ${labels}<br>${trEvalData(outcome.reason)}`;
+  const stats = document.getElementById('taskStats');
+  if (stats) {
+    stats.innerHTML = '';
+    for (const [label, value, tipKey] of [
+      [t('eval.dyn.result'), outcome.available ? outcome.outcome : '—', 'task_outcome'],
+      [t('eval.dyn.reasonCode'), outcome.reason_code || '—', 'task_outcome'],
+      [t('eval.dyn.contactFrame'), String(analysis.contact.n_contact_frames), 'contact_events'],
+      [t('eval.dyn.events'), String(analysis.events.length), 'contact_events'],
+      [t('eval.dyn.objects'), analysis.objects.ids.join(',') || '—', 'object_pose'],
+    ]) {
+      appendStat(stats, label, value, tipKey);
+    }
+  }
+  const list = document.getElementById('taskEventList');
+  if (list) {
+    list.innerHTML = analysis.events.length
+      ? analysis.events.map((ev) => {
+        const bits = [
+          `t=${ev.frame}`,
+          ev.type,
+          ev.force_n != null ? `F=${ev.force_n.toFixed(1)}N` : null,
+          ev.slip_mm != null ? `slip=${ev.slip_mm.toFixed(1)}mm` : null,
+          ev.note ? trEvalData(ev.note) : null,
+        ].filter(Boolean).join(' · ');
+        const cls = /slip|miss|fail|collision/i.test(ev.type) ? 'bad'
+          : /place|success|grasp_force|contact_end/i.test(ev.type) ? '' : 'warn';
+        return `<li class="${cls}" data-frame="${ev.frame}">${bits}</li>`;
+      }).join('')
+      : `<li class="muted">${t('eval.dyn.noEvents')}</li>`;
+  }
+}
+
 function refreshEvalLocaleDynamic() {
   document.querySelectorAll('[data-gloss-tip]').forEach((el) => {
     const key = el.getAttribute('data-gloss-tip');
@@ -727,6 +787,10 @@ function refreshEvalLocaleDynamic() {
   rebuildMainStats(st.meta, st.robotCfg);
   rebuildTcpStatsPanel(st);
   if (st.safety) rebuildSafetyPanel(st.safety, st.stride);
+  if (st.unitCheck) refreshUnitHint(st.unitCheck);
+  if (st.taskAnalysis) {
+    refreshTaskOutcomeHint(st.taskAnalysis.outcome, st.taskAnalysis);
+  }
   const sub = document.getElementById('subtitle');
   if (sub && st.meta && st.robotCfg) {
     sub.textContent = t('eval.dyn.metaSubtitle', {
@@ -1562,51 +1626,11 @@ function setupTcpCharts(DATA, tcp) {
 function setupTaskGPanel(DATA, tcp, world, onJumpFrame) {
   const analysis = analyzeTaskEpisode(DATA);
   const outcome = analysis.outcome;
-  const hint = document.getElementById('taskOutcomeHint');
-  const stats = document.getElementById('taskStats');
+  refreshTaskOutcomeHint(outcome, analysis);
   const list = document.getElementById('taskEventList');
   const objHint = document.getElementById('objectFrameHint');
 
-  if (hint) {
-    if (!outcome.available) {
-      hint.innerHTML = `<span class="tag">${t('eval.dyn.tagNoTask')}</span> ${t('eval.dyn.noTaskOutcome')}`;
-    } else {
-      const cls = outcomeTagClass(outcome.outcome);
-      const labels = (outcome.labels || []).map((l) => `<span class="tag">${l}</span>`).join('') || '—';
-      hint.innerHTML =
-        `<span class="tag ${cls}">${outcome.outcome}</span>`
-        + `<span class="tag">${outcome.reason_code || '—'}</span>`
-        + ` ${outcome.task || 'task'} · score ${outcome.score ?? '—'}<br>`
-        + `labels: ${labels}<br>${outcome.reason || ''}`;
-    }
-  }
-  if (stats) {
-    stats.innerHTML = '';
-    for (const [label, value, tipKey] of [
-      [t('eval.dyn.result'), outcome.available ? outcome.outcome : '—', 'task_outcome'],
-      [t('eval.dyn.reasonCode'), outcome.reason_code || '—', 'task_outcome'],
-      [t('eval.dyn.contactFrame'), String(analysis.contact.n_contact_frames), 'contact_events'],
-      [t('eval.dyn.events'), String(analysis.events.length), 'contact_events'],
-      [t('eval.dyn.objects'), analysis.objects.ids.join(',') || '—', 'object_pose'],
-    ]) {
-      appendStat(stats, label, value, tipKey);
-    }
-  }
   if (list) {
-    list.innerHTML = analysis.events.length
-      ? analysis.events.map((ev) => {
-        const bits = [
-          `t=${ev.frame}`,
-          ev.type,
-          ev.force_n != null ? `F=${ev.force_n.toFixed(1)}N` : null,
-          ev.slip_mm != null ? `slip=${ev.slip_mm.toFixed(1)}mm` : null,
-          ev.note,
-        ].filter(Boolean).join(' · ');
-        const cls = /slip|miss|fail|collision/i.test(ev.type) ? 'bad'
-          : /place|success|grasp_force|contact_end/i.test(ev.type) ? '' : 'warn';
-        return `<li class="${cls}" data-frame="${ev.frame}">${bits}</li>`;
-      }).join('')
-      : `<li class="muted">${t('eval.dyn.noEvents')}</li>`;
     list.onclick = (e) => {
       const li = e.target.closest('li[data-frame]');
       if (li && onJumpFrame) onJumpFrame(Number(li.dataset.frame));
@@ -2130,8 +2154,12 @@ try {
   }
 
   document.getElementById('title').textContent = `Embody · ${robotCfg.label}`;
-  document.getElementById('subtitle').textContent =
-    `${robotCfg.id} · ${meta.source} · ${meta.n_frames}帧 · ${meta.generated_at}`;
+  document.getElementById('subtitle').textContent = t('eval.dyn.metaSubtitle', {
+    id: robotCfg.id,
+    source: meta.source,
+    frames: meta.n_frames,
+    at: meta.generated_at,
+  });
   setLoadProgress(0.08, t('eval.dyn.initUi'), t('eval.dyn.initUiFrames', { label: robotCfg.label, n: meta.n_frames }));
 
   const stats = document.getElementById('stats');
@@ -2528,17 +2556,7 @@ try {
 
   const unitCheck = validateUnitsAndActionMode(DATA);
   const provenance = extractProvenance(meta);
-  const unitEl = document.getElementById('unitHint');
-  if (unitEl) {
-    const tags = [
-      `<span class="tag ${unitCheck.ok ? 'ok' : 'bad'}">${unitCheck.ok ? t('eval.dyn.unitOk') : t('eval.dyn.unitBad')}</span>`,
-      `<span class="tag">推断 ${unitCheck.inferred_unit}</span>`,
-      `<span class="tag">声明 ${unitCheck.declared_unit || '—'}</span>`,
-      `<span class="tag">mode ${unitCheck.action_mode || '—'}</span>`,
-    ].join('');
-    const msgs = [...unitCheck.issues, ...unitCheck.warnings].map((x) => x.msg).join('；') || t('eval.dyn.noExtraWarn');
-    unitEl.innerHTML = `${tags}<br>${msgs}`;
-  }
+  refreshUnitHint(unitCheck);
   const provEl = document.getElementById('provHint');
   if (provEl) {
     provEl.textContent = [
@@ -2632,38 +2650,9 @@ try {
   safety.collision.table_hits = mapHit(safety.collision.table_hits || []);
   safety.collision.self_hits = mapHit(safety.collision.self_hits || []);
 
-  const sBox = document.getElementById('safetyStats');
-  if (sBox) {
-    sBox.innerHTML = '';
-    for (const [label, value, tipKey] of [
-      ['越限', String(safety.limits.n_over), 'limit_over'],
-      ['近限位', String(safety.limits.n_near), 'limit_near'],
-      ['近奇异', String(safety.limits.n_sing), 'sing'],
-      ['超速事件', String(safety.smooth.n_over_speed), 'overspeed'],
-      ['桌面碰', String(safety.collision.n_table), 'table_hit'],
-      ['自碰', String(safety.collision.n_self), 'self_hit'],
-    ]) {
-      appendStat(sBox, label, value, tipKey);
-    }
-  }
+  rebuildSafetyPanel(safety, stride);
   const sList = document.getElementById('safetyList');
   if (sList) {
-    const items = [];
-    for (const h of safety.limits.over_limit.slice(0, 12)) {
-      items.push({ i: h.i, cls: 'bad', text: `越限 t=${h.i} ${h.joint}=${h.q.toFixed(1)}°` });
-    }
-    for (const h of safety.limits.singularity_frames.slice(0, 8)) {
-      items.push({ i: h.i, cls: 'warn', text: `近奇异 t=${h.i} w=${h.manipulability.toExponential(2)}` });
-    }
-    for (const h of safety.smooth.over_speed.slice(0, 8)) {
-      items.push({ i: h.i, cls: 'warn', text: `超速 t=${h.i} ${h.joint} ${h.deg_s.toFixed(0)}°/s` });
-    }
-    for (const h of safety.smooth.jump_frames.slice(0, 6)) {
-      items.push({ i: h.i, cls: 'warn', text: `关节跳变 t=${h.i} L2=${h.l2_deg.toFixed(1)}°` });
-    }
-    sList.innerHTML = items.map((x) =>
-      `<li data-frame="${x.i}" class="${x.cls}">${x.text}</li>`
-    ).join('') || `<li>${t('eval.dyn.noSafetyAlert')}</li>`;
     sList.addEventListener('click', (e) => {
       const li = e.target.closest('li[data-frame]');
       if (li) pauseJump(Number(li.dataset.frame));
@@ -2675,10 +2664,10 @@ try {
     const sh = safety.collision.self_hits[0];
     const method = safety.collision.method || 'hull';
     colHint.textContent =
-      `${trText('碰撞检测')}(${method}) stride=${stride} · ${trText('桌面碰')} ${safety.collision.n_table}`
-      + (th ? `（例 t=${th.i} ${th.link} z=${th.z.toFixed(3)}）` : '')
-      + ` · ${trText('自碰')} ${safety.collision.n_self}`
-      + (sh ? `（例 t=${sh.i} ${sh.a}/${sh.b} ${sh.dist_mm.toFixed(1)}mm）` : '')
+      `${t('eval.collisionDetect')}(${method}) stride=${stride} · ${t('eval.collisionTable')} ${safety.collision.n_table}`
+      + (th ? t('eval.dyn.collisionExample', { t: th.i, link: th.link, z: th.z.toFixed(3) }) : '')
+      + ` · ${t('eval.collisionSelf')} ${safety.collision.n_self}`
+      + (sh ? t('eval.dyn.selfCollisionExample', { t: sh.i, a: sh.a, b: sh.b, dist: sh.dist_mm.toFixed(1) }) : '')
       + t('eval.dyn.collisionSample');
   }
 
@@ -2863,6 +2852,8 @@ try {
     stride: typeof stride !== 'undefined' ? stride : 1,
     guard,
     mismatch,
+    unitCheck,
+    taskAnalysis: taskPanel.analysis,
   };
 
   setRecUI('idle');

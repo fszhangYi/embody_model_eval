@@ -308,8 +308,8 @@ function renderSkillList() {
       <label class="skill-card">
         <input type="checkbox" data-skill="${s.id}" ${checked} />
         <span class="skill-card-body">
-          <span class="skill-name" data-preview="${s.id}">${s.name || s.id}</span>
-          <span class="skill-id">${s.id}</span>
+          <span class="skill-name" data-preview="${s.id}" title="${(s.name || s.id).replace(/"/g, '&quot;')}">${s.name || s.id}</span>
+          <span class="skill-id" title="${s.id.replace(/"/g, '&quot;')}">${s.id}</span>
           <span class="skill-desc">${desc}</span>
         </span>
         <button type="button" class="skill-del" data-del="${s.id}" title=t('chat.btnDeleteSkill')>×</button>

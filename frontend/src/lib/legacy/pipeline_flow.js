@@ -5,6 +5,19 @@
 
 import { t } from '../../i18n/runtime';
 
+function nodeFieldKey(graphKey, nodeId, field) {
+  const m = String(graphKey || '').match(/^(.+)_(train|infer)$/);
+  if (!m) return '';
+  return `pipeline.node.${m[1]}.${m[2]}.${nodeId}.${field}`;
+}
+
+function localizedNodeField(graphKey, node, field) {
+  const key = nodeFieldKey(graphKey, node.id, field);
+  if (!key) return node[field] || '';
+  const text = t(key);
+  return text !== key ? text : (node[field] || '');
+}
+
 const KIND_COLORS = {
   data: '#3b82f6',
   vision: '#a855f7',
@@ -441,8 +454,11 @@ export class FlowCanvas {
     this.graph = structuredClone(g);
     this.editingId = null;
     if (this.titleEl) {
-      this.titleEl.textContent = g.label;
-      this.titleEl.setAttribute('title', g.label);
+      const labelKey = `pipeline.graph.${key}.label`;
+      const labelText = t(labelKey);
+      const title = labelText !== labelKey ? labelText : g.label;
+      this.titleEl.textContent = title;
+      this.titleEl.setAttribute('title', title);
     }
     if (this.blurbEl) {
       const blurbKey = `pipeline.graph.${key}.blurb`;
@@ -463,12 +479,13 @@ export class FlowCanvas {
     if (!this.graph) return;
 
     for (const n of this.graph.nodes) {
+      const title = localizedNodeField(this.graphKey, n, 'title');
       const el = document.createElement('div');
       el.className = 'flow-node';
       el.dataset.id = n.id;
       el.style.setProperty('--kind', KIND_COLORS[n.kind] || '#64748b');
       el.innerHTML = `
-        <div class="flow-node-title">${escapeHtml(n.title)}</div>
+        <div class="flow-node-title">${escapeHtml(title)}</div>
         <div class="flow-node-kind">${escapeHtml(n.kind)}</div>
         <div class="flow-ports">
           <div class="flow-ports-in">
@@ -544,14 +561,16 @@ export class FlowCanvas {
       this.detailEl.innerHTML = `<p class="muted">${escapeHtml(t('pipeline.nodeEmpty'))}</p>`;
       return;
     }
+    const title = localizedNodeField(this.graphKey, n, 'title');
+    const detail = localizedNodeField(this.graphKey, n, 'detail');
     const io = t('pipeline.nodeInputs', {
       inputs: (n.inputs || []).join(', ') || '—',
       outputs: (n.outputs || []).join(', ') || '—',
     });
     this.detailEl.innerHTML = `
       <div class="detail-kicker" style="color:${KIND_COLORS[n.kind] || KIND_COLORS[n.kind] || '#94a3b8'}">${escapeHtml(n.kind)}</div>
-      <h3>${escapeHtml(n.title)}</h3>
-      <p>${escapeHtml(n.detail || '')}</p>
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(detail || '')}</p>
       ${n.file ? `<p class="mono">↪ ${escapeHtml(n.file)}</p>` : ''}
       <p class="muted">${escapeHtml(io)}</p>
       <p class="muted" style="margin-top:10px">${escapeHtml(t('pipeline.nodeEditHint'))}</p>
