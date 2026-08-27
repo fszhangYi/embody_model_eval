@@ -11,6 +11,7 @@ import {
   inlineLoadingHtml,
 } from '../../lib/legacy/loading.js';
 import { consumeChatPendingPrompt, CHAT_DSH_SESSION_KEY, CHAT_STORAGE_KEY, resetChatSession } from './pendingPrompt';
+import { bubbleMarkdown, downloadMarkdown, downloadMarkdownAsPdf } from './bubbleExport';
 
 export function mountChat(): void | (() => void) {
 const shellRoot = document.querySelector('.chat-page .legacy-shell');
@@ -88,13 +89,56 @@ async function copyText(text) {
 }
 
 function downloadText(filename, text) {
-  const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
+  downloadMarkdown(filename, text);
+}
+
+function bubbleTitle(role) {
+  return role === 'user' ? t('chat.whoYou') : 'Agent';
+}
+
+function exportBubbleMd(role, text, meta) {
+  const md = bubbleMarkdown(bubbleTitle(role), text, meta);
+  const prefix = role === 'user' ? 'chat-ask' : 'chat-reply';
+  downloadText(`${prefix}-${Date.now()}.md`, md);
+  toast(t('chat.exported'), 'ok');
+}
+
+async function exportBubblePdf(role, text, meta) {
+  const md = bubbleMarkdown(bubbleTitle(role), text, meta);
+  const prefix = role === 'user' ? 'chat-ask' : 'chat-reply';
+  try {
+    await downloadMarkdownAsPdf(`${prefix}-${Date.now()}.pdf`, md);
+    toast(t('chat.exportedPdf'), 'ok');
+  } catch (err) {
+    toast(String(err?.message || err), 'err');
+  }
+}
+
+function appendBubbleActions(div, role, text, meta) {
+  const actions = document.createElement('div');
+  actions.className = 'bubble-actions';
+
+  const btnCopy = document.createElement('button');
+  btnCopy.type = 'button';
+  btnCopy.textContent = t('chat.btnCopy');
+  btnCopy.addEventListener('click', () => copyText(text));
+  actions.appendChild(btnCopy);
+
+  const btnMd = document.createElement('button');
+  btnMd.type = 'button';
+  btnMd.textContent = t('chat.btnExportMd');
+  btnMd.addEventListener('click', () => exportBubbleMd(role, text, meta));
+  actions.appendChild(btnMd);
+
+  const btnPdf = document.createElement('button');
+  btnPdf.type = 'button';
+  btnPdf.textContent = t('chat.btnExportPdf');
+  btnPdf.addEventListener('click', () => {
+    void exportBubblePdf(role, text, meta);
+  });
+  actions.appendChild(btnPdf);
+
+  div.appendChild(actions);
 }
 
 function persistTurns() {
@@ -176,36 +220,7 @@ function appendBubble(role, text, { meta, receipt, skillIds, persist = true } = 
   }
 
   if (role === 'user' || role === 'assistant') {
-    const actions = document.createElement('div');
-    actions.className = 'bubble-actions';
-    const btnCopy = document.createElement('button');
-    btnCopy.type = 'button';
-    btnCopy.textContent = t('chat.btnCopy');
-    btnCopy.addEventListener('click', () => copyText(text));
-    actions.appendChild(btnCopy);
-
-    if (role === 'assistant') {
-      const btnMd = document.createElement('button');
-      btnMd.type = 'button';
-      btnMd.textContent = t('chat.btnExportBubble');
-      btnMd.addEventListener('click', () => {
-        downloadText(`chat-reply-${Date.now()}.md`, `# ${t('chat.exportReplyTitle')}\n\n${text}\n`);
-        toast(t('chat.exported'), 'ok');
-      });
-      actions.appendChild(btnMd);
-
-      if (receipt) {
-        const btnReceipt = document.createElement('button');
-        btnReceipt.type = 'button';
-        btnReceipt.textContent = t('chat.btnCopyReceipt');
-        btnReceipt.title = t('chat.btnCopyReceiptTitle');
-        btnReceipt.addEventListener('click', () => {
-          copyText(JSON.stringify(receipt, null, 2));
-        });
-        actions.appendChild(btnReceipt);
-      }
-    }
-    div.appendChild(actions);
+    appendBubbleActions(div, role, text, meta);
   }
 
   log.appendChild(div);
