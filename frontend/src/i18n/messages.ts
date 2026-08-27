@@ -83,6 +83,23 @@ export type MessageTree = {
       statusOnline: string
       statusOff: string
       statusPlaceholder: string
+      newUsername: string
+      newPassword: string
+      newRole: string
+      addBtn: string
+      adding: string
+      loadFail: string
+      forbidden: string
+      authOff: string
+      saved: string
+      deleteBtn: string
+      enable: string
+      disable: string
+      resetPassword: string
+      resetPasswordPlaceholder: string
+      deleteConfirm: string
+      cannotDeleteSelf: string
+      youBadge: string
     }
     about: {
       p1: string
@@ -241,14 +258,14 @@ export const messages: Record<Locale, MessageTree> = {
       },
       users: {
         current: '当前用户',
-        currentDesc: '展示登录身份；真实资料编辑尚未接入。',
-        invite: '邀请成员',
-        inviteDesc: '邮件邀请或分享一次性注册链接（占位）。',
-        inviteBtn: '邀请…',
+        currentDesc: '已登录账号与角色。',
+        invite: '添加用户',
+        inviteDesc: '创建本地账号（写入 config/users.json，勿提交仓库）。',
+        inviteBtn: '添加…',
         roles: '角色模板',
-        rolesDesc: '管理员 · 评测员 · 访客；参考 GitHub Org / Notion Workspace。',
+        rolesDesc: 'admin · 评测员 eval · 访客 guest。',
         rolesBtn: '管理角色',
-        tableAria: '用户列表占位',
+        tableAria: '用户列表',
         colUser: '用户',
         colRole: '角色',
         colStatus: '状态',
@@ -257,10 +274,27 @@ export const messages: Record<Locale, MessageTree> = {
         roleGuest: '访客',
         statusOnline: '在线',
         statusOff: '停用',
-        statusPlaceholder: '占位',
+        statusPlaceholder: '离线',
+        newUsername: '用户名',
+        newPassword: '密码',
+        newRole: '角色',
+        addBtn: '添加用户',
+        adding: '添加中…',
+        loadFail: '加载用户失败：{msg}',
+        forbidden: '需要管理员权限',
+        authOff: '鉴权已关闭，用户管理不可用',
+        saved: '已保存',
+        deleteBtn: '删除',
+        enable: '启用',
+        disable: '停用',
+        resetPassword: '重置密码',
+        resetPasswordPlaceholder: '新密码（留空不改）',
+        deleteConfirm: '确定删除用户「{name}」？',
+        cannotDeleteSelf: '不能删除当前登录账号',
+        youBadge: '当前',
       },
       about: {
-        p1: '设置面板：语言与外观偏好会写入 localStorage；鉴权 / 用户管理仍为 UI 占位。',
+        p1: '设置面板：语言与外观偏好会写入 localStorage；用户管理需管理员登录。',
         li1: '布局参考：VS Code / Cursor Settings、Linear Preferences、GitHub Settings',
         li2: '可在「外观」切换主题 / 紧凑布局 / 密度，「语言」切换界面与文档语言',
         li3: '当前生产鉴权仍以 Cookie 会话为准',
@@ -428,14 +462,14 @@ export const messages: Record<Locale, MessageTree> = {
       },
       users: {
         current: 'Current user',
-        currentDesc: 'Shows signed-in identity; profile editing is not wired yet.',
-        invite: 'Invite members',
-        inviteDesc: 'Email invite or one-time signup link (placeholder).',
-        inviteBtn: 'Invite…',
+        currentDesc: 'Signed-in account and role.',
+        invite: 'Add user',
+        inviteDesc: 'Create a local account (saved to config/users.json — do not commit).',
+        inviteBtn: 'Add…',
         roles: 'Role templates',
-        rolesDesc: 'Admin · Evaluator · Guest — like GitHub Org / Notion Workspace.',
+        rolesDesc: 'admin · evaluator (eval) · guest.',
         rolesBtn: 'Manage roles',
-        tableAria: 'User list placeholder',
+        tableAria: 'User list',
         colUser: 'User',
         colRole: 'Role',
         colStatus: 'Status',
@@ -444,10 +478,27 @@ export const messages: Record<Locale, MessageTree> = {
         roleGuest: 'Guest',
         statusOnline: 'Online',
         statusOff: 'Disabled',
-        statusPlaceholder: 'Placeholder',
+        statusPlaceholder: 'Offline',
+        newUsername: 'Username',
+        newPassword: 'Password',
+        newRole: 'Role',
+        addBtn: 'Add user',
+        adding: 'Adding…',
+        loadFail: 'Failed to load users: {msg}',
+        forbidden: 'Admin access required',
+        authOff: 'Auth is disabled — user management unavailable',
+        saved: 'Saved',
+        deleteBtn: 'Delete',
+        enable: 'Enable',
+        disable: 'Disable',
+        resetPassword: 'Reset password',
+        resetPasswordPlaceholder: 'New password (leave blank to keep)',
+        deleteConfirm: 'Delete user "{name}"?',
+        cannotDeleteSelf: 'Cannot delete your own account',
+        youBadge: 'You',
       },
       about: {
-        p1: 'Settings: language and appearance preferences are written to localStorage; auth / users remain UI placeholders.',
+        p1: 'Settings: language and appearance preferences are saved locally; user management requires an admin session.',
         li1: 'Layout inspired by VS Code / Cursor Settings, Linear Preferences, GitHub Settings',
         li2: 'Use Appearance for theme / compact / density, and Language for UI & docs locale',
         li3: 'Production auth still uses Cookie sessions',

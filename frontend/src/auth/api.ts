@@ -1,4 +1,4 @@
-export type AuthUser = { username: string }
+export type AuthUser = { username: string; role?: 'admin' | 'eval' | 'guest' }
 
 export type AuthMeResponse = {
   ok: boolean

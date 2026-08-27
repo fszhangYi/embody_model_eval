@@ -31,6 +31,7 @@ recordings/
 # Optional local overrides
 compare_result.local.json
 config/.auth.json
+config/users.json
 
 # Agent chat secrets / temp staged skills
 agent_skills/.agent_config.json

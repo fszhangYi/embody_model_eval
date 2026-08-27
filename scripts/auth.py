@@ -91,6 +91,8 @@ def _write_auth_file(username: str, password: str) -> None:
 
 def init_auth() -> dict[str, Any]:
     """Load or bootstrap credentials. Call once at server start."""
+    from users import bootstrap_admin, init_users, list_users_public
+
     with _lock:
         if _env_truthy("EMBODY_AUTH_DISABLED"):
             _state.update(enabled=False, username="", password_hash="", bootstrapped=True)
@@ -100,55 +102,40 @@ def init_auth() -> dict[str, Any]:
         password = (os.environ.get("EMBODY_AUTH_PASSWORD") or "").strip()
         source = "env"
 
-        if not password and AUTH_CONFIG_PATH.is_file():
-            try:
-                raw = json.loads(AUTH_CONFIG_PATH.read_text(encoding="utf-8"))
-            except Exception as e:
-                raise RuntimeError(f"invalid {AUTH_CONFIG_PATH}: {e}") from e
-            if isinstance(raw, dict):
-                user = str(raw.get("username") or user).strip() or "embody"
-                ph = str(raw.get("password_hash") or "").strip()
-                pw = str(raw.get("password") or "").strip()
-                if ph:
-                    _state.update(
-                        enabled=True, username=user, password_hash=ph, bootstrapped=True
-                    )
-                    return {"enabled": True, "username": user, "source": "file-hash"}
-                if pw:
-                    password = pw
-                    source = "file"
-                else:
-                    raise RuntimeError(
-                        f"{AUTH_CONFIG_PATH} needs password or password_hash"
-                    )
+        info = init_users()
+        if info.get("count", 0) == 0:
+            if not password:
+                password = secrets.token_urlsafe(12)
+                source = "bootstrap"
+            bootstrap_admin(user, password)
+            if source == "bootstrap":
+                _write_auth_file(user, password)
+                print(
+                    f"[auth] created admin in config/users.json "
+                    f"(user={user} password={password})",
+                    flush=True,
+                )
+                print(
+                    "[auth] set EMBODY_AUTH_PASSWORD or Settings → Users to manage accounts",
+                    flush=True,
+                )
+            elif source == "env":
+                bootstrap_admin(user, password)
+                print(f"[auth] enabled via env (user={user})", flush=True)
+        elif password and source == "env":
+            bootstrap_admin(user, password)
 
-        if not password:
-            password = secrets.token_urlsafe(12)
-            _write_auth_file(user, password)
-            source = "bootstrap"
-            print(
-                f"[auth] created {AUTH_CONFIG_PATH.relative_to(ROOT)} "
-                f"(user={user} password={password})",
-                flush=True,
-            )
-            print(
-                "[auth] set EMBODY_AUTH_PASSWORD or edit config/.auth.json to change it",
-                flush=True,
-            )
-        elif source == "env":
-            print(f"[auth] enabled via env (user={user})", flush=True)
-        elif source == "file":
-            # Upgrade plaintext file to hashed
-            _write_auth_file(user, password)
-            print(f"[auth] enabled via {AUTH_CONFIG_PATH.name} (user={user})", flush=True)
+        admins = list_users_public()
+        primary = next((u for u in admins if u.get("role") == "admin"), admins[0] if admins else None)
+        primary_name = str(primary.get("username") if primary else user)
 
         _state.update(
             enabled=True,
-            username=user,
-            password_hash=_pbkdf2_hash(password),
+            username=primary_name,
+            password_hash="",
             bootstrapped=True,
         )
-        return {"enabled": True, "username": user, "source": source}
+        return {"enabled": True, "username": primary_name, "source": info.get("source", source)}
 
 
 def auth_enabled() -> bool:
@@ -186,6 +173,11 @@ def _purge_expired() -> None:
 
 
 def session_user(token: str | None) -> str | None:
+    prof = session_profile(token)
+    return prof.get("username") if prof else None
+
+
+def session_profile(token: str | None) -> dict[str, Any] | None:
     if not token:
         return None
     with _lock:
@@ -196,16 +188,19 @@ def session_user(token: str | None) -> str | None:
         if float(row.get("expires", 0)) < time.time():
             _sessions.pop(token, None)
             return None
-        # Sliding expiry
         row["expires"] = time.time() + SESSION_TTL_SEC
-        return str(row.get("username") or "")
+        return {
+            "username": str(row.get("username") or ""),
+            "role": str(row.get("role") or "guest"),
+        }
 
 
-def create_session(username: str) -> str:
+def create_session(username: str, role: str = "guest") -> str:
     token = secrets.token_urlsafe(32)
     with _lock:
         _sessions[token] = {
             "username": username,
+            "role": role or "guest",
             "expires": time.time() + SESSION_TTL_SEC,
             "created": time.time(),
         }
@@ -220,18 +215,24 @@ def destroy_session(token: str | None) -> None:
 
 
 def try_login(username: str, password: str) -> dict[str, Any]:
+    from users import verify_login
+
     if not auth_enabled():
         return {"ok": True, "authRequired": False, "user": None, "token": None}
     u = (username or "").strip()
     p = password or ""
-    expected_user = str(_state.get("username") or "")
-    ph = str(_state.get("password_hash") or "")
     if not u or not p:
         return {"ok": False, "error": "请输入用户名和密码"}
-    if not secrets.compare_digest(u, expected_user) or not _verify_password(p, ph):
+    prof = verify_login(u, p)
+    if not prof:
         return {"ok": False, "error": "用户名或密码错误"}
-    token = create_session(u)
-    return {"ok": True, "authRequired": True, "user": {"username": u}, "token": token}
+    token = create_session(prof["username"], prof.get("role", "guest"))
+    return {
+        "ok": True,
+        "authRequired": True,
+        "user": {"username": prof["username"], "role": prof.get("role", "guest")},
+        "token": token,
+    }
 
 
 def cookie_header_set(token: str) -> str:
@@ -248,7 +249,24 @@ def cookie_header_clear() -> str:
 def request_user(cookie_header: str | None) -> str | None:
     if not auth_enabled():
         return None
-    return session_user(parse_session_cookie(cookie_header))
+    prof = session_profile(parse_session_cookie(cookie_header))
+    return prof.get("username") if prof else None
+
+
+def request_profile(cookie_header: str | None) -> dict[str, Any] | None:
+    if not auth_enabled():
+        return None
+    return session_profile(parse_session_cookie(cookie_header))
+
+
+def active_usernames() -> set[str]:
+    with _lock:
+        _purge_expired()
+        return {
+            str(v.get("username") or "")
+            for v in _sessions.values()
+            if v.get("username")
+        }
 
 
 def is_authenticated(cookie_header: str | None) -> bool:

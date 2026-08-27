@@ -7,6 +7,10 @@ Endpoints:
   GET    /api/auth/me
   POST   /api/auth/login
   POST   /api/auth/logout
+  GET    /api/users
+  POST   /api/users
+  PUT    /api/users/<username>
+  DELETE /api/users/<username>
   GET    /api/skills
   GET    /api/skills/<id>
   GET    /api/skills/sources
@@ -82,6 +86,7 @@ from arm_kinematics import (
     test_arm,
 )
 from auth import (
+    active_usernames,
     auth_enabled,
     cookie_header_clear,
     cookie_header_set,
@@ -91,8 +96,16 @@ from auth import (
     parse_session_cookie,
     path_requires_auth,
     public_status,
+    request_profile,
     request_user,
     try_login,
+)
+from users import (
+    create_user,
+    delete_user,
+    is_admin,
+    list_users_public,
+    update_user,
 )
 from fs_browse import browse_roots, list_children
 
@@ -1015,6 +1028,19 @@ class Handler(SimpleHTTPRequestHandler):
         self._unauthorized()
         return False
 
+    def _require_admin(self) -> dict[str, Any] | None:
+        if not auth_enabled():
+            self._send_json({"ok": False, "error": "auth disabled"}, HTTPStatus.BAD_REQUEST)
+            return None
+        prof = request_profile(self.headers.get("Cookie"))
+        if not prof:
+            self._unauthorized()
+            return None
+        if not is_admin(prof.get("username")):
+            self._send_json({"ok": False, "error": "admin required"}, HTTPStatus.FORBIDDEN)
+            return None
+        return prof
+
     def do_OPTIONS(self) -> None:  # noqa: N802
         self._send(204, b"", "text/plain")
 
@@ -1051,16 +1077,30 @@ class Handler(SimpleHTTPRequestHandler):
                     }
                 )
                 return
+            prof = request_profile(self.headers.get("Cookie")) or {"username": user, "role": "guest"}
             self._send_json(
                 {
                     "ok": True,
                     "authRequired": True,
                     "authenticated": True,
-                    "user": {"username": user},
+                    "user": {
+                        "username": prof.get("username") or user,
+                        "role": prof.get("role") or "guest",
+                    },
                 }
             )
             return
         if not self._require_auth(path):
+            return
+        if path == "/api/users":
+            if not self._require_admin():
+                return
+            active = active_usernames()
+            rows = [
+                {**u, "online": u.get("username") in active}
+                for u in list_users_public()
+            ]
+            self._send_json({"ok": True, "users": rows})
             return
         if path == "/api/skills":
             SKILLS_DIR.mkdir(parents=True, exist_ok=True)
@@ -1201,6 +1241,31 @@ class Handler(SimpleHTTPRequestHandler):
         path = unquote(parsed.path)
         if not self._require_auth(path):
             return
+        m_user = re.match(r"^/api/users/([^/]+)$", path)
+        if m_user:
+            admin = self._require_admin()
+            if not admin:
+                return
+            target = unquote(m_user.group(1))
+            try:
+                body = _read_json_body(self)
+            except Exception as e:
+                self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, HTTPStatus.BAD_REQUEST)
+                return
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                row = update_user(
+                    target,
+                    role=str(body["role"]) if "role" in body else None,
+                    enabled=bool(body["enabled"]) if "enabled" in body else None,
+                    password=str(body["password"]) if body.get("password") else None,
+                )
+                self._send_json({"ok": True, "user": row})
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
         if path == "/api/agent/config":
             try:
                 body = _read_json_body(self)
@@ -1237,6 +1302,23 @@ class Handler(SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         path = unquote(parsed.path)
         if not self._require_auth(path):
+            return
+        if not self._require_auth(path):
+            return
+        m_user_del = re.match(r"^/api/users/([^/]+)$", path)
+        if m_user_del:
+            admin = self._require_admin()
+            if not admin:
+                return
+            target = unquote(m_user_del.group(1))
+            if target == admin.get("username"):
+                self._send_json({"ok": False, "error": "cannot delete yourself"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                delete_user(target)
+                self._send_json({"ok": True, "deleted": target})
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
         m = re.match(r"^/api/skills/([^/]+)$", path)
         if m:
@@ -1313,6 +1395,24 @@ class Handler(SimpleHTTPRequestHandler):
             return
 
         if not self._require_auth(path):
+            return
+
+        if path == "/api/users":
+            admin = self._require_admin()
+            if not admin:
+                return
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                row = create_user(
+                    str(body.get("username") or ""),
+                    str(body.get("password") or ""),
+                    str(body.get("role") or "eval"),
+                )
+                self._send_json({"ok": True, "user": row})
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
 
         if path == "/api/skills/import":

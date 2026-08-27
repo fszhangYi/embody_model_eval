@@ -1,7 +1,17 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { memo, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { SettingOutlined } from '@ant-design/icons'
+import { useAuth } from '../auth/AuthContext'
+import {
+  createUser,
+  deleteUser,
+  fetchUsers,
+  updateUser,
+  type ManagedUser,
+  type UserRole,
+} from '../auth/usersApi'
 import { useLocale } from '../i18n/LocaleContext'
+import type { MessageTree } from '../i18n/messages'
 import type { DocsLocale, Locale } from '../i18n/types'
 import { useAppearance } from '../prefs/AppearanceContext'
 import type { DensityPref, ThemePref } from '../prefs/appearance'
@@ -183,47 +193,353 @@ function PanelAuth() {
   )
 }
 
-function PanelUsers() {
-  const { m } = useLocale()
-  const u = m.settings.users
-  const badge = m.common.placeholder
+type UsersLabels = MessageTree['settings']['users']
+
+function roleLabelFrom(labels: UsersLabels, role: UserRole): string {
+  if (role === 'admin') return labels.roleAdmin
+  if (role === 'eval') return labels.roleEval
+  return labels.roleGuest
+}
+
+const SettingsAddUserCard = memo(function SettingsAddUserCard({
+  labels,
+  busy,
+  onAdd,
+}: {
+  labels: UsersLabels
+  busy: boolean
+  onAdd: (body: { username: string; password: string; role: UserRole }) => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [pass, setPass] = useState('')
+  const [role, setRole] = useState<UserRole>('eval')
+
+  const submit = async () => {
+    if (!name.trim() || !pass) return
+    await onAdd({ username: name.trim(), password: pass, role })
+    setName('')
+    setPass('')
+    setRole('eval')
+  }
 
   return (
-    <>
-      <SettingRow title={u.current} desc={u.currentDesc} badge={badge}>
-        <span className="settings-pill">embody</span>
-      </SettingRow>
-      <SettingRow title={u.invite} desc={u.inviteDesc} badge={badge}>
-        <button type="button" className="settings-ghost-btn" disabled>
-          {u.inviteBtn}
-        </button>
-      </SettingRow>
-      <SettingRow title={u.roles} desc={u.rolesDesc} badge={badge}>
-        <button type="button" className="settings-ghost-btn" disabled>
-          {u.rolesBtn}
-        </button>
-      </SettingRow>
-      <div className="settings-table" role="table" aria-label={u.tableAria}>
-        <div className="settings-table-head" role="row">
-          <span role="columnheader">{u.colUser}</span>
-          <span role="columnheader">{u.colRole}</span>
-          <span role="columnheader">{u.colStatus}</span>
-        </div>
-        {[
-          { name: 'embody', role: u.roleAdmin, status: u.statusOnline },
-          { name: 'eval_bot', role: u.roleEval, status: u.statusOff },
-          { name: 'guest', role: u.roleGuest, status: u.statusPlaceholder },
-        ].map((row) => (
-          <div key={row.name} className="settings-table-row" role="row">
-            <span role="cell">{row.name}</span>
-            <span role="cell">{row.role}</span>
-            <span role="cell" className="muted">
-              {row.status}
-            </span>
-          </div>
-        ))}
+    <section className="settings-users-add-card" aria-label={labels.invite}>
+      <div className="settings-users-card-head">
+        <h4 className="settings-users-card-title">{labels.invite}</h4>
+        <p className="settings-users-card-desc">{labels.inviteDesc}</p>
       </div>
-    </>
+      <div className="settings-users-add-grid">
+        <label className="settings-users-field">
+          <span className="settings-users-field-label">{labels.newUsername}</span>
+          <input
+            type="text"
+            className="settings-users-input"
+            placeholder={labels.newUsername}
+            value={name}
+            disabled={busy}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
+        <label className="settings-users-field">
+          <span className="settings-users-field-label">{labels.newPassword}</span>
+          <input
+            type="password"
+            className="settings-users-input"
+            placeholder={labels.newPassword}
+            value={pass}
+            disabled={busy}
+            onChange={(e) => setPass(e.target.value)}
+          />
+        </label>
+        <label className="settings-users-field">
+          <span className="settings-users-field-label">{labels.newRole}</span>
+          <select
+            className="settings-users-select"
+            value={role}
+            disabled={busy}
+            onChange={(e) => setRole(e.target.value as UserRole)}
+          >
+            <option value="admin">{labels.roleAdmin}</option>
+            <option value="eval">{labels.roleEval}</option>
+            <option value="guest">{labels.roleGuest}</option>
+          </select>
+        </label>
+        <div className="settings-users-field settings-users-add-action">
+          <button
+            type="button"
+            className="settings-primary-btn settings-users-add-btn"
+            disabled={busy || !name.trim() || !pass}
+            onClick={() => void submit()}
+          >
+            {busy ? labels.adding : labels.addBtn}
+          </button>
+        </div>
+      </div>
+    </section>
+  )
+})
+
+const SettingsUserCard = memo(function SettingsUserCard({
+  row,
+  meUsername,
+  busy,
+  labels,
+  onRoleChange,
+  onToggle,
+  onDelete,
+  onResetPassword,
+}: {
+  row: ManagedUser
+  meUsername?: string
+  busy: boolean
+  labels: UsersLabels
+  onRoleChange: (username: string, role: UserRole) => void
+  onToggle: (row: ManagedUser) => void
+  onDelete: (username: string) => void
+  onResetPassword: (username: string, password: string) => void
+}) {
+  const [pw, setPw] = useState('')
+  const isSelf = row.username === meUsername
+  const statusClass = !row.enabled
+    ? 'disabled'
+    : row.online
+      ? 'online'
+      : 'offline'
+
+  return (
+    <article className="settings-user-card">
+      <div className="settings-user-card-top">
+        <div className="settings-user-card-ident">
+          <span className="settings-user-card-name">{row.username}</span>
+          {isSelf ? <span className="settings-badge">{labels.youBadge}</span> : null}
+          <span className={`settings-user-status ${statusClass}`}>
+            {!row.enabled
+              ? labels.statusOff
+              : row.online
+                ? labels.statusOnline
+                : labels.statusPlaceholder}
+          </span>
+        </div>
+        <select
+          className="settings-users-select settings-user-role-select"
+          value={row.role}
+          disabled={busy || isSelf}
+          aria-label={`${labels.colRole} ${row.username}`}
+          onChange={(e) => onRoleChange(row.username, e.target.value as UserRole)}
+        >
+          <option value="admin">{labels.roleAdmin}</option>
+          <option value="eval">{labels.roleEval}</option>
+          <option value="guest">{labels.roleGuest}</option>
+        </select>
+      </div>
+      <div className="settings-user-card-actions">
+        <div className="settings-user-card-actions-primary">
+          <button
+            type="button"
+            className="settings-ghost-btn"
+            disabled={busy || isSelf}
+            onClick={() => onToggle(row)}
+          >
+            {row.enabled ? labels.disable : labels.enable}
+          </button>
+          <button
+            type="button"
+            className="settings-ghost-btn danger"
+            disabled={busy || isSelf}
+            onClick={() => onDelete(row.username)}
+          >
+            {labels.deleteBtn}
+          </button>
+        </div>
+        <div className="settings-user-card-reset">
+          <input
+            type="password"
+            className="settings-users-input"
+            placeholder={labels.resetPasswordPlaceholder}
+            value={pw}
+            disabled={busy}
+            onChange={(e) => setPw(e.target.value)}
+          />
+          <button
+            type="button"
+            className="settings-ghost-btn"
+            disabled={busy || !pw.trim()}
+            onClick={() => {
+              onResetPassword(row.username, pw.trim())
+              setPw('')
+            }}
+          >
+            {labels.resetPassword}
+          </button>
+        </div>
+      </div>
+    </article>
+  )
+})
+
+function PanelUsers() {
+  const { m, t } = useLocale()
+  const u = m.settings.users
+  const { authRequired, user: me } = useAuth()
+  const isAdmin = me?.role === 'admin'
+
+  const [rows, setRows] = useState<ManagedUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [busy, setBusy] = useState(false)
+
+  const reload = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true)
+      setError(null)
+      try {
+        if (!authRequired) {
+          setRows([])
+          setError(u.authOff)
+          return
+        }
+        if (!isAdmin) {
+          setRows([])
+          setError(u.forbidden)
+          return
+        }
+        setRows(await fetchUsers())
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e)
+        setError(t('settings.users.loadFail', { msg }))
+        setRows([])
+      } finally {
+        if (!opts?.silent) setLoading(false)
+      }
+    },
+    [authRequired, isAdmin, u.authOff, u.forbidden, t],
+  )
+
+  useEffect(() => {
+    void reload()
+  }, [reload, me?.username])
+
+  const runMutation = useCallback(
+    async (fn: () => Promise<void>) => {
+      setBusy(true)
+      setNotice(null)
+      try {
+        await fn()
+        setNotice(u.saved)
+        await reload({ silent: true })
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setBusy(false)
+      }
+    },
+    [reload, u.saved],
+  )
+
+  const onAdd = useCallback(
+    async (body: { username: string; password: string; role: UserRole }) => {
+      await runMutation(async () => {
+        await createUser(body)
+      })
+    },
+    [runMutation],
+  )
+
+  const onRoleChange = useCallback(
+    (username: string, role: UserRole) => {
+      void runMutation(async () => {
+        await updateUser(username, { role })
+      })
+    },
+    [runMutation],
+  )
+
+  const onToggle = useCallback(
+    (row: ManagedUser) => {
+      if (row.username === me?.username && row.enabled) return
+      void runMutation(async () => {
+        await updateUser(row.username, { enabled: !row.enabled })
+      })
+    },
+    [me?.username, runMutation],
+  )
+
+  const onResetPassword = useCallback(
+    (username: string, password: string) => {
+      if (!password) return
+      void runMutation(async () => {
+        await updateUser(username, { password })
+      })
+    },
+    [runMutation],
+  )
+
+  const onDelete = useCallback(
+    (username: string) => {
+      if (username === me?.username) {
+        setError(u.cannotDeleteSelf)
+        return
+      }
+      if (!window.confirm(t('settings.users.deleteConfirm', { name: username }))) return
+      void runMutation(async () => {
+        await deleteUser(username)
+      })
+    },
+    [me?.username, runMutation, t, u.cannotDeleteSelf],
+  )
+
+  const meRole = (me?.role as UserRole | undefined) ?? 'guest'
+
+  return (
+    <div className="settings-users-panel">
+      <div className="settings-users-summary">
+        <div>
+          <p className="settings-users-summary-label">{u.current}</p>
+          <p className="settings-users-summary-desc">{u.currentDesc}</p>
+        </div>
+        <span className="settings-pill">
+          {me?.username ?? '—'}
+          {me?.username ? ` · ${roleLabelFrom(u, meRole)}` : ''}
+        </span>
+      </div>
+
+      {error ? <p className="settings-users-msg err">{error}</p> : null}
+      {notice ? <p className="settings-users-msg ok">{notice}</p> : null}
+
+      {isAdmin && authRequired ? (
+        <>
+          <SettingsAddUserCard labels={u} busy={busy} onAdd={onAdd} />
+          <section className="settings-users-list-wrap" aria-label={u.tableAria}>
+            <div className="settings-users-list-head">
+              <h4 className="settings-users-card-title">{u.tableAria}</h4>
+              <p className="settings-users-card-desc">{u.rolesDesc}</p>
+            </div>
+            {loading ? (
+              <p className="settings-users-loading muted">…</p>
+            ) : rows.length === 0 ? (
+              <p className="settings-users-loading muted">—</p>
+            ) : (
+              <div className="settings-users-list">
+                {rows.map((row) => (
+                  <SettingsUserCard
+                    key={row.username}
+                    row={row}
+                    meUsername={me?.username}
+                    busy={busy}
+                    labels={u}
+                    onRoleChange={onRoleChange}
+                    onToggle={onToggle}
+                    onDelete={onDelete}
+                    onResetPassword={onResetPassword}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </>
+      ) : null}
+    </div>
   )
 }
 
