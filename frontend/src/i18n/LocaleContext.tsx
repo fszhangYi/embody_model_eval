@@ -18,7 +18,7 @@ import {
   type DocsLocale,
   type Locale,
 } from './types'
-import { PAGES, type PageDef, type PageId } from '../config/pages'
+import { PAGES, PAGE_GROUPS, type PageDef, type PageGroupDef, type PageId } from '../config/pages'
 
 type LocaleContextValue = {
   locale: Locale
@@ -29,6 +29,7 @@ type LocaleContextValue = {
   t: (path: string, vars?: Record<string, string | number>) => string
   m: MessageTree
   pages: PageDef[]
+  pageGroups: PageGroupDef[]
   pageLabel: (id: PageId) => PageDef
 }
 
@@ -82,6 +83,15 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     [m],
   )
 
+  const pageGroups = useMemo<PageGroupDef[]>(
+    () =>
+      PAGE_GROUPS.map((g) => {
+        const loc = m.pageGroups[g.id]
+        return loc ? { ...g, label: loc.label, short: loc.short } : g
+      }),
+    [m],
+  )
+
   const pageLabel = useCallback(
     (id: PageId) => pages.find((p) => p.id === id) ?? pages[0],
     [pages],
@@ -97,6 +107,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       t,
       m,
       pages,
+      pageGroups,
       pageLabel,
     }),
     [
@@ -108,6 +119,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
       t,
       m,
       pages,
+      pageGroups,
       pageLabel,
     ],
   )

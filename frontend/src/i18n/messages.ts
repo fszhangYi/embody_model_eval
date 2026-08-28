@@ -19,6 +19,10 @@ export type MessageTree = {
     logout: string
     loggingOut: string
   }
+  pageGroups: Record<
+    'overview' | 'eval' | 'act' | 'tools' | 'hardware',
+    { label: string; short: string }
+  >
   pages: Record<
     'home' | 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline' | 'modelAnalysis' | 'datasetConverter' | 'sensors',
     { label: string; short: string; desc: string }
@@ -169,6 +173,13 @@ export const messages: Record<Locale, MessageTree> = {
       loggedIn: '已登录',
       logout: '退出登录',
       loggingOut: '退出中…',
+    },
+    pageGroups: {
+      overview: { label: '总览', short: '总览' },
+      eval: { label: '评测', short: '评测' },
+      act: { label: 'ACT', short: 'ACT' },
+      tools: { label: '工具', short: '工具' },
+      hardware: { label: '硬件', short: '硬件' },
     },
     pages: {
       home: {
@@ -383,6 +394,13 @@ export const messages: Record<Locale, MessageTree> = {
       loggedIn: 'Signed in',
       logout: 'Sign out',
       loggingOut: 'Signing out…',
+    },
+    pageGroups: {
+      overview: { label: 'Overview', short: 'Home' },
+      eval: { label: 'Evaluation', short: 'Eval' },
+      act: { label: 'ACT', short: 'ACT' },
+      tools: { label: 'Tools', short: 'Tools' },
+      hardware: { label: 'Hardware', short: 'HW' },
     },
     pages: {
       home: {

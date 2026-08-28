@@ -160,6 +160,28 @@ html[data-theme='light'] .page-nav-menu-portal {
   color: var(--text);
 }
 
+html[data-theme='light'] .page-nav-menu-portal .page-nav-branch-btn {
+  color: var(--text);
+}
+
+html[data-theme='light'] .page-nav-menu-portal .page-nav-branch-btn:hover,
+html[data-theme='light'] .page-nav-menu-portal .page-nav-branch.open > .page-nav-branch-btn {
+  background: var(--accent-dim);
+}
+
+html[data-theme='light'] .page-nav-menu-portal .page-nav-branch-btn.active,
+html[data-theme='light'] .page-nav-menu-portal .page-nav-branch.has-active > .page-nav-branch-btn {
+  background: rgba(13, 148, 136, 0.12);
+  outline-color: rgba(13, 148, 136, 0.32);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+html[data-theme='light'] .page-nav-menu-portal .page-nav-submenu {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: var(--shadow-lg);
+}
+
 html[data-theme='light'] .page-nav-menu-portal .page-nav-item,
 html[data-theme='light'] .page-nav-menu-portal .page-nav-item-title {
   color: var(--text);

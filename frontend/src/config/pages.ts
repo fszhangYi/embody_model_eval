@@ -10,12 +10,22 @@ export type PageId =
   | 'datasetConverter'
   | 'sensors'
 
+export type PageGroupId = 'overview' | 'eval' | 'act' | 'tools' | 'hardware'
+
 export interface PageDef {
   id: PageId
   path: string
   label: string
   short: string
   desc: string
+}
+
+export interface PageGroupDef {
+  id: PageGroupId
+  /** Default ZH labels; overridden via i18n. */
+  label: string
+  short: string
+  pageIds: PageId[]
 }
 
 export const PAGES: PageDef[] = [
@@ -91,6 +101,37 @@ export const PAGES: PageDef[] = [
   },
 ]
 
+/** Multi-level nav: related pages share a parent group. */
+export const PAGE_GROUPS: PageGroupDef[] = [
+  { id: 'overview', label: '总览', short: '总览', pageIds: ['home'] },
+  { id: 'eval', label: '评测', short: '评测', pageIds: ['eval', 'hub'] },
+  {
+    id: 'act',
+    label: 'ACT',
+    short: 'ACT',
+    pageIds: ['actPipeline', 'modelAnalysis', 'datasetConverter'],
+  },
+  { id: 'tools', label: '工具', short: '工具', pageIds: ['pipeline', 'chat'] },
+  { id: 'hardware', label: '硬件', short: '硬件', pageIds: ['robots', 'sensors'] },
+]
+
 export function pageById(id: PageId): PageDef {
   return PAGES.find((p) => p.id === id) ?? PAGES[0]
+}
+
+export function groupForPage(pageId: PageId): PageGroupDef | undefined {
+  return PAGE_GROUPS.find((g) => g.pageIds.includes(pageId))
+}
+
+/** Flat page order for Alt+N / adjacent shortcuts (follows group order). */
+export function pagesInNavOrder(): PageDef[] {
+  const byId = new Map(PAGES.map((p) => [p.id, p]))
+  const ordered: PageDef[] = []
+  for (const g of PAGE_GROUPS) {
+    for (const id of g.pageIds) {
+      const p = byId.get(id)
+      if (p) ordered.push(p)
+    }
+  }
+  return ordered
 }

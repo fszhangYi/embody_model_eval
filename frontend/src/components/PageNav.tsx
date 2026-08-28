@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { useLocale } from '../i18n/LocaleContext'
-import type { PageId } from '../config/pages'
+import type { PageGroupId, PageId } from '../config/pages'
+import { groupForPage } from '../config/pages'
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!el || !(el instanceof Element)) return false
@@ -21,6 +22,7 @@ function resolvePageId(pathname: string): PageId {
   if (pathname.startsWith('/robots')) return 'robots'
   if (pathname.startsWith('/act-pipeline')) return 'actPipeline'
   if (pathname.startsWith('/model-analysis')) return 'modelAnalysis'
+  if (pathname.startsWith('/dataset-converter')) return 'datasetConverter'
   if (pathname.startsWith('/sensors')) return 'sensors'
   return 'home'
 }
@@ -29,14 +31,48 @@ export function PageNav() {
   const location = useLocation()
   const navigate = useNavigate()
   const { authRequired, user, logout } = useAuth()
-  const { pages, t, m } = useLocale()
+  const { pages, pageGroups, t, m } = useLocale()
+  const pageById = useMemo(() => new Map(pages.map((p) => [p.id, p])), [pages])
+  const navPages = useMemo(() => {
+    const ordered: typeof pages = []
+    for (const g of pageGroups) {
+      for (const id of g.pageIds) {
+        const p = pageById.get(id)
+        if (p) ordered.push(p)
+      }
+    }
+    return ordered
+  }, [pageGroups, pageById])
+  const shortcutOf = useMemo(() => {
+    const map = new Map<PageId, number>()
+    navPages.forEach((p, i) => map.set(p.id, i + 1))
+    return map
+  }, [navPages])
+
   const currentId = resolvePageId(location.pathname)
-  const currentIdx = Math.max(0, pages.findIndex((p) => p.id === currentId))
-  const current = pages[currentIdx]
+  const currentIdx = Math.max(0, navPages.findIndex((p) => p.id === currentId))
+  const current = navPages[currentIdx] ?? pages[0]
+  const currentGroup = useMemo(() => {
+    const raw = groupForPage(currentId)
+    if (!raw) return undefined
+    return pageGroups.find((g) => g.id === raw.id) ?? raw
+  }, [currentId, pageGroups])
+
   const [open, setOpen] = useState(false)
+  const [flyout, setFlyout] = useState<PageGroupId | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!open) {
+      setFlyout(null)
+      return
+    }
+    const gid = groupForPage(currentId)?.id
+    const g = gid ? pageGroups.find((x) => x.id === gid) : undefined
+    setFlyout(g && g.pageIds.length > 1 ? g.id : null)
+  }, [open, currentId, pageGroups])
 
   useEffect(() => {
     const onDocClick = (e: MouseEvent) => {
@@ -51,6 +87,10 @@ export function PageNav() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (flyout) {
+          setFlyout(null)
+          return
+        }
         setOpen(false)
         return
       }
@@ -62,26 +102,26 @@ export function PageNav() {
         : /^[1-9]$/.test(e.key)
           ? Number(e.key)
           : 0
-      if (digit >= 1 && digit <= pages.length) {
+      if (digit >= 1 && digit <= navPages.length) {
         e.preventDefault()
-        const page = pages[digit - 1]
+        const page = navPages[digit - 1]
         if (page.id !== currentId) navigate(page.path)
         return
       }
       if (e.key === 'ArrowLeft' || e.key === '[' || e.code === 'BracketLeft') {
         e.preventDefault()
-        const next = (currentIdx - 1 + pages.length) % pages.length
-        navigate(pages[next].path)
+        const next = (currentIdx - 1 + navPages.length) % navPages.length
+        navigate(navPages[next].path)
       }
       if (e.key === 'ArrowRight' || e.key === ']' || e.code === 'BracketRight') {
         e.preventDefault()
-        const next = (currentIdx + 1) % pages.length
-        navigate(pages[next].path)
+        const next = (currentIdx + 1) % navPages.length
+        navigate(navPages[next].path)
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [currentId, currentIdx, navigate, pages])
+  }, [currentId, currentIdx, flyout, navigate, navPages])
 
   useEffect(() => {
     if (!open || !btnRef.current || !menuRef.current) return
@@ -89,7 +129,12 @@ export function PageNav() {
     const menu = menuRef.current
     menu.style.top = `${Math.round(rect.bottom + 6)}px`
     menu.style.right = `${Math.round(Math.max(8, window.innerWidth - rect.right))}px`
-  }, [open])
+  }, [open, flyout])
+
+  const btnLabel =
+    currentGroup && currentGroup.pageIds.length > 1
+      ? `${currentGroup.short} · ${current.short || current.label}`
+      : current.short || current.label
 
   return (
     <div className={`page-nav${open ? ' open' : ''}`}>
@@ -99,13 +144,13 @@ export function PageNav() {
         className="page-nav-btn pill"
         aria-expanded={open}
         aria-haspopup="true"
-        title={t('nav.switchPages', { n: pages.length })}
+        title={t('nav.switchPages', { n: navPages.length })}
         onClick={(e) => {
           e.stopPropagation()
           setOpen((v) => !v)
         }}
       >
-        <span className="page-nav-label">{current.short || current.label}</span>
+        <span className="page-nav-label">{btnLabel}</span>
         <span className="page-nav-caret" aria-hidden="true">
           ▾
         </span>
@@ -117,22 +162,91 @@ export function PageNav() {
         hidden={!open}
         onClick={(e) => e.stopPropagation()}
       >
-        {pages.map((p, i) => (
-          <Link
-            key={p.id}
-            role="menuitem"
-            className={`page-nav-item${p.id === currentId ? ' active' : ''}`}
-            to={p.path}
-            title={`Alt+${i + 1}`}
-            onClick={() => setOpen(false)}
-          >
-            <span className="page-nav-item-main">
-              <span className="page-nav-item-title">{p.label}</span>
-              <span className="page-nav-item-desc">{p.desc}</span>
-            </span>
-            <kbd className="page-nav-item-key">Alt+{i + 1}</kbd>
-          </Link>
-        ))}
+        {pageGroups.map((group) => {
+          const groupPages = group.pageIds
+            .map((id) => pageById.get(id))
+            .filter((p): p is NonNullable<typeof p> => Boolean(p))
+          if (groupPages.length === 0) return null
+
+          const hasActive = groupPages.some((p) => p.id === currentId)
+
+          // Single leaf: one-level link
+          if (groupPages.length === 1) {
+            const p = groupPages[0]
+            const keyN = shortcutOf.get(p.id) ?? 0
+            return (
+              <Link
+                key={group.id}
+                role="menuitem"
+                className={`page-nav-item${p.id === currentId ? ' active' : ''}`}
+                to={p.path}
+                title={keyN ? `Alt+${keyN}` : undefined}
+                onClick={() => setOpen(false)}
+              >
+                <span className="page-nav-item-main">
+                  <span className="page-nav-item-title">{p.label}</span>
+                  <span className="page-nav-item-desc">{p.desc}</span>
+                </span>
+                {keyN ? <kbd className="page-nav-item-key">Alt+{keyN}</kbd> : null}
+              </Link>
+            )
+          }
+
+          const isFlyout = flyout === group.id
+          return (
+            <div
+              key={group.id}
+              className={`page-nav-branch${hasActive ? ' has-active' : ''}${isFlyout ? ' open' : ''}`}
+              onMouseEnter={() => setFlyout(group.id)}
+            >
+              <button
+                type="button"
+                role="menuitem"
+                className={`page-nav-branch-btn${hasActive ? ' active' : ''}`}
+                aria-expanded={isFlyout}
+                aria-haspopup="true"
+                onClick={() => setFlyout((prev) => (prev === group.id ? null : group.id))}
+              >
+                <span className="page-nav-item-main">
+                  <span className="page-nav-item-title">{group.label}</span>
+                  <span className="page-nav-item-desc">
+                    {groupPages.map((p) => p.short || p.label).join(' · ')}
+                  </span>
+                </span>
+                <span className="page-nav-branch-chevron" aria-hidden="true">
+                  ›
+                </span>
+              </button>
+              {isFlyout ? (
+                <div
+                  className="page-nav-submenu"
+                  role="menu"
+                  aria-label={group.label}
+                >
+                  {groupPages.map((p) => {
+                    const keyN = shortcutOf.get(p.id) ?? 0
+                    return (
+                      <Link
+                        key={p.id}
+                        role="menuitem"
+                        className={`page-nav-item${p.id === currentId ? ' active' : ''}`}
+                        to={p.path}
+                        title={keyN ? `Alt+${keyN}` : undefined}
+                        onClick={() => setOpen(false)}
+                      >
+                        <span className="page-nav-item-main">
+                          <span className="page-nav-item-title">{p.label}</span>
+                          <span className="page-nav-item-desc">{p.desc}</span>
+                        </span>
+                        {keyN ? <kbd className="page-nav-item-key">Alt+{keyN}</kbd> : null}
+                      </Link>
+                    )
+                  })}
+                </div>
+              ) : null}
+            </div>
+          )
+        })}
         <div className="page-nav-hint" role="note">
           {m.nav.adjacentHint}
         </div>

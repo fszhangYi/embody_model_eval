@@ -35,7 +35,10 @@ header:not(.login-brand) {
 }
 .page-nav-menu-portal {
   position: fixed !important;
-  min-width: 220px;
+  min-width: 200px;
+  max-width: min(280px, calc(100vw - 16px));
+  max-height: none;
+  overflow: visible;
   padding: 6px;
   background: var(--panel);
   border: 1px solid var(--border);
@@ -43,6 +46,28 @@ header:not(.login-brand) {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  color: var(--text);
+}
+.page-nav-menu-portal .page-nav-branch-btn {
+  color: var(--text);
+}
+.page-nav-menu-portal .page-nav-branch-btn:hover,
+.page-nav-menu-portal .page-nav-branch.open > .page-nav-branch-btn {
+  background: var(--accent-dim);
+}
+.page-nav-menu-portal .page-nav-branch-btn.active,
+.page-nav-menu-portal .page-nav-branch.has-active > .page-nav-branch-btn {
+  background: linear-gradient(90deg, var(--spark-dim), var(--accent-dim));
+  outline: 1px solid rgba(61, 214, 198, 0.35);
+  box-shadow: inset 3px 0 0 var(--spark);
+}
+.page-nav-menu-portal .page-nav-branch-chevron {
+  color: var(--muted);
+}
+.page-nav-menu-portal .page-nav-submenu {
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
   color: var(--text);
 }
 .page-nav-menu-portal .page-nav-item {
