@@ -32,6 +32,8 @@ Endpoints:
   DELETE /api/act-pipeline/jobs/<id>
   POST   /api/act-pipeline/run
   POST   /api/model-analysis/compare
+  GET    /api/model-analysis/gpu-status
+  POST   /api/model-analysis/analyze-gpu
   GET    /api/dataset-converter/spec
   POST   /api/dataset-converter/detect
   POST   /api/dataset-converter/inspect
@@ -113,7 +115,7 @@ from users import (
     update_user,
 )
 from fs_browse import browse_roots, list_children
-from model_analysis import compare_ckpt_dirs
+from model_analysis import analyze_gpu_artifacts, compare_ckpt_dirs, get_gpu_status
 from dataset_converter import convert_episode, detect_structure, get_spec, inspect_target
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -1158,6 +1160,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/dataset-converter/spec":
             self._send_json(get_spec())
             return
+        if path == "/api/model-analysis/gpu-status":
+            self._send_json(get_gpu_status())
+            return
         if path == "/api/fs/roots":
             self._send_json({"ok": True, "roots": browse_roots()})
             return
@@ -1509,6 +1514,22 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             try:
                 self._send_json(compare_ckpt_dirs([str(d) for d in ckpt_dirs if d]))
+            except (ValueError, PermissionError) as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if path == "/api/model-analysis/analyze-gpu":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            ckpt_dirs = body.get("ckptDirs") or body.get("ckpt_dirs") or []
+            if not isinstance(ckpt_dirs, list):
+                self._send_json({"ok": False, "error": "ckptDirs must be array"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(analyze_gpu_artifacts([str(d) for d in ckpt_dirs if d]))
             except (ValueError, PermissionError) as e:
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             except Exception as e:  # noqa: BLE001

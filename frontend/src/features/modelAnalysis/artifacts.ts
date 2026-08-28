@@ -27,4 +27,10 @@ export const COMPARE_ARTIFACT_IDS: ArtifactKey[] = [
   'train_history',
 ]
 
+export const ALL_ARTIFACT_IDS: ArtifactKey[] = [
+  ...COMPARE_ARTIFACT_IDS,
+  'optimizer',
+  'policy_best',
+]
+
 export const GPU_ARTIFACT_IDS = new Set<ModelArtifactId>(['optimizer', 'policy_best'])

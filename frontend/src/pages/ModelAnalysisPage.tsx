@@ -1,17 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PathPickerModal } from '../components/PathPickerModal'
 import { PageChrome } from '../components/PageChrome'
 import { useLocale } from '../i18n/LocaleContext'
-import { compareCkptDirs } from '../features/modelAnalysis/api'
 import {
-  COMPARE_ARTIFACT_IDS,
+  analyzeGpuArtifacts,
+  compareCkptDirs,
+  fetchGpuStatus,
+  mergeGpuAnalyzeResult,
+} from '../features/modelAnalysis/api'
+import {
+  ALL_ARTIFACT_IDS,
   GPU_ARTIFACT_IDS,
   MODEL_ARTIFACTS,
   type ModelArtifactId,
 } from '../features/modelAnalysis/artifacts'
 import { CompareDatasetStatsPanel } from '../features/modelAnalysis/CompareDatasetStatsPanel'
+import { CompareOptimizerPanel } from '../features/modelAnalysis/CompareOptimizerPanel'
 import { CompareOverviewPanel } from '../features/modelAnalysis/CompareOverviewPanel'
+import { ComparePolicyBestPanel } from '../features/modelAnalysis/ComparePolicyBestPanel'
 import { ComparePolicyConfigPanel } from '../features/modelAnalysis/ComparePolicyConfigPanel'
 import { CompareTrainHistoryPanel } from '../features/modelAnalysis/CompareTrainHistoryPanel'
 import { firstRun } from '../features/modelAnalysis/runHelpers'
@@ -19,7 +26,9 @@ import {
   SingleDatasetStatsPanel,
   singleDimLabels,
 } from '../features/modelAnalysis/SingleDatasetStatsPanel'
+import { SingleOptimizerPanel } from '../features/modelAnalysis/SingleOptimizerPanel'
 import { SingleOverviewPanel } from '../features/modelAnalysis/SingleOverviewPanel'
+import { SinglePolicyBestPanel } from '../features/modelAnalysis/SinglePolicyBestPanel'
 import { SinglePolicyConfigPanel } from '../features/modelAnalysis/SinglePolicyConfigPanel'
 import { SingleTrainHistoryPanel } from '../features/modelAnalysis/SingleTrainHistoryPanel'
 import {
@@ -35,13 +44,26 @@ const ARTIFACT_TO_KEY: Partial<Record<ModelArtifactId, ArtifactKey>> = {
   dataset_stats: 'dataset_stats',
   policy_config: 'policy_config',
   train_history: 'train_history',
+  optimizer: 'optimizer',
+  policy_best: 'policy_best',
 }
 
 function artifactStatus(
   result: ModelCompareResult | null,
   artifactId: ModelArtifactId,
+  gpuAvailable: boolean,
+  gpuLoaded: boolean,
 ): 'idle' | 'ok' | 'missing' | 'na' {
-  if (GPU_ARTIFACT_IDS.has(artifactId)) return 'na'
+  if (GPU_ARTIFACT_IDS.has(artifactId)) {
+    if (!gpuAvailable) return 'na'
+    if (!result || !gpuLoaded) return 'idle'
+    const gpuKey = ARTIFACT_TO_KEY[artifactId]
+    if (!gpuKey) return 'idle'
+    const okCount = result.runs.filter((r) => r.artifacts[gpuKey]?.ok).length
+    if (okCount === 0) return 'missing'
+    if (okCount === result.runs.length) return 'ok'
+    return 'missing'
+  }
   const key = ARTIFACT_TO_KEY[artifactId]
   if (!key || !result) return 'idle'
   const okCount = result.runs.filter((r) => r.artifacts[key]?.ok).length
@@ -50,14 +72,61 @@ function artifactStatus(
   return 'missing'
 }
 
+function GpuArtifactPlaceholder({
+  gpuAvailable,
+  gpuLoaded,
+  onAnalyzeGpu,
+  gpuBusy,
+  validDirs,
+  mode,
+}: {
+  gpuAvailable: boolean
+  gpuLoaded: boolean
+  onAnalyzeGpu: () => void
+  gpuBusy: boolean
+  validDirs: string[]
+  mode: AnalysisMode
+}) {
+  const { t } = useLocale()
+
+  if (gpuLoaded) return null
+
+  return (
+    <div className="ma-empty-state ma-gpu-block">
+      <h3>{gpuAvailable ? t('modelAnalysis.gpuPendingTitle') : t('modelAnalysis.gpuRequiredTitle')}</h3>
+      <p className="muted">
+        {gpuAvailable ? t('modelAnalysis.gpuPendingDesc') : t('modelAnalysis.gpuRequiredDesc')}
+      </p>
+      <button
+        type="button"
+        className="ma-btn primary"
+        disabled={!gpuAvailable || gpuBusy || validDirs.length < 1 || (mode === 'compare' && validDirs.length < 2)}
+        onClick={onAnalyzeGpu}
+      >
+        {gpuBusy ? t('modelAnalysis.gpuAnalyzing') : t('modelAnalysis.gpuAnalyze')}
+      </button>
+    </div>
+  )
+}
+
 function ArtifactDetailContent({
   mode,
   artifactId,
   result,
+  gpuAvailable,
+  gpuLoaded,
+  gpuBusy,
+  validDirs,
+  onAnalyzeGpu,
 }: {
   mode: AnalysisMode
   artifactId: ModelArtifactId
   result: ModelCompareResult | null
+  gpuAvailable: boolean
+  gpuLoaded: boolean
+  gpuBusy: boolean
+  validDirs: string[]
+  onAnalyzeGpu: () => void
 }) {
   const { t } = useLocale()
   const run = firstRun(result)
@@ -66,10 +135,14 @@ function ArtifactDetailContent({
   if (!result || !run) {
     if (isGpu) {
       return (
-        <div className="ma-empty-state ma-gpu-block">
-          <h3>{t('modelAnalysis.gpuRequiredTitle')}</h3>
-          <p className="muted">{t('modelAnalysis.gpuRequiredDesc')}</p>
-        </div>
+        <GpuArtifactPlaceholder
+          gpuAvailable={gpuAvailable}
+          gpuLoaded={false}
+          onAnalyzeGpu={onAnalyzeGpu}
+          gpuBusy={gpuBusy}
+          validDirs={validDirs}
+          mode={mode}
+        />
       )
     }
     return (
@@ -83,17 +156,21 @@ function ArtifactDetailContent({
     )
   }
 
-  // Keep data panels mounted so local UI state survives artifact-tab switches
-  // (including visits to GPU-only artifacts).
   if (mode === 'single') {
     return (
       <div className="ma-detail-panes">
-        {isGpu ? (
-          <div className="ma-empty-state ma-gpu-block">
-            <h3>{t('modelAnalysis.gpuRequiredTitle')}</h3>
-            <p className="muted">{t('modelAnalysis.gpuRequiredDesc')}</p>
-          </div>
+        {isGpu && !gpuLoaded ? (
+          <GpuArtifactPlaceholder
+            gpuAvailable={gpuAvailable}
+            gpuLoaded={gpuLoaded}
+            onAnalyzeGpu={onAnalyzeGpu}
+            gpuBusy={gpuBusy}
+            validDirs={validDirs}
+            mode={mode}
+          />
         ) : null}
+        {isGpu && gpuLoaded && artifactId === 'optimizer' ? <SingleOptimizerPanel run={run} /> : null}
+        {isGpu && gpuLoaded && artifactId === 'policy_best' ? <SinglePolicyBestPanel run={run} /> : null}
         <div
           className={`ma-detail-pane${artifactId === 'dataset_stats' ? ' active' : ''}`}
           hidden={artifactId !== 'dataset_stats'}
@@ -118,11 +195,21 @@ function ArtifactDetailContent({
 
   return (
     <div className="ma-detail-panes">
-      {isGpu ? (
-        <div className="ma-empty-state ma-gpu-block">
-          <h3>{t('modelAnalysis.gpuRequiredTitle')}</h3>
-          <p className="muted">{t('modelAnalysis.gpuRequiredDesc')}</p>
-        </div>
+      {isGpu && !gpuLoaded ? (
+        <GpuArtifactPlaceholder
+          gpuAvailable={gpuAvailable}
+          gpuLoaded={gpuLoaded}
+          onAnalyzeGpu={onAnalyzeGpu}
+          gpuBusy={gpuBusy}
+          validDirs={validDirs}
+          mode={mode}
+        />
+      ) : null}
+      {isGpu && gpuLoaded && artifactId === 'optimizer' && result.compare.optimizer ? (
+        <CompareOptimizerPanel data={result.compare.optimizer} runs={result.runs} />
+      ) : null}
+      {isGpu && gpuLoaded && artifactId === 'policy_best' && result.compare.policy_best ? (
+        <ComparePolicyBestPanel data={result.compare.policy_best} runs={result.runs} />
       ) : null}
       <div
         className={`ma-detail-pane${artifactId === 'dataset_stats' ? ' active' : ''}`}
@@ -161,8 +248,12 @@ export function ModelAnalysisPage() {
   const [singleResult, setSingleResult] = useState<ModelCompareResult | null>(null)
   const [compareResult, setCompareResult] = useState<ModelCompareResult | null>(null)
   const [busy, setBusy] = useState(false)
+  const [gpuBusy, setGpuBusy] = useState(false)
+  const [gpuAvailable, setGpuAvailable] = useState(false)
+  const [gpuLoaded, setGpuLoaded] = useState(false)
   const [error, setError] = useState('')
   const [agentModalOpen, setAgentModalOpen] = useState(false)
+  const autoAnalyzeRef = useRef(0)
 
   const result = mode === 'single' ? singleResult : compareResult
   const setResult = mode === 'single' ? setSingleResult : setCompareResult
@@ -179,6 +270,9 @@ export function ModelAnalysisPage() {
         if (d?.roots?.act) setActRoot(d.roots.act)
       })
       .catch(() => {})
+    fetchGpuStatus()
+      .then((status) => setGpuAvailable(Boolean(status.available)))
+      .catch(() => setGpuAvailable(false))
   }, [])
 
   const validDirs = useMemo(() => {
@@ -191,20 +285,16 @@ export function ModelAnalysisPage() {
 
   const loadedCount = useMemo(() => {
     if (!result) return 0
-    return COMPARE_ARTIFACT_IDS.filter((id) => artifactStatus(result, id) === 'ok').length
-  }, [result])
+    return ALL_ARTIFACT_IDS.filter((id) => artifactStatus(result, id, gpuAvailable, gpuLoaded) === 'ok').length
+  }, [result, gpuAvailable, gpuLoaded])
 
-  const onAnalyze = useCallback(async () => {
-    if (validDirs.length < 1) {
-      setError(t('modelAnalysis.errNeedDir'))
-      return
-    }
-    if (mode === 'compare' && validDirs.length < 2) {
-      setError(t('modelAnalysis.errNeedTwoDirs'))
-      return
-    }
+  const canAnalyze = validDirs.length >= 1 && (mode !== 'compare' || validDirs.length >= 2)
+
+  const runLightAnalyze = useCallback(async () => {
+    if (!canAnalyze) return
     setBusy(true)
     setError('')
+    setGpuLoaded(false)
     try {
       const data = await compareCkptDirs(validDirs)
       setResult(data)
@@ -215,12 +305,47 @@ export function ModelAnalysisPage() {
     } finally {
       setBusy(false)
     }
-  }, [validDirs, mode, t, setResult])
+  }, [canAnalyze, validDirs, t, setResult])
+
+  useEffect(() => {
+    if (!canAnalyze) {
+      setResult(null)
+      setGpuLoaded(false)
+      return
+    }
+    const token = ++autoAnalyzeRef.current
+    const timer = window.setTimeout(() => {
+      if (token !== autoAnalyzeRef.current) return
+      void runLightAnalyze()
+    }, 500)
+    return () => window.clearTimeout(timer)
+  }, [canAnalyze, validDirs.join('\u0000'), mode, runLightAnalyze, setResult])
+
+  const onAnalyzeGpu = useCallback(async () => {
+    if (!canAnalyze || !gpuAvailable) return
+    setGpuBusy(true)
+    setError('')
+    try {
+      const gpu = await analyzeGpuArtifacts(validDirs)
+      setResult((prev) => (prev ? mergeGpuAnalyzeResult(prev, gpu) : null))
+      setGpuLoaded(true)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      setError(msg === 'not found' ? t('modelAnalysis.errServerStale') : msg)
+    } finally {
+      setGpuBusy(false)
+    }
+  }, [canAnalyze, gpuAvailable, validDirs, t, setResult])
+
+  const onAnalyze = useCallback(async () => {
+    await runLightAnalyze()
+  }, [runLightAnalyze])
 
   const switchMode = (next: AnalysisMode) => {
     if (next === mode) return
     setMode(next)
     setError('')
+    setGpuLoaded(false)
     if (next === 'single' && !singleDir.trim() && ckptDirs[0]?.trim()) {
       setSingleDir(ckptDirs[0].trim())
     }
@@ -230,7 +355,7 @@ export function ModelAnalysisPage() {
   }
 
   const statusLabel = (id: ModelArtifactId): string => {
-    const st = artifactStatus(result, id)
+    const st = artifactStatus(result, id, gpuAvailable, gpuLoaded)
     if (st === 'ok') return t('modelAnalysis.statusLoaded')
     if (st === 'missing') return t('modelAnalysis.statusPartial')
     if (st === 'na') return t('modelAnalysis.statusGpu')
@@ -244,7 +369,7 @@ export function ModelAnalysisPage() {
         : t('modelAnalysis.singleAnalyze')
       : busy
         ? t('modelAnalysis.analyzing')
-        : t('modelAnalysis.analyze')
+        : t('modelAnalysis.analyzeRefresh')
 
   const sendToAgent = () => {
     if (!result) return
@@ -371,16 +496,30 @@ export function ModelAnalysisPage() {
             <button
               type="button"
               className="ma-btn primary"
-              disabled={busy || validDirs.length < 1 || (mode === 'compare' && validDirs.length < 2)}
+              disabled={busy || !canAnalyze}
               onClick={() => void onAnalyze()}
             >
               {analyzeLabel}
+            </button>
+            <button
+              type="button"
+              className="ma-btn ghost"
+              disabled={!gpuAvailable || gpuBusy || !canAnalyze || !result}
+              onClick={() => void onAnalyzeGpu()}
+              title={gpuAvailable ? t('modelAnalysis.gpuAnalyzeHint') : t('modelAnalysis.gpuRequiredDesc')}
+            >
+              {gpuBusy ? t('modelAnalysis.gpuAnalyzing') : t('modelAnalysis.gpuAnalyze')}
             </button>
           </div>
 
           <p className="muted ma-toolbar-hint">
             {mode === 'single' ? t('modelAnalysis.toolbarHintSingle') : t('modelAnalysis.toolbarHint')}
           </p>
+          {gpuAvailable ? (
+            <p className="muted ma-toolbar-hint">{t('modelAnalysis.gpuReadyHint')}</p>
+          ) : (
+            <p className="muted ma-toolbar-hint">{t('modelAnalysis.gpuUnavailableHint')}</p>
+          )}
           {error ? <p className="ma-error">{error}</p> : null}
         </section>
 
@@ -395,7 +534,7 @@ export function ModelAnalysisPage() {
             <ul className="ma-artifact-list" role="list">
               {MODEL_ARTIFACTS.map((artifact) => {
                 const active = artifact.id === selectedId
-                const st = artifactStatus(result, artifact.id)
+                const st = artifactStatus(result, artifact.id, gpuAvailable, gpuLoaded)
                 return (
                   <li key={artifact.id}>
                     <button
@@ -428,12 +567,12 @@ export function ModelAnalysisPage() {
                     ? mode === 'single'
                       ? t('modelAnalysis.statusSummarySingle', {
                           loaded: loadedCount,
-                          total: COMPARE_ARTIFACT_IDS.length,
+                          total: ALL_ARTIFACT_IDS.length,
                           label: result.runs[0]?.label ?? '',
                         })
                       : t('modelAnalysis.statusSummaryDone', {
                           loaded: loadedCount,
-                          total: COMPARE_ARTIFACT_IDS.length,
+                          total: ALL_ARTIFACT_IDS.length,
                           runs: result.runs.length,
                         })
                     : t('modelAnalysis.statusSummary')}
@@ -441,7 +580,7 @@ export function ModelAnalysisPage() {
               </div>
               <div className="ma-status-chips">
                 {MODEL_ARTIFACTS.map((artifact) => {
-                  const st = artifactStatus(result, artifact.id)
+                  const st = artifactStatus(result, artifact.id, gpuAvailable, gpuLoaded)
                   return (
                     <div key={artifact.id} className={`ma-status-chip ${st}`}>
                       <code>{artifact.filename}</code>
@@ -535,7 +674,16 @@ export function ModelAnalysisPage() {
                 </div>
                 <span className="ma-format-tag large">{t(selected.formatKey)}</span>
               </header>
-              <ArtifactDetailContent mode={mode} artifactId={selectedId} result={result} />
+              <ArtifactDetailContent
+                mode={mode}
+                artifactId={selectedId}
+                result={result}
+                gpuAvailable={gpuAvailable}
+                gpuLoaded={gpuLoaded}
+                gpuBusy={gpuBusy}
+                validDirs={validDirs}
+                onAnalyzeGpu={() => void onAnalyzeGpu()}
+              />
             </section>
           </div>
         </div>
