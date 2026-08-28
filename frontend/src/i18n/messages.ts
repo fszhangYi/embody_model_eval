@@ -20,7 +20,7 @@ export type MessageTree = {
     loggingOut: string
   }
   pages: Record<
-    'home' | 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline' | 'modelAnalysis' | 'sensors',
+    'home' | 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline' | 'modelAnalysis' | 'datasetConverter' | 'sensors',
     { label: string; short: string; desc: string }
   >
   settings: {
@@ -210,6 +210,11 @@ export const messages: Record<Locale, MessageTree> = {
         label: 'ACT 模型分析',
         short: '分析',
         desc: '解析 ckpt 目录：stats / 优化器 / 权重 / 配置 / 曲线',
+      },
+      datasetConverter: {
+        label: '数据集格式转换',
+        short: '转换',
+        desc: '异构具身数据：11 类训练生态 lineage 检测与格式互转',
       },
       sensors: {
         label: '传感器状态',
@@ -419,6 +424,11 @@ export const messages: Record<Locale, MessageTree> = {
         label: 'ACT model analysis',
         short: 'Analyze',
         desc: 'Inspect ckpt dir: stats / optimizer / weights / config / curves',
+      },
+      datasetConverter: {
+        label: 'Dataset format converter',
+        short: 'Convert',
+        desc: 'Heterogeneous embodied data: 11 training-ecology lineages detect & convert',
       },
       sensors: {
         label: 'Sensor status',

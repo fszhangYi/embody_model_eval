@@ -32,6 +32,10 @@ Endpoints:
   DELETE /api/act-pipeline/jobs/<id>
   POST   /api/act-pipeline/run
   POST   /api/model-analysis/compare
+  GET    /api/dataset-converter/spec
+  POST   /api/dataset-converter/detect
+  POST   /api/dataset-converter/inspect
+  POST   /api/dataset-converter/convert
   GET    /api/fs/children?root=act|embody&path=<abs>&rootPath=<override>
   GET    /api/fs/roots
   GET    /api/sensors/arm
@@ -110,6 +114,7 @@ from users import (
 )
 from fs_browse import browse_roots, list_children
 from model_analysis import compare_ckpt_dirs
+from dataset_converter import convert_episode, detect_structure, get_spec, inspect_target
 
 ROOT = Path(__file__).resolve().parent.parent
 DIST = ROOT / "dist"
@@ -1150,6 +1155,9 @@ class Handler(SimpleHTTPRequestHandler):
                 }
             )
             return
+        if path == "/api/dataset-converter/spec":
+            self._send_json(get_spec())
+            return
         if path == "/api/fs/roots":
             self._send_json({"ok": True, "roots": browse_roots()})
             return
@@ -1501,6 +1509,62 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             try:
                 self._send_json(compare_ckpt_dirs([str(d) for d in ckpt_dirs if d]))
+            except (ValueError, PermissionError) as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if path == "/api/dataset-converter/detect":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            target = body.get("path") or body.get("episodePath") or ""
+            if not target:
+                self._send_json({"ok": False, "error": "path required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(detect_structure(str(target)))
+            except (ValueError, PermissionError) as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if path == "/api/dataset-converter/inspect":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            target = body.get("path") or ""
+            if not target:
+                self._send_json({"ok": False, "error": "path required"}, HTTPStatus.BAD_REQUEST)
+                return
+            fmt_hint = body.get("format") or body.get("formatHint")
+            try:
+                self._send_json(inspect_target(str(target), str(fmt_hint) if fmt_hint else None))
+            except (ValueError, PermissionError) as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
+        if path == "/api/dataset-converter/convert":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            source_path = body.get("sourcePath") or body.get("path") or ""
+            source_format = body.get("sourceFormat") or body.get("source_format") or ""
+            target_format = body.get("targetFormat") or body.get("target_format") or ""
+            options = body.get("options") if isinstance(body.get("options"), dict) else {}
+            try:
+                self._send_json(
+                    convert_episode(
+                        str(source_path),
+                        str(source_format),
+                        str(target_format),
+                        options,
+                    )
+                )
             except (ValueError, PermissionError) as e:
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             except Exception as e:  # noqa: BLE001

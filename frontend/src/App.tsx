@@ -12,6 +12,7 @@ import { RobotsPage } from './pages/RobotsPage'
 import { PipelinePage } from './pages/PipelinePage'
 import { ActPipelinePage } from './pages/ActPipelinePage'
 import { ModelAnalysisPage } from './pages/ModelAnalysisPage'
+import { DatasetConverterPage } from './pages/DatasetConverterPage'
 import { SensorsPage } from './pages/SensorsPage'
 import { LoginPage } from './pages/LoginPage'
 
@@ -104,6 +105,14 @@ export default function App() {
             }
           />
           <Route
+            path="/dataset-converter"
+            element={
+              <Protected>
+                <DatasetConverterPage />
+              </Protected>
+            }
+          />
+          <Route
             path="/sensors"
             element={
               <Protected>
@@ -118,6 +127,7 @@ export default function App() {
           <Route path="/robots.html" element={<Navigate to="/robots" replace />} />
           <Route path="/act-pipeline.html" element={<Navigate to="/act-pipeline" replace />} />
           <Route path="/model-analysis.html" element={<Navigate to="/model-analysis" replace />} />
+          <Route path="/dataset-converter.html" element={<Navigate to="/dataset-converter" replace />} />
           <Route path="/sensors.html" element={<Navigate to="/sensors" replace />} />
           <Route path="/login.html" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -7,6 +7,7 @@ export type PageId =
   | 'robots'
   | 'actPipeline'
   | 'modelAnalysis'
+  | 'datasetConverter'
   | 'sensors'
 
 export interface PageDef {
@@ -73,6 +74,13 @@ export const PAGES: PageDef[] = [
     label: 'ACT 模型分析',
     short: '分析',
     desc: '解析 ckpt 目录：stats / 优化器 / 权重 / 配置 / 曲线',
+  },
+  {
+    id: 'datasetConverter',
+    path: '/dataset-converter',
+    label: '数据集格式转换',
+    short: '转换',
+    desc: '异构具身数据：预览常见文件并在 RLDS / LeRobot / HDF5 间转换',
   },
   {
     id: 'sensors',

@@ -14,6 +14,7 @@ const MODULE_IDS: PageId[] = [
   'robots',
   'actPipeline',
   'modelAnalysis',
+  'datasetConverter',
   'sensors',
 ]
 
