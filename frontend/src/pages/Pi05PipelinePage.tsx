@@ -9,7 +9,9 @@ import {
   fetchPi05Job,
   fetchPi05Jobs,
   fetchPi05Spec,
+  loadPi05TrainYaml,
   runPi05Step,
+  savePi05TrainYaml,
 } from '../features/pi05/api'
 import { fieldLabel, stepDescription, stepTitle } from '../features/pi05/stepI18n'
 import { Pi05TrainGuide } from '../features/pi05/TrainGuide'
@@ -32,11 +34,12 @@ import '../styles/act-pipeline.css'
 import '../styles/pi05-pipeline.css'
 
 const FLOW_KEYS = [
-  { n: 1, id: 'convert', labelKey: 'pi05.flow.convert', to: 'lerobot/' },
-  { n: 2, id: 'norm_stats', labelKey: 'pi05.flow.norm', to: 'norm_stats.json' },
-  { n: 3, id: 'train', labelKey: 'pi05.flow.train', to: 'checkpoints/' },
-  { n: 4, id: 'infer_batch', labelKey: 'pi05.flow.infer', to: 'infer/' },
-  { n: 5, id: 'embody', labelKey: 'pi05.flow.embody', to: 'data/' },
+  { n: 1, id: 'quality', labelKey: 'pi05.flow.quality', to: 'quality_pass.json' },
+  { n: 2, id: 'convert', labelKey: 'pi05.flow.convert', to: 'lerobot/' },
+  { n: 3, id: 'norm_stats', labelKey: 'pi05.flow.norm', to: 'norm_stats.json' },
+  { n: 4, id: 'train', labelKey: 'pi05.flow.train', to: 'checkpoints/' },
+  { n: 5, id: 'infer_batch', labelKey: 'pi05.flow.infer', to: 'infer/' },
+  { n: 6, id: 'embody', labelKey: 'pi05.flow.embody', to: 'data/' },
 ] as const
 
 type PickerTarget =
@@ -88,7 +91,16 @@ function FieldInput({
   ioRole?: 'input' | 'output' | 'neutral'
 }) {
   const id = `pi05-field-${field.key}`
-  const wide = field.key === 'scriptPath' || field.key === 'configPath' || field.key === 'taskPrompt'
+  const wide =
+    field.key === 'scriptPath' ||
+    field.key === 'configPath' ||
+    field.key === 'taskPrompt' ||
+    field.key === 'inputDir' ||
+    field.key === 'outputDir' ||
+    field.key === 'annotationDir' ||
+    field.key === 'filterJson' ||
+    field.key === 'writePassJson'
+
   const fieldClass = `act-field act-field-${ioRole}${wide ? ' act-field-wide' : ''}`
   const label = fieldLabel(stepId, field)
 
@@ -210,7 +222,7 @@ export function Pi05PipelinePage() {
   const { locale } = useLocale()
   const [spec, setSpec] = useState<PipelineSpec | null>(null)
   const [loadErr, setLoadErr] = useState('')
-  const [stepId, setStepId] = useState('convert')
+  const [stepId, setStepId] = useState('quality')
   const [params, setParams] = useState<Record<string, Record<string, string | number | boolean>>>({})
   const [activeJob, setActiveJob] = useState<PipelineJob | null>(null)
   const [jobs, setJobs] = useState<PipelineJob[]>([])
@@ -222,6 +234,9 @@ export function Pi05PipelinePage() {
   const [picker, setPicker] = useState<PickerTarget | null>(null)
   const [pi05Root, setPi05Root] = useState('')
   const [route, setRoute] = useState<Pi05RouteMode>(() => resolveInitialPi05Route())
+  const [yamlBusy, setYamlBusy] = useState(false)
+  const [yamlMsg, setYamlMsg] = useState('')
+  const trainConfigPath = String(params.train?.configPath ?? '')
 
   useEffect(() => {
     writeStoredPi05Route(route)
@@ -274,7 +289,7 @@ export function Pi05PipelinePage() {
       .then((s) => {
         setSpec(s)
         setPi05Root(s.paths?.pi05Root || s.browseRoots?.pi05 || '')
-        setStepId(s.steps[0]?.id || 'convert')
+        setStepId(s.steps[0]?.id || 'quality')
         setParams(initParamsFromSpec(s))
       })
       .catch((e: Error) => setLoadErr(e.message))
@@ -291,6 +306,46 @@ export function Pi05PipelinePage() {
       return { ...prev, [step.id]: defaultParams(step) }
     })
   }, [step])
+
+  // Train step: selecting a YAML auto-fills hyperparams into the form.
+  useEffect(() => {
+    if (stepId !== 'train' || !rootsReady) return
+    const path = trainConfigPath.trim()
+    if (!path) return
+    let cancelled = false
+    setYamlBusy(true)
+    setYamlMsg('')
+    loadPi05TrainYaml(path, pi05Root.trim() || undefined)
+      .then((r) => {
+        if (cancelled) return
+        setParams((prev) => {
+          const cur = prev.train || {}
+          const nextSave =
+            !cur.savePath || cur.savePath === cur.configPath ? r.path : String(cur.savePath)
+          return {
+            ...prev,
+            train: {
+              ...cur,
+              ...r.params,
+              configPath: path,
+              savePath: nextSave,
+              scriptPath: cur.scriptPath ?? '',
+              printOnly: cur.printOnly ?? false,
+            },
+          }
+        })
+        setYamlMsg(t('pi05.trainYaml.loaded', { path: r.path }))
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setYamlMsg(e.message || t('pi05.trainYaml.loadFail'))
+      })
+      .finally(() => {
+        if (!cancelled) setYamlBusy(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [stepId, trainConfigPath, pi05Root, rootsReady])
 
   useEffect(() => {
     if (!activeJob || !isJobActive(activeJob.status)) return
@@ -312,10 +367,47 @@ export function Pi05PipelinePage() {
 
   const setField = (key: string, value: string | number | boolean) => {
     if (!step) return
-    setParams((prev) => ({
-      ...prev,
-      [step.id]: { ...(prev[step.id] || defaultParams(step)), [key]: value },
-    }))
+    setParams((prev) => {
+      const cur = { ...(prev[step.id] || defaultParams(step)), [key]: value }
+      if (step.id === 'train' && key === 'configPath') {
+        const prevCfg = String(prev.train?.configPath || '')
+        const prevSave = String(prev.train?.savePath || '')
+        if (!prevSave || prevSave === prevCfg) cur.savePath = value
+      }
+      return { ...prev, [step.id]: cur }
+    })
+  }
+
+  const onSaveTrainYaml = async () => {
+    if (!rootsReady) return
+    const savePath = String(currentParams.savePath || currentParams.configPath || '').trim()
+    if (!savePath) {
+      setYamlMsg(t('pi05.trainYaml.needSavePath'))
+      return
+    }
+    setYamlBusy(true)
+    setYamlMsg('')
+    try {
+      const r = await savePi05TrainYaml({
+        savePath,
+        params: currentParams,
+        pi05Root: pi05Root.trim() || undefined,
+        mergeFrom: String(currentParams.configPath || '') || undefined,
+      })
+      setYamlMsg(t('pi05.trainYaml.saved', { path: r.path }))
+      setParams((prev) => ({
+        ...prev,
+        train: {
+          ...(prev.train || currentParams),
+          configPath: r.path,
+          savePath: r.path,
+        },
+      }))
+    } catch (e) {
+      setYamlMsg(e instanceof Error ? e.message : String(e))
+    } finally {
+      setYamlBusy(false)
+    }
   }
 
   const onRun = async () => {
@@ -499,15 +591,37 @@ export function Pi05PipelinePage() {
                       <p className="act-config-hint muted">{t('pi05.configLocked')}</p>
                     ) : null}
                   </div>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={busy || !rootsReady}
-                    onClick={() => void onRun()}
-                  >
-                    {busy ? t('pi05.btnStarting') : t('pi05.btnRun')}
-                  </button>
+                  <div className="act-step-actions">
+                    {step.id === 'train' ? (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={busy || yamlBusy || !rootsReady}
+                        onClick={() => void onSaveTrainYaml()}
+                        title={t('pi05.trainYaml.saveTitle')}
+                      >
+                        {yamlBusy ? t('pi05.trainYaml.saving') : t('pi05.trainYaml.save')}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={busy || !rootsReady}
+                      onClick={() => void onRun()}
+                    >
+                      {busy ? t('pi05.btnStarting') : t('pi05.btnRun')}
+                    </button>
+                  </div>
                 </div>
+                {step.id === 'train' && yamlMsg ? (
+                  <p className={`pi05-train-yaml-msg muted${yamlMsg.includes('fail') || yamlMsg.includes('Error') || yamlMsg.includes('错误') ? ' err' : ''}`}>
+                    {yamlBusy ? t('pi05.trainYaml.loading') : null}
+                    {yamlBusy ? ' · ' : null}
+                    {yamlMsg}
+                  </p>
+                ) : step.id === 'train' && yamlBusy ? (
+                  <p className="pi05-train-yaml-msg muted">{t('pi05.trainYaml.loading')}</p>
+                ) : null}
                 <div className="act-fields">
                   {step.fields
                     .filter((f) => !f.hidden)

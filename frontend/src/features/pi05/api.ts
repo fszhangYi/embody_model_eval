@@ -308,6 +308,30 @@ export function inspectPi05Config(configPath: string, pi05Root?: string) {
   )
 }
 
+export function loadPi05TrainYaml(configPath: string, pi05Root?: string) {
+  return api<{
+    ok: boolean
+    path: string
+    yaml: unknown
+    params: Record<string, string | number | boolean>
+  }>('/api/pi05-pipeline/load-train-yaml', {
+    method: 'POST',
+    body: JSON.stringify({ configPath, pi05Root }),
+  })
+}
+
+export function savePi05TrainYaml(opts: {
+  savePath: string
+  params: Record<string, unknown>
+  pi05Root?: string
+  mergeFrom?: string
+}) {
+  return api<{ ok: boolean; path: string; bytes: number }>('/api/pi05-pipeline/save-train-yaml', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  })
+}
+
 export function inspectPi05Checkpoint(checkpointPath: string, pi05Root?: string) {
   return api<Pi05CheckpointInspect>('/api/pi05-analysis/inspect-checkpoint', {
     method: 'POST',

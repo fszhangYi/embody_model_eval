@@ -622,6 +622,23 @@
   margin-bottom: 14px;
 }
 
+.act-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.pi05-train-yaml-msg {
+  margin: -6px 0 12px;
+  font-size: 0.75rem;
+}
+
+.pi05-train-yaml-msg.err {
+  color: #f0a0a0;
+}
+
 .act-step-head h2 {
   margin: 0 0 4px;
   font-size: 1rem;
@@ -1072,6 +1089,23 @@
 }
 
 .btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  flex-shrink: 0;
+  background: rgba(36, 50, 71, 0.55);
+  border: 1px solid rgba(120, 145, 175, 0.45);
+  color: var(--text, #e7ecf3);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.btn-secondary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

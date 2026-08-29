@@ -387,7 +387,7 @@ def pipeline_spec(act_root: str | None = None, embody_root: str | None = None) -
             "step": 4,
             "title": "批量离线推理",
             "subtitle": "infer_all_quality_pass.py",
-            "description": "对白名单全集在 raw 上跑离线推理。",
+            "description": "对白名单全集，在所选 raw 目录上跑离线推理。",
             "outputs": ["outputDir"],
             "fields": _exec_fields(
                 ar,
