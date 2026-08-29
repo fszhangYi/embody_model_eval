@@ -1,12 +1,16 @@
-"""pi0.5 pipeline: convert → norm_stats → train → eval → serve.
+"""pi0.5 pipeline: convert → norm_stats → train → offline infer → embody.
 
-Primary route: Tonglu PyTorch full FT (mlu_full_ft*). Secondary: JAX LoRA smoke.
+Primary route: Tl PyTorch full FT (mlu_full_ft*). Secondary: JAX LoRA smoke.
+UI only needs the π0.5 project root; data roots come from YAML (raw_root etc.).
+Step 5 converters may live under act_robot by absolute path (format helpers),
+but the pipeline does not select or depend on an act_robot project root.
 """
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -20,7 +24,9 @@ ROOT = Path(__file__).resolve().parent.parent
 RUNS_DIR = ROOT / "agent_skills" / ".run" / "pi05_pipeline"
 PI05_ROOT = Path(os.environ.get("PI05_ROOT", "/root/autodl-tmp/pi05"))
 ACT_ROBOT_ROOT = Path(os.environ.get("ACT_ROBOT_ROOT", "/root/autodl-tmp/act_robot"))
+EMBODY_ROOT = Path(os.environ.get("EMBODY_ROOT", str(ROOT)))
 BASH = os.environ.get("PI05_PIPELINE_BASH", "/bin/bash")
+PYTHON = os.environ.get("PI05_PIPELINE_PYTHON", sys.executable)
 
 ROUTE_FULL_FT = "full_ft"
 ROUTE_SMOKE_LORA = "smoke_lora"
@@ -55,9 +61,9 @@ def _count_gpus() -> int:
         return 0
 
 
-def _default_paths(pi05: Path | None = None, act: Path | None = None, route: str = ROUTE_FULL_FT) -> dict[str, str]:
+def _default_paths(pi05: Path | None = None, route: str = ROUTE_FULL_FT) -> dict[str, str]:
     pi05 = pi05 or PI05_ROOT
-    act = act or ACT_ROBOT_ROOT
+    er = EMBODY_ROOT
     route = normalize_route(route)
     smoke = str(pi05 / "configs" / "pi05_act_robot_smoke.yaml")
     full_ft = str(pi05 / "configs" / "pi05_tonglu0630_full_ft_two_view.yaml")
@@ -69,17 +75,18 @@ def _default_paths(pi05: Path | None = None, act: Path | None = None, route: str
     docs_full = str(pi05 / "docs" / "tonglu_mlu_full_ft_reproduce.md")
     return {
         "pi05Root": str(pi05),
-        "actRobotRoot": str(act),
+        "embodyRoot": str(er),
         "route": route,
         "smokeConfig": smoke,
         "fullFtConfig": full_ft,
         "fullConfig": str(pi05 / "configs" / "pi05_act_robot_local.yaml"),
-        "rawDir": str(act / "data" / "raw"),
-        "annotationDir": str(act / "data" / "annotation" / "annotation" / "restored_txt"),
         "lerobotHome": str(pi05 / "data" / "lerobot"),
         "assetsDir": str(pi05 / "artifacts" / "assets"),
         "ckptBaseDir": str(pi05 / "artifacts" / "checkpoints"),
         "evalDir": str(pi05 / "artifacts" / "eval"),
+        "inferDir": str(pi05 / "artifacts" / "infer"),
+        "embodyActDir": str(er / "data" / "ec616_pi05"),
+        "embodyChunkDir": str(er / "data" / "ec616_pi05_chunk"),
         "baseCkpt": base_pytorch if route == ROUTE_FULL_FT else base_jax,
         "baseCkptPytorch": base_pytorch,
         "baseCkptJax": base_jax,
@@ -89,12 +96,31 @@ def _default_paths(pi05: Path | None = None, act: Path | None = None, route: str
         "trainFullFtScript": train_full,
         "trainScriptJax8": train_jax8,
         "train2Script": train_jax2,
-        "evalScript": str(pi05 / "scripts" / "evaluate_checkpoint.sh"),
-        "serveScript": str(pi05 / "scripts" / "serve.sh"),
+        "inferBatchScript": str(pi05 / "scripts" / "infer_offline_batch.sh"),
+        "inferSingleScript": str(pi05 / "scripts" / "evaluate_checkpoint.sh"),
+        # Format helpers currently ship under act_robot; default is absolute path only.
+        "embodyScript": str(ACT_ROBOT_ROOT / "scripts" / "infer_to_embody_eval.py"),
+        "embodyChunkScript": str(ACT_ROBOT_ROOT / "scripts" / "infer_to_embody_eval_chunk.py"),
         "docsInstall": str(pi05 / "docs" / "installation.md"),
         "docsIssues": str(pi05 / "docs" / "issues.md"),
         "docsFullFt": docs_full,
     }
+
+
+def _exec_fields_pi05(pi05: Path, script_rel: str, script_hint: str, fields: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            "key": "scriptPath",
+            "label": "脚本路径",
+            "type": "path",
+            "pathKind": "file",
+            "browseRoot": "pi05",
+            "default": str(pi05 / script_rel) if not Path(script_rel).is_absolute() else script_rel,
+            "hint": script_hint,
+            "io": "config",
+        },
+        *fields,
+    ]
 
 
 def _config_options(pi05: Path) -> list[str]:
@@ -110,10 +136,11 @@ def pipeline_spec(
     act_root: str | None = None,
     route: str | None = None,
 ) -> dict[str, Any]:
+    # act_root ignored (API compat); π0.5 data roots come from YAML / step fields.
+    _ = act_root
     pi05 = _resolve_dir(pi05_root) if pi05_root else PI05_ROOT
-    act = _resolve_dir(act_root) if act_root else ACT_ROBOT_ROOT
     route = normalize_route(route)
-    paths = _default_paths(pi05, act, route)
+    paths = _default_paths(pi05, route)
     configs = _config_options(pi05)
 
     if route == ROUTE_FULL_FT:
@@ -122,7 +149,7 @@ def pipeline_spec(
         train_title = "训练 π0.5（PyTorch 全参）"
         train_subtitle = "train_tonglu_full_ft.sh / torchrun"
         train_desc = (
-            "Tonglu mlu_full_ft*：gemma_2b + gemma_300m 双全参，全局 batch=256，"
+            "Tl mlu_full_ft*：gemma_2b + gemma_300m 双全参，全局 batch=256，"
             "默认 8 卡 torchrun。缺 pi05_base_pytorch 或 GPU<8 时 preflight 失败。"
         )
         default_cfg = preferred if Path(preferred).is_file() else (
@@ -157,7 +184,7 @@ def pipeline_spec(
             "step": 1,
             "title": "转 LeRobot",
             "subtitle": "prepare_dataset.sh",
-            "description": "将 raw + annotation 转为 LeRobot。全参主线用 Tonglu YAML。",
+            "description": "按 YAML 中的 raw_root / annotation_root 转为 LeRobot（与 act_robot 项目目录无关）。",
             "outputs": [],
             "fields": [
                 {
@@ -219,11 +246,11 @@ def pipeline_spec(
             ],
         },
         {
-            "id": "eval",
+            "id": "infer_batch",
             "step": 4,
-            "title": "离线评测",
-            "subtitle": "evaluate_checkpoint.sh",
-            "description": "对指定 step 的 checkpoint 跑离线样本评测，结果写入 artifacts/eval。",
+            "title": "批量离线推理",
+            "subtitle": "infer_offline_batch.sh",
+            "description": "在 LeRobot 数据集上按 sample-index 批量跑 π0.5 checkpoint 离线推理，结果写入 artifacts/eval。",
             "outputs": [],
             "fields": [
                 {
@@ -233,7 +260,32 @@ def pipeline_spec(
                     "pathKind": "file",
                     "browseRoot": "pi05",
                     "io": "config",
-                    "default": paths["evalScript"],
+                    "default": paths["inferBatchScript"],
+                    "hint": "infer_offline_batch.sh",
+                },
+                cfg_field(default_cfg),
+                {"key": "checkpointStep", "label": "checkpoint step（空=最新）", "type": "text", "io": "config", "default": ""},
+                {"key": "sampleStart", "label": "sample 起始 index", "type": "number", "io": "config", "default": 0},
+                {"key": "sampleCount", "label": "sample 数量", "type": "number", "io": "config", "default": 8},
+            ],
+        },
+        {
+            "id": "infer_single",
+            "step": 4,
+            "title": "单条推理（调试）",
+            "subtitle": "evaluate_checkpoint.sh",
+            "description": "对单个 LeRobot sample-index 做 π0.5 离线推理调试。",
+            "variant": True,
+            "outputs": [],
+            "fields": [
+                {
+                    "key": "scriptPath",
+                    "label": "脚本",
+                    "type": "path",
+                    "pathKind": "file",
+                    "browseRoot": "pi05",
+                    "io": "config",
+                    "default": paths["inferSingleScript"],
                     "hint": "evaluate_checkpoint.sh",
                 },
                 cfg_field(default_cfg),
@@ -242,12 +294,12 @@ def pipeline_spec(
             ],
         },
         {
-            "id": "serve",
+            "id": "embody",
             "step": 5,
-            "title": "推理服务",
-            "subtitle": "serve.sh",
-            "description": "TCP 推理服务；全参主线默认对接 Tonglu MLU serve 配置。",
-            "outputs": [],
+            "title": "转 embody（chunk 第 0 步）",
+            "subtitle": "infer_to_embody_eval.py",
+            "description": "将 artifacts/infer 下的 episode 级推理 JSON 转为 Eval/Hub 可用的 embody JSON（ec616_pi05）。",
+            "outputs": ["outputDir"],
             "fields": [
                 {
                     "key": "scriptPath",
@@ -256,22 +308,132 @@ def pipeline_spec(
                     "pathKind": "file",
                     "browseRoot": "pi05",
                     "io": "config",
-                    "default": paths["serveScript"],
-                    "hint": "serve.sh",
+                    "default": paths["embodyScript"],
+                    "hint": "infer_to_embody_eval.py",
                 },
-                cfg_field(default_cfg),
-                {"key": "checkpointStep", "label": "checkpoint step（空=最新）", "type": "text", "io": "config", "default": ""},
-                {"key": "port", "label": "PORT", "type": "number", "io": "config", "default": 5000},
                 {
-                    "key": "imageProtocol",
-                    "label": "IMAGE_PROTOCOL",
-                    "type": "select",
-                    "io": "config",
-                    "default": "three-view",
-                    "options": ["legacy", "three-view"],
+                    "key": "inferDir",
+                    "label": "推理目录",
+                    "type": "path",
+                    "pathKind": "dir",
+                    "browseRoot": "pi05",
+                    "io": "input",
+                    "default": paths["inferDir"],
                 },
-                {"key": "temporalAgg", "label": "TEMPORAL_AGG", "type": "checkbox", "io": "config", "default": False},
-                {"key": "taskPrompt", "label": "TASK_PROMPT（可选覆盖）", "type": "text", "io": "config", "default": ""},
+                {
+                    "key": "rawDir",
+                    "label": "raw 目录（YAML raw_root）",
+                    "type": "path",
+                    "pathKind": "dir",
+                    "browseRoot": "pi05",
+                    "io": "input",
+                    "default": "",
+                },
+                {
+                    "key": "outputDir",
+                    "label": "embody 输出",
+                    "type": "path",
+                    "pathKind": "dir",
+                    "browseRoot": "embody",
+                    "io": "output",
+                    "default": paths["embodyActDir"],
+                },
+                {"key": "suite", "label": "套件 ID", "type": "text", "io": "config", "default": "ec616_pi05"},
+                {"key": "refreshIndex", "label": "refresh-index", "type": "checkbox", "io": "config", "default": True},
+                {
+                    "key": "inferJson",
+                    "label": "单文件 infer JSON（留空=批量）",
+                    "type": "path",
+                    "pathKind": "file",
+                    "browseRoot": "pi05",
+                    "io": "input",
+                    "default": "",
+                },
+                {"key": "fps", "label": "fps", "type": "number", "io": "config", "default": 30.0},
+                {"key": "limit", "label": "limit（0=全部）", "type": "number", "io": "config", "default": 0},
+                {
+                    "key": "embodyRoot",
+                    "label": "embody-root（refresh-index）",
+                    "type": "path",
+                    "pathKind": "dir",
+                    "browseRoot": "embody",
+                    "io": "config",
+                    "default": paths["embodyRoot"],
+                },
+                {"key": "tcpToolZM", "label": "tcp-tool-z-m", "type": "number", "io": "config", "default": 0.18},
+                {"key": "ikEnforceLimits", "label": "ik-enforce-limits", "type": "checkbox", "io": "config", "default": False},
+            ],
+        },
+        {
+            "id": "embody_chunk",
+            "step": 5,
+            "title": "转 embody（完整 chunk）",
+            "subtitle": "infer_to_embody_eval_chunk.py",
+            "description": "将推理 JSON 转为每观测帧一个 embody JSON（ec616_pi05_chunk）。",
+            "variant": True,
+            "outputs": ["outputDir"],
+            "fields": [
+                {
+                    "key": "scriptPath",
+                    "label": "脚本",
+                    "type": "path",
+                    "pathKind": "file",
+                    "browseRoot": "pi05",
+                    "io": "config",
+                    "default": paths["embodyChunkScript"],
+                    "hint": "infer_to_embody_eval_chunk.py",
+                },
+                {
+                    "key": "inferDir",
+                    "label": "推理目录（批量）",
+                    "type": "path",
+                    "pathKind": "dir",
+                    "browseRoot": "pi05",
+                    "io": "input",
+                    "default": paths["inferDir"],
+                },
+                {
+                    "key": "inferJson",
+                    "label": "单 infer JSON（优先）",
+                    "type": "path",
+                    "pathKind": "file",
+                    "browseRoot": "pi05",
+                    "io": "input",
+                    "default": "",
+                },
+                {
+                    "key": "rawDir",
+                    "label": "raw 目录（YAML raw_root）",
+                    "type": "path",
+                    "pathKind": "dir",
+                    "browseRoot": "pi05",
+                    "io": "input",
+                    "default": "",
+                },
+                {
+                    "key": "outputDir",
+                    "label": "embody 输出",
+                    "type": "path",
+                    "pathKind": "dir",
+                    "browseRoot": "embody",
+                    "io": "output",
+                    "default": paths["embodyChunkDir"],
+                },
+                {"key": "suite", "label": "套件 ID", "type": "text", "io": "config", "default": "ec616_pi05_chunk"},
+                {"key": "refreshIndex", "label": "refresh-index", "type": "checkbox", "io": "config", "default": False},
+                {"key": "fps", "label": "fps", "type": "number", "io": "config", "default": 30.0},
+                {"key": "limit", "label": "limit（0=全部）", "type": "number", "io": "config", "default": 0},
+                {
+                    "key": "embodyRoot",
+                    "label": "embody-root（refresh-index）",
+                    "type": "path",
+                    "pathKind": "dir",
+                    "browseRoot": "embody",
+                    "io": "config",
+                    "default": paths["embodyRoot"],
+                },
+                {"key": "tcpToolZM", "label": "tcp-tool-z-m", "type": "number", "io": "config", "default": 0.18},
+                {"key": "ikEnforceLimits", "label": "ik-enforce-limits", "type": "checkbox", "io": "config", "default": False},
             ],
         },
     ]
@@ -281,8 +443,6 @@ def pipeline_spec(
     checks = {
         "pi05Root": str(pi05),
         "pi05Exists": pi05.is_dir(),
-        "actRobotRoot": str(act),
-        "actRobotExists": act.is_dir(),
         "baseCkptExists": Path(paths["baseCkpt"]).exists() or (route == ROUTE_FULL_FT and pytorch_weights.is_file()),
         "basePytorchExists": pytorch_weights.is_file(),
         "baseJaxExists": Path(paths["baseCkptJax"]).exists(),
@@ -301,31 +461,152 @@ def pipeline_spec(
         "ok": True,
         "route": route,
         "routeModes": [
-            {"id": ROUTE_FULL_FT, "label": "Tonglu 全参", "primary": True, "backend": "pytorch", "defaultConfig": paths["fullFtConfig"]},
+            {"id": ROUTE_FULL_FT, "label": "Tl 全参", "primary": True, "backend": "pytorch", "defaultConfig": paths["fullFtConfig"]},
             {"id": ROUTE_SMOKE_LORA, "label": "LoRA 冒烟", "primary": False, "backend": "jax", "defaultConfig": paths["smokeConfig"]},
         ],
         "paths": paths,
         "steps": steps,
         "checks": checks,
-        "browseRoots": {"pi05": str(pi05), "act": str(act)},
+        "browseRoots": {"pi05": str(pi05), "embody": str(EMBODY_ROOT)},
         "configs": configs,
     }
 
 
 
+def _flag(key: str) -> str:
+    s = re.sub(r"(?<!^)(?=[A-Z])", "-", key).lower().replace("_", "-")
+    return f"--{s}"
+
+
+def _append_arg(argv: list[str], key: str, value: Any) -> None:
+    argv.extend([_flag(key), str(value)])
+
+
+def _append_camera_names(argv: list[str], params: dict[str, Any], key: str = "cameraNames") -> None:
+    argv.append(_flag(key))
+    argv.extend(str(params[key]).split())
+
+
+def _append_embody_ik_args(argv: list[str], p: dict[str, Any]) -> None:
+    _append_arg(argv, "fps", p["fps"])
+    _append_arg(argv, "tcpToolZM", p["tcpToolZM"])
+    if p.get("ikEnforceLimits"):
+        argv.append(_flag("ikEnforceLimits"))
+
+
 def build_argv(step_id: str, params: dict[str, Any]) -> tuple[list[str], Path, str, dict[str, str]]:
     pi05 = Path(str(params.get("_pi05Root") or PI05_ROOT)).expanduser().resolve()
-    act = Path(str(params.get("_actRoot") or ACT_ROBOT_ROOT)).expanduser().resolve()
+    embody = Path(str(params.get("_embodyRoot") or EMBODY_ROOT)).expanduser().resolve()
     route = normalize_route(str(params.get("_route") or params.get("route") or ROUTE_FULL_FT))
-    spec_data = pipeline_spec(str(pi05), str(act), route)
+    spec_data = pipeline_spec(str(pi05), None, route)
     spec = {s["id"]: s for s in spec_data["steps"]}
     if step_id not in spec:
         raise ValueError(f"unknown step: {step_id}")
     step = spec[step_id]
-    meta_keys = {"stepId", "_pi05Root", "_actRoot", "_route", "route"}
+    meta_keys = {"stepId", "_pi05Root", "_actRoot", "_embodyRoot", "_route", "route"}
     p = {f["key"]: params.get(f["key"], f.get("default")) for f in step["fields"]}
     p.update({k: v for k, v in params.items() if k not in meta_keys})
 
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+
+    # Steps 4: π0.5 offline infer (LeRobot samples)
+    if step_id in ("infer_batch", "infer_single"):
+        script = Path(str(p.get("scriptPath") or "")).expanduser()
+        if not script.is_absolute():
+            script = pi05 / script
+        if not script.is_file():
+            raise FileNotFoundError(f"script not found: {script}")
+        config = str(p.get("configPath") or "").strip()
+        if not config:
+            raise ValueError("configPath required")
+        config_path = Path(config).expanduser()
+        if not config_path.is_absolute():
+            config_path = pi05 / config_path
+        if not config_path.is_file():
+            raise FileNotFoundError(f"config not found: {config_path}")
+        cwd = pi05
+        step_s = str(p.get("checkpointStep") or "").strip()
+        if step_s:
+            env["CHECKPOINT_STEP"] = step_s
+        if step_id == "infer_batch":
+            env["SAMPLE_START"] = str(int(p.get("sampleStart") or 0))
+            env["SAMPLE_COUNT"] = str(int(p.get("sampleCount") or 8))
+            argv = [
+                BASH,
+                str(script),
+                str(config_path),
+                str(int(p.get("sampleStart") or 0)),
+                str(int(p.get("sampleCount") or 8)),
+            ]
+        else:
+            env["SAMPLE_INDEX"] = str(int(p.get("sampleIndex") or 0))
+            argv = [BASH, str(script), str(config_path)]
+            if step_s:
+                argv.append(step_s)
+            # evaluate_checkpoint.sh reads SAMPLE_INDEX from env
+        return argv, cwd, " ".join(argv), env
+
+    # Steps 5: embody format conversion (script may live outside pi05; paths are π0.5/embody)
+    if step_id in ("embody", "embody_chunk"):
+        script = Path(str(p.get("scriptPath") or "")).expanduser()
+        if not script.is_file():
+            raise FileNotFoundError(f"script not found: {script}")
+        cwd = script.parent.parent  # repo that owns the converter
+        argv = [PYTHON, str(script)]
+        if step_id == "embody":
+            infer_json = str(p.get("inferJson") or "").strip()
+            raw_dir = str(p.get("rawDir") or "").strip()
+            if not raw_dir:
+                raise ValueError("rawDir required（填 YAML 中的 raw_root）")
+            if infer_json:
+                argv += [
+                    _flag("inferJson"), infer_json,
+                    _flag("rawDir"), raw_dir,
+                    _flag("output"), str(Path(p["outputDir"]) / "episode.json"),
+                ]
+            else:
+                argv += [
+                    _flag("inferDir"), str(p["inferDir"]),
+                    _flag("rawDir"), raw_dir,
+                    _flag("outputDir"), str(p["outputDir"]),
+                    _flag("suite"), str(p["suite"]),
+                ]
+                limit = int(p.get("limit") or 0)
+                if limit > 0:
+                    _append_arg(argv, "limit", limit)
+                if p.get("refreshIndex"):
+                    argv.append(_flag("refreshIndex"))
+                    _append_arg(argv, "embodyRoot", p.get("embodyRoot") or embody)
+            _append_embody_ik_args(argv, p)
+        else:
+            infer_json = str(p.get("inferJson") or "").strip()
+            raw_dir = str(p.get("rawDir") or "").strip()
+            if not raw_dir:
+                raise ValueError("rawDir required（填 YAML 中的 raw_root）")
+            if infer_json:
+                argv += [
+                    _flag("inferJson"), infer_json,
+                    _flag("rawDir"), raw_dir,
+                    _flag("outputDir"), str(p["outputDir"]),
+                ]
+            else:
+                argv += [
+                    _flag("inferDir"), str(p["inferDir"]),
+                    _flag("rawDir"), raw_dir,
+                    _flag("outputDir"), str(p["outputDir"]),
+                    _flag("suite"), str(p["suite"]),
+                ]
+                limit = int(p.get("limit") or 0)
+                if limit > 0:
+                    _append_arg(argv, "limit", limit)
+                if p.get("refreshIndex"):
+                    argv.append(_flag("refreshIndex"))
+                    _append_arg(argv, "embodyRoot", p.get("embodyRoot") or embody)
+            _append_embody_ik_args(argv, p)
+        return argv, cwd, " ".join(argv), env
+
+    # Steps 1–3: pi05 shell / python entrypoints (need YAML config)
     script = Path(str(p.get("scriptPath") or "")).expanduser()
     if not script.is_absolute():
         script = pi05 / script
@@ -341,10 +622,7 @@ def build_argv(step_id: str, params: dict[str, Any]) -> tuple[list[str], Path, s
     if not config_path.is_file():
         raise FileNotFoundError(f"config not found: {config_path}")
 
-    env = os.environ.copy()
-    env["PYTHONUNBUFFERED"] = "1"
     cwd = pi05
-
     if step_id == "convert":
         env["DRY_RUN"] = "1" if p.get("dryRun") else "0"
         env["RESUME"] = "1" if p.get("resume") else "0"
@@ -369,23 +647,6 @@ def build_argv(step_id: str, params: dict[str, Any]) -> tuple[list[str], Path, s
             argv = [py, "-m", mod, "--config", str(config_path), "--print-only"]
         else:
             argv = [BASH, str(script), str(config_path)]
-    elif step_id == "eval":
-        env["SAMPLE_INDEX"] = str(int(p.get("sampleIndex") or 0))
-        argv = [BASH, str(script), str(config_path)]
-        step_s = str(p.get("checkpointStep") or "").strip()
-        if step_s:
-            argv.append(step_s)
-    elif step_id == "serve":
-        env["PORT"] = str(int(p.get("port") or 5000))
-        env["IMAGE_PROTOCOL"] = str(p.get("imageProtocol") or "three-view")
-        env["TEMPORAL_AGG"] = "1" if p.get("temporalAgg") else "0"
-        prompt = str(p.get("taskPrompt") or "").strip()
-        if prompt:
-            env["TASK_PROMPT"] = prompt
-        argv = [BASH, str(script), str(config_path)]
-        step_s = str(p.get("checkpointStep") or "").strip()
-        if step_s:
-            argv.append(step_s)
     else:
         raise ValueError(step_id)
 

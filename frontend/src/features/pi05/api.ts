@@ -12,10 +12,9 @@ async function api<T>(path: string, init?: RequestInit): Promise<T> {
   return data as T
 }
 
-export function fetchPi05Spec(pi05Root?: string, actRoot?: string, route?: string) {
+export function fetchPi05Spec(pi05Root?: string, route?: string) {
   const qs = new URLSearchParams()
   if (pi05Root) qs.set('pi05Root', pi05Root)
-  if (actRoot) qs.set('actRoot', actRoot)
   if (route) qs.set('route', route)
   const q = qs.toString()
   return api<PipelineSpec & { route?: string; routeModes?: Array<Record<string, unknown>> }>(
@@ -37,12 +36,11 @@ export function runPi05Step(
   stepId: string,
   params: Record<string, unknown>,
   pi05Root: string,
-  actRoot: string,
   route?: string,
 ) {
   return api<{ ok: boolean; job: PipelineJob }>('/api/pi05-pipeline/run', {
     method: 'POST',
-    body: JSON.stringify({ stepId, params, pi05Root, actRoot, route }),
+    body: JSON.stringify({ stepId, params, pi05Root, route }),
   })
 }
 
@@ -228,6 +226,8 @@ export interface Pi05AnalyzeResult {
   route?: string
   healthHint?: string
   defaultRoot?: string
+  selectedPath?: string
+  checkpointScope?: string | null
   checks?: Record<string, string | boolean | number>
   paths?: Record<string, string>
   presets?: { hww?: string; pi05?: string }
@@ -236,6 +236,9 @@ export interface Pi05AnalyzeResult {
     checkpointRoot: string
     runs: Pi05CkptRun[]
     route?: string
+    scope?: string | null
+    selectedPath?: string
+    pi05Root?: string
   }
   normStats?: Array<{
     path: string
@@ -266,6 +269,33 @@ export function analyzePi05(
     method: 'POST',
     body: JSON.stringify({ pi05Root, configPath, checkpointPath, route }),
   })
+}
+
+export function probeFsPath(path: string, expect?: 'dir' | 'file' | 'pytorch_base') {
+  const qs = new URLSearchParams()
+  if (path) qs.set('path', path)
+  if (expect) qs.set('expect', expect)
+  return api<{
+    ok: boolean
+    path: string
+    exists: boolean
+    isFile: boolean
+    isDir: boolean
+    healthy?: boolean
+    expect?: string | null
+    detail?: string | null
+    reason?: string
+    error?: string
+  }>(`/api/fs/stat?${qs}`)
+}
+
+export function fetchPi05GpuStatus() {
+  return api<{
+    ok: boolean
+    gpuCount: number
+    enoughForFullFt: boolean
+    minForFullFt: number
+  }>('/api/pi05-pipeline/gpu')
 }
 
 export function inspectPi05Config(configPath: string, pi05Root?: string) {

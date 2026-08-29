@@ -57,6 +57,7 @@ html[data-theme='light'] {
   --shadow-glow: 0 0 0 1px rgba(13, 148, 136, 0.14);
   --scrollbar-thumb: rgba(13, 148, 136, 0.32);
   --scrollbar-thumb-hover: rgba(13, 148, 136, 0.52);
+  --scrollbar-size: 4px;
   --code-inline-bg: rgba(15, 118, 110, 0.08);
   --code-inline-border: rgba(15, 118, 110, 0.2);
   --header-bg: linear-gradient(
@@ -703,7 +704,7 @@ html[data-theme='light'] .pipeline-page select,
 html[data-theme='light'] .sensors-btn,
 html[data-theme='light'] .act-pipeline-page input,
 html[data-theme='light'] .act-pipeline-page select,
-html[data-theme='light'] .act-pipeline-page button,
+html[data-theme='light'] .act-pipeline-page button:not(.act-flow-item),
 html[data-theme='light'] .act-pipeline-page textarea {
   background: var(--input-bg);
   border-color: var(--border);

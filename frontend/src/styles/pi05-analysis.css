@@ -36,12 +36,7 @@
 }
 
 .pi05a-presets {
-  display: inline-flex;
-  padding: 3px;
-  border-radius: 9px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  gap: 2px;
+  display: none;
 }
 
 .pi05a-seg {
@@ -67,6 +62,17 @@
   flex: 1 1 360px;
   gap: 6px;
   min-width: 0;
+}
+
+.pi05a-topbar-path.grow {
+  flex: 1 1 100%;
+}
+
+.pi05a-root-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 0.7rem;
+  line-height: 1.45;
 }
 
 .pi05a-topbar-path input {
@@ -718,10 +724,13 @@ button.pi05a-ckpt-chip.active {
 }
 
 .pi05a-banner.err {
-  padding: 0.65rem 0.85rem;
-  border-radius: 10px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  line-height: 1.45;
   background: color-mix(in srgb, var(--danger) 14%, var(--panel));
   border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--border));
+  color: color-mix(in srgb, var(--danger) 70%, var(--text));
 }
 
 /* —— Health strip —— */

@@ -80,3 +80,96 @@ def list_children(root_key: str, path: str = "", root_path: str | None = None) -
 
 def browse_roots() -> dict[str, str]:
     return {k: str(v) for k, v in ROOTS.items()}
+
+
+def stat_path(path: str, expect: str | None = None) -> dict[str, Any]:
+    """Read-only path probe for setup health rows.
+
+    expect:
+      - dir / file: exact type
+      - pytorch_base: directory containing model.safetensors, or the safetensors file itself
+      - None: any existing path
+
+    reason codes (for UI copy):
+      empty | missing | not_dir | not_file | dir_ok | file_ok
+      | pytorch_ok_file | pytorch_ok_dir | pytorch_missing_weights | pytorch_wrong_type
+    """
+    raw = (path or "").strip()
+    if not raw:
+        return {
+            "ok": True,
+            "path": "",
+            "exists": False,
+            "isFile": False,
+            "isDir": False,
+            "healthy": False,
+            "expect": expect,
+            "reason": "empty",
+        }
+    p = Path(raw).expanduser()
+    try:
+        p = p.resolve(strict=False)
+    except OSError:
+        return {
+            "ok": True,
+            "path": raw,
+            "exists": False,
+            "isFile": False,
+            "isDir": False,
+            "healthy": False,
+            "expect": expect,
+            "reason": "missing",
+        }
+
+    exists = p.exists()
+    is_file = exists and p.is_file()
+    is_dir = exists and p.is_dir()
+    healthy = exists
+    detail = None
+    reason = "missing" if not exists else "ok"
+
+    if expect == "dir":
+        healthy = is_dir
+        reason = "dir_ok" if is_dir else ("missing" if not exists else "not_dir")
+    elif expect == "file":
+        healthy = is_file
+        reason = "file_ok" if is_file else ("missing" if not exists else "not_file")
+    elif expect == "pytorch_base":
+        if is_file and p.name == "model.safetensors":
+            healthy = True
+            reason = "pytorch_ok_file"
+        elif is_dir:
+            weights = p / "model.safetensors"
+            detail = str(weights)
+            if weights.is_file():
+                healthy = True
+                reason = "pytorch_ok_dir"
+            else:
+                healthy = False
+                reason = "pytorch_missing_weights"
+        elif not exists:
+            healthy = False
+            reason = "missing"
+            detail = str(p / "model.safetensors")
+        else:
+            healthy = False
+            reason = "pytorch_wrong_type"
+            detail = str(p / "model.safetensors")
+    elif not exists:
+        reason = "missing"
+    elif is_dir:
+        reason = "dir_ok"
+    elif is_file:
+        reason = "file_ok"
+
+    return {
+        "ok": True,
+        "path": str(p),
+        "exists": exists,
+        "isFile": is_file,
+        "isDir": is_dir,
+        "healthy": healthy,
+        "expect": expect,
+        "detail": detail,
+        "reason": reason,
+    }

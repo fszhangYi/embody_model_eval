@@ -13,6 +13,7 @@ import {
 } from '../features/pi05/api'
 import { fieldLabel, stepDescription, stepTitle } from '../features/pi05/stepI18n'
 import { Pi05TrainGuide } from '../features/pi05/TrainGuide'
+import { Pi05TrainTheory } from '../features/pi05/TrainTheory'
 import { Pi05RouteChrome } from '../features/pi05/Pi05RouteChrome'
 import {
   resolveInitialPi05Route,
@@ -34,8 +35,8 @@ const FLOW_KEYS = [
   { n: 1, id: 'convert', labelKey: 'pi05.flow.convert', to: 'lerobot/' },
   { n: 2, id: 'norm_stats', labelKey: 'pi05.flow.norm', to: 'norm_stats.json' },
   { n: 3, id: 'train', labelKey: 'pi05.flow.train', to: 'checkpoints/' },
-  { n: 4, id: 'eval', labelKey: 'pi05.flow.eval', to: 'artifacts/eval/' },
-  { n: 5, id: 'serve', labelKey: 'pi05.flow.serve', to: 'TCP :PORT' },
+  { n: 4, id: 'infer_batch', labelKey: 'pi05.flow.infer', to: 'infer/' },
+  { n: 5, id: 'embody', labelKey: 'pi05.flow.embody', to: 'data/' },
 ] as const
 
 type PickerTarget =
@@ -176,17 +177,11 @@ function FieldInput({
   )
 }
 
-function rootBrowseAnchor(root: BrowseRoot, current: string, spec: PipelineSpec | null): string {
-  const fallback =
-    current ||
-    spec?.browseRoots?.[root] ||
-    (root === 'pi05' ? spec?.paths?.pi05Root : spec?.paths?.actRobotRoot) ||
-    ''
-  if (fallback) {
-    const parent = fallback.replace(/\/[^/]+$/, '')
-    return parent || fallback
-  }
-  return '/root/autodl-tmp'
+/** Path picker chroot for π0.5 pages: parent of the project = /root/autodl-tmp. */
+const PI05_BROWSE_SUPERROOT = '/root/autodl-tmp'
+
+function rootBrowseAnchor(_root: BrowseRoot, _current: string, _spec: PipelineSpec | null): string {
+  return PI05_BROWSE_SUPERROOT
 }
 
 function truncatePath(path: string, max = 42): string {
@@ -226,7 +221,6 @@ export function Pi05PipelinePage() {
   const [deletingJobId, setDeletingJobId] = useState<string | null>(null)
   const [picker, setPicker] = useState<PickerTarget | null>(null)
   const [pi05Root, setPi05Root] = useState('')
-  const [actRoot, setActRoot] = useState('')
   const [route, setRoute] = useState<Pi05RouteMode>(() => resolveInitialPi05Route())
 
   useEffect(() => {
@@ -234,45 +228,36 @@ export function Pi05PipelinePage() {
   }, [route])
 
   useEffect(() => {
-    if (!pi05Root.trim() || !actRoot.trim()) {
-      fetchPi05Spec(undefined, undefined, route)
-        .then((s) => {
-          setSpec(s)
-          setLoadErr('')
-          const br = (s as { browseRoots?: { pi05?: string; act?: string } }).browseRoots
-          if (br?.pi05) setPi05Root(br.pi05)
-          if (br?.act) setActRoot(br.act)
-          const next: Record<string, Record<string, string | number | boolean>> = {}
-          for (const st of s.steps) next[st.id] = defaultParams(st)
-          setParams(next)
-          setStepId(s.steps[0]?.id || 'convert')
-        })
-        .catch((e: Error) => setLoadErr(e.message))
-      return
-    }
-    fetchPi05Spec(pi05Root.trim(), actRoot.trim(), route)
+    fetchPi05Spec(pi05Root.trim() || undefined, route)
       .then((s) => {
         setSpec(s)
         setLoadErr('')
-        const next: Record<string, Record<string, string | number | boolean>> = {}
-        for (const st of s.steps) next[st.id] = defaultParams(st)
-        setParams(next)
+        if (!pi05Root.trim() && (s.paths?.pi05Root || s.browseRoots?.pi05)) {
+          setPi05Root(s.paths?.pi05Root || s.browseRoots?.pi05 || '')
+        }
+        setParams((prev) => {
+          const next = initParamsFromSpec(s)
+          for (const id of Object.keys(next)) {
+            if (prev[id]) next[id] = { ...next[id], ...prev[id] }
+          }
+          return next
+        })
       })
       .catch((e: Error) => setLoadErr(e.message))
-  }, [route])
+  }, [route, pi05Root])
 
   const browseRoots = useMemo(
     () =>
       ({
-        pi05: pi05Root,
-        act: actRoot,
-        embody: '',
+        pi05: PI05_BROWSE_SUPERROOT,
+        act: PI05_BROWSE_SUPERROOT,
+        embody: PI05_BROWSE_SUPERROOT,
       }) as Record<BrowseRoot, string>,
-    [pi05Root, actRoot],
+    [],
   )
 
   const step = useMemo(() => spec?.steps.find((s) => s.id === stepId) ?? null, [spec, stepId])
-  const rootsReady = Boolean(pi05Root.trim() && actRoot.trim())
+  const rootsReady = Boolean(pi05Root.trim())
   const currentParams = step ? params[step.id] ?? defaultParams(step) : {}
   const checks = spec?.checks || {}
 
@@ -285,11 +270,10 @@ export function Pi05PipelinePage() {
   )
 
   useEffect(() => {
-    fetchPi05Spec(undefined, undefined, route)
+    fetchPi05Spec(undefined, route)
       .then((s) => {
         setSpec(s)
         setPi05Root(s.paths?.pi05Root || s.browseRoots?.pi05 || '')
-        setActRoot(s.paths?.actRobotRoot || s.browseRoots?.act || '')
         setStepId(s.steps[0]?.id || 'convert')
         setParams(initParamsFromSpec(s))
       })
@@ -299,34 +283,6 @@ export function Pi05PipelinePage() {
       .catch(() => {})
   }, [])
 
-  useEffect(() => {
-    const pi05 = pi05Root.trim()
-    const act = actRoot.trim()
-    if (!pi05 || !act) return
-    let cancelled = false
-    const timer = window.setTimeout(() => {
-      fetchPi05Spec(pi05, act, route)
-        .then((s) => {
-          if (cancelled) return
-          setSpec(s)
-          setParams((prev) => {
-            const next = initParamsFromSpec(s)
-            for (const id of Object.keys(next)) {
-              if (prev[id]) next[id] = { ...next[id], ...prev[id] }
-            }
-            return next
-          })
-          setLoadErr('')
-        })
-        .catch((e: Error) => {
-          if (!cancelled) setLoadErr(e.message)
-        })
-    }, 400)
-    return () => {
-      cancelled = true
-      window.clearTimeout(timer)
-    }
-  }, [pi05Root, actRoot])
 
   useEffect(() => {
     if (!step) return
@@ -366,7 +322,7 @@ export function Pi05PipelinePage() {
     if (!step || !rootsReady) return
     setBusy(true)
     try {
-      const r = await runPi05Step(step.id, currentParams, pi05Root.trim(), actRoot.trim(), route)
+      const r = await runPi05Step(step.id, currentParams, pi05Root.trim(), route)
       setActiveJob(r.job)
       const j = await fetchPi05Jobs()
       setJobs(j.jobs)
@@ -469,20 +425,6 @@ export function Pi05PipelinePage() {
               </button>
             </div>
           </label>
-          <label className={`act-root-field act-root-step${actRoot.trim() ? ' done' : ''}`}>
-            <span className="act-root-step-label">{t('pi05.rootAct')}</span>
-            <div className="act-path-field">
-              <input
-                type="text"
-                value={actRoot}
-                onChange={(e) => setActRoot(e.target.value)}
-                placeholder={t('pi05.rootActPlaceholder')}
-              />
-              <button type="button" className="act-path-browse" onClick={() => setPicker({ kind: 'root', root: 'act' })}>
-                {t('pi05.btnBrowse')}
-              </button>
-            </div>
-          </label>
           <div className={`act-root-field act-root-step pi05-health-field${healthOk ? ' done' : ''}`}>
             <span className="act-root-step-label">{t('pi05.healthLabel')}</span>
             <div className="pi05-health-shell" aria-label={t('pi05.healthLabel')}>
@@ -492,9 +434,6 @@ export function Pi05PipelinePage() {
               <span className={`pi05-pill${checkTrue(checks.lerobotExists) ? ' ok' : ' bad'}`}>
                 {t('pi05.health.lerobot')}
               </span>
-              <span className={`pi05-pill${checkTrue(checks.actRobotExists) ? ' ok' : ' bad'}`}>
-                {t('pi05.health.act')}
-              </span>
               <span className="pi05-pill info">
                 {t('pi05.health.configs', { n: Number(checks.configCount) || 0 })}
               </span>
@@ -503,20 +442,26 @@ export function Pi05PipelinePage() {
         </div>
 
         <div className="act-flow" aria-label={t('pi05.flowAria')}>
-          {FLOW_KEYS.map((f, i) => (
-            <span key={f.n} className="pi05-flow-wrap">
-              <button
-                type="button"
-                className={`act-flow-item${stepId === f.id ? ' active' : ''}`}
-                onClick={() => setStepId(f.id)}
-              >
-                <span className="act-flow-n">{f.n}</span>
-                <span className="act-flow-label">{t(f.labelKey)}</span>
-                <span className="act-flow-to">{f.to}</span>
-              </button>
-              {i < FLOW_KEYS.length - 1 ? <span className="act-flow-arrow">→</span> : null}
-            </span>
-          ))}
+          {FLOW_KEYS.map((f, i) => {
+            const active =
+              stepId === f.id ||
+              (f.id === 'infer_batch' && stepId === 'infer_single') ||
+              (f.id === 'embody' && stepId === 'embody_chunk')
+            return (
+              <span key={f.n} className="pi05-flow-wrap">
+                <button
+                  type="button"
+                  className={`act-flow-item${active ? ' active' : ''}`}
+                  onClick={() => setStepId(f.id)}
+                >
+                  <span className="act-flow-n">{f.n}</span>
+                  <span className="act-flow-label">{t(f.labelKey)}</span>
+                  <span className="act-flow-to">{f.to}</span>
+                </button>
+                {i < FLOW_KEYS.length - 1 ? <span className="act-flow-arrow">→</span> : null}
+              </span>
+            )
+          })}
         </div>
 
         {loadErr ? <div className="act-banner err">{loadErr}</div> : null}
@@ -528,11 +473,14 @@ export function Pi05PipelinePage() {
               <button
                 key={s.id}
                 type="button"
-                className={`act-step-btn${s.id === stepId ? ' active' : ''}`}
+                className={`act-step-btn${s.id === stepId ? ' active' : ''}${s.variant ? ' variant' : ''}`}
                 onClick={() => setStepId(s.id)}
                 title={s.subtitle ? t('pi05.scriptHint', { hint: s.subtitle }) : undefined}
               >
-                <span className="act-step-num">{s.step}</span>
+                <span className="act-step-num">
+                  {s.step}
+                  {s.variant ? '·' : ''}
+                </span>
                 <span className="act-step-title">{stepTitle(s, route)}</span>
                 <span className="act-step-sub">{s.subtitle}</span>
               </button>
@@ -582,11 +530,14 @@ export function Pi05PipelinePage() {
                     ))}
                 </div>
                 {step.id === 'train' ? (
-                  <Pi05TrainGuide
-                    configName={String(currentParams.configPath || '')}
-                    printOnly={Boolean(currentParams.printOnly)}
-                    route={route}
-                  />
+                  <>
+                    <Pi05TrainGuide
+                      configName={String(currentParams.configPath || '')}
+                      printOnly={Boolean(currentParams.printOnly)}
+                      route={route}
+                    />
+                    <Pi05TrainTheory route={route} />
+                  </>
                 ) : null}
               </div>
             ) : null}
@@ -699,13 +650,6 @@ export function Pi05PipelinePage() {
           ) : (
             <span className="act-footer-path idle">{t('pi05.footerNone')}</span>
           )}
-          {actRoot.trim() ? (
-            <span className="act-footer-path" title={actRoot}>
-              {t('pi05.footerAct')} {truncatePath(actRoot)}
-            </span>
-          ) : (
-            <span className="act-footer-path idle">{t('pi05.footerActNone')}</span>
-          )}
         </div>
         <div className="act-footer-meta">
           {step ? <span className="act-footer-step">{stepTitle(step, route)}</span> : null}
@@ -718,9 +662,9 @@ export function Pi05PipelinePage() {
           open
           title={
             picker.kind === 'root'
-              ? picker.root === 'pi05'
-                ? t('pi05.pickerPi05Root')
-                : t('pi05.pickerActRoot')
+              ? picker.root === 'embody'
+                ? t('pi05.pickerEmbodyRoot')
+                : t('pi05.pickerPi05Root')
               : fieldLabel(stepId, picker.field)
           }
           value={pickerValue}
@@ -730,13 +674,12 @@ export function Pi05PipelinePage() {
           browseAnchor={
             picker.kind === 'root'
               ? rootBrowseAnchor(picker.root, browseRoots[picker.root], spec)
-              : undefined
+              : PI05_BROWSE_SUPERROOT
           }
           onClose={() => setPicker(null)}
           onConfirm={(path) => {
             if (picker.kind === 'root') {
               if (picker.root === 'pi05') setPi05Root(path)
-              else if (picker.root === 'act') setActRoot(path)
             } else {
               setField(picker.field.key, path)
             }

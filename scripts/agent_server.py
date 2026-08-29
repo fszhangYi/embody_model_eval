@@ -50,7 +50,9 @@ Endpoints:
   POST   /api/dataset-converter/inspect
   POST   /api/dataset-converter/convert
   GET    /api/fs/children?root=act|embody|pi05&path=<abs>&rootPath=<override>
+  GET    /api/fs/stat?path=&expect=dir|file|pytorch_base
   GET    /api/fs/roots
+  GET    /api/pi05-pipeline/gpu
   GET    /api/sensors/arm
   GET    /api/sensors/arm/kin
   GET    /api/sensors/arm/kin/overview
@@ -95,6 +97,7 @@ from act_pipeline_runner import (
     start_job,
 )
 from pi05_pipeline_runner import (
+    _count_gpus as pi05_count_gpus,
     cancel_job as pi05_cancel_job,
     delete_job as pi05_delete_job,
     get_job as pi05_get_job,
@@ -140,7 +143,7 @@ from users import (
     list_users_public,
     update_user,
 )
-from fs_browse import browse_roots, list_children
+from fs_browse import browse_roots, list_children, stat_path
 from model_analysis import analyze_gpu_artifacts, compare_ckpt_dirs, get_gpu_status
 from dataset_converter import convert_episode, detect_structure, get_spec, inspect_target
 
@@ -1192,6 +1195,15 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/fs/roots":
             self._send_json({"ok": True, "roots": browse_roots()})
             return
+        if path == "/api/fs/stat":
+            qs = parse_qs(parsed.query)
+            target = (qs.get("path") or [""])[0]
+            expect = (qs.get("expect") or [None])[0] or None
+            try:
+                self._send_json(stat_path(str(target), expect))
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
         if path == "/api/fs/children":
             qs = parse_qs(parsed.query)
             root_key = (qs.get("root") or ["act"])[0]
@@ -1201,6 +1213,17 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json(list_children(str(root_key), str(target), root_path))
             except (ValueError, PermissionError, NotADirectoryError) as e:
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/api/pi05-pipeline/gpu":
+            n = int(pi05_count_gpus())
+            self._send_json(
+                {
+                    "ok": True,
+                    "gpuCount": n,
+                    "enoughForFullFt": n >= 8,
+                    "minForFullFt": 8,
+                }
+            )
             return
         if path == "/api/act-pipeline/spec":
             qs = parse_qs(parsed.query)
@@ -1277,9 +1300,10 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/pi05-analysis/checkpoints":
             qs = parse_qs(parsed.query)
             pi05_root = (qs.get("pi05Root") or [None])[0]
+            checkpoint_path = (qs.get("checkpointPath") or [None])[0]
             route = (qs.get("route") or [None])[0]
             try:
-                self._send_json(pi05_list_checkpoints(pi05_root, route))
+                self._send_json(pi05_list_checkpoints(pi05_root, route, checkpoint_path))
             except Exception as e:  # noqa: BLE001
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return

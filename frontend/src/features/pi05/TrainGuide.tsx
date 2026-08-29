@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { t } from '../../i18n/runtime'
 import type { Pi05RouteMode } from './routeMode'
 
-/** Mode-aware tips: Tonglu full FT primary vs LoRA smoke secondary. */
+/** Mode-aware tips: Tl full FT primary vs LoRA smoke secondary. */
 export function Pi05TrainGuide({
   configName,
   printOnly,

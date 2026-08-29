@@ -243,7 +243,7 @@ export const messages: Record<Locale, MessageTree> = {
       pi05Pipeline: {
         label: 'π0.5 数据流水线',
         short: 'π0.5',
-        desc: 'raw → LeRobot → norm_stats → 训练 → 评测 → 推理服务',
+        desc: 'raw → LeRobot → norm_stats → 训练 → 离线推理 → embody',
       },
       pi05Analysis: {
         label: 'π0.5 模型分析',
@@ -251,9 +251,9 @@ export const messages: Record<Locale, MessageTree> = {
         desc: '解析配置 / norm_stats / checkpoint 与路径健康',
       },
       pi05Setup: {
-        label: 'π0.5 环境说明',
+        label: 'π0.5 环境检测',
         short: '环境',
-        desc: '相对 ACT 的差异、路径检查与文档入口',
+        desc: '选择路径并自动检测物料是否满足要求',
       },
       sensors: {
         label: '传感器状态',
@@ -480,7 +480,7 @@ export const messages: Record<Locale, MessageTree> = {
       pi05Pipeline: {
         label: 'π0.5 data pipeline',
         short: 'π0.5',
-        desc: 'raw → LeRobot → norm_stats → train → eval → serve',
+        desc: 'raw → LeRobot → norm_stats → train → offline infer → embody',
       },
       pi05Analysis: {
         label: 'π0.5 model analysis',
@@ -488,9 +488,9 @@ export const messages: Record<Locale, MessageTree> = {
         desc: 'Inspect configs / norm_stats / checkpoints and path health',
       },
       pi05Setup: {
-        label: 'π0.5 setup notes',
-        short: 'Setup',
-        desc: 'Differences vs ACT, path checks, and docs',
+        label: 'π0.5 environment check',
+        short: 'Env',
+        desc: 'Pick paths and auto-check whether materials meet requirements',
       },
       sensors: {
         label: 'Sensor status',

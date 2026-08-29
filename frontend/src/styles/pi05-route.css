@@ -1,4 +1,4 @@
-/* Shared Tonglu full-FT / LoRA smoke route chrome */
+/* Shared Tl full-FT / LoRA smoke route chrome */
 
 .pi05-route-chrome {
   display: grid;
@@ -103,9 +103,21 @@
   color: var(--muted);
 }
 
+.pi05a-banner {
+  margin: 8px 0 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  font-size: 0.72rem;
+  line-height: 1.45;
+  font-weight: 400;
+  color: var(--muted, #8b9bb4);
+}
+
 .pi05a-banner.info {
-  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
-  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+  color: color-mix(in srgb, var(--accent) 55%, var(--muted, #8b9bb4));
 }
 
 @media (max-width: 720px) {

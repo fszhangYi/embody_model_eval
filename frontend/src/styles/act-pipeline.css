@@ -20,64 +20,9 @@
   --act-out-border: rgba(240, 180, 41, 0.42);
   --act-out-bg: rgba(240, 180, 41, 0.07);
   --act-out-label: #e8c878;
-}
-
-/* Scroll happens inside panels — style each scroll container (not only the page root) */
-.act-pipeline-page .act-steps,
-.act-pipeline-page .act-main,
-.act-pipeline-page .act-jobs,
-.act-pipeline-page .act-log-body,
-.act-pipeline-page .path-picker-cascade,
-.act-pipeline-page .path-picker-col {
+  /* thin scrollbars: tokens here + global * rules in globals.css */
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) transparent;
-}
-
-.act-pipeline-page .act-steps::-webkit-scrollbar,
-.act-pipeline-page .act-main::-webkit-scrollbar,
-.act-pipeline-page .act-jobs::-webkit-scrollbar,
-.act-pipeline-page .act-log-body::-webkit-scrollbar,
-.act-pipeline-page .path-picker-cascade::-webkit-scrollbar,
-.act-pipeline-page .path-picker-col::-webkit-scrollbar {
-  width: var(--scrollbar-size);
-  height: var(--scrollbar-size);
-}
-
-.act-pipeline-page .act-steps::-webkit-scrollbar-track,
-.act-pipeline-page .act-main::-webkit-scrollbar-track,
-.act-pipeline-page .act-jobs::-webkit-scrollbar-track,
-.act-pipeline-page .act-log-body::-webkit-scrollbar-track,
-.act-pipeline-page .path-picker-cascade::-webkit-scrollbar-track,
-.act-pipeline-page .path-picker-col::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.act-pipeline-page .act-steps::-webkit-scrollbar-thumb,
-.act-pipeline-page .act-main::-webkit-scrollbar-thumb,
-.act-pipeline-page .act-jobs::-webkit-scrollbar-thumb,
-.act-pipeline-page .act-log-body::-webkit-scrollbar-thumb,
-.act-pipeline-page .path-picker-cascade::-webkit-scrollbar-thumb,
-.act-pipeline-page .path-picker-col::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 999px;
-}
-
-.act-pipeline-page .act-steps::-webkit-scrollbar-thumb:hover,
-.act-pipeline-page .act-main::-webkit-scrollbar-thumb:hover,
-.act-pipeline-page .act-jobs::-webkit-scrollbar-thumb:hover,
-.act-pipeline-page .act-log-body::-webkit-scrollbar-thumb:hover,
-.act-pipeline-page .path-picker-cascade::-webkit-scrollbar-thumb:hover,
-.act-pipeline-page .path-picker-col::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
-}
-
-.act-pipeline-page .act-steps::-webkit-scrollbar-corner,
-.act-pipeline-page .act-main::-webkit-scrollbar-corner,
-.act-pipeline-page .act-jobs::-webkit-scrollbar-corner,
-.act-pipeline-page .act-log-body::-webkit-scrollbar-corner,
-.act-pipeline-page .path-picker-cascade::-webkit-scrollbar-corner,
-.act-pipeline-page .path-picker-col::-webkit-scrollbar-corner {
-  background: transparent;
 }
 
 .act-header {

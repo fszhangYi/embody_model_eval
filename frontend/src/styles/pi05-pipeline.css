@@ -108,13 +108,22 @@
   background: var(--accent, #3dd6c6);
 }
 
-/* —— Flow: ACT-like type; clickable, no pill chrome —— */
-.pi05-flow-wrap {
-  display: contents;
+/* —— Flow: clickable steps; must not inherit form-button chrome —— */
+.pi05-pipeline-page .act-flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 2px;
+  min-height: 2.5rem;
+  box-sizing: border-box;
 }
 
-.pi05-pipeline-page .act-flow {
-  gap: 8px 4px;
+.pi05-flow-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0;
+  flex: 0 0 auto;
+  max-width: 100%;
 }
 
 .pi05-pipeline-page button.act-flow-item {
@@ -122,13 +131,14 @@
   -webkit-appearance: none;
   display: inline-flex;
   align-items: center;
+  flex-wrap: nowrap;
   gap: 6px;
   margin: 0;
-  padding: 0;
-  border: 0;
+  padding: 4px 2px;
+  border: 0 !important;
   border-radius: 0;
-  background: transparent;
-  box-shadow: none;
+  background: transparent !important;
+  box-shadow: none !important;
   cursor: pointer;
   font-family: inherit;
   font-size: 0.72rem;
@@ -137,6 +147,7 @@
   letter-spacing: 0;
   color: inherit;
   text-align: left;
+  white-space: nowrap;
 }
 
 .pi05-pipeline-page button.act-flow-item:hover .act-flow-label,
@@ -153,6 +164,10 @@
 }
 
 .pi05-pipeline-page .act-flow-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   width: 1.35rem;
   height: 1.35rem;
   font-size: 0.68rem;
@@ -176,11 +191,12 @@
   opacity: 0.9;
 }
 
-.pi05-pipeline-page .act-flow-arrow {
-  margin: 0 4px;
+.pi05-pipeline-page .pi05-flow-wrap > .act-flow-arrow {
+  margin: 0 6px 0 4px;
   font-size: 0.72rem;
   color: var(--muted, #8b9bb4);
   pointer-events: none;
+  flex-shrink: 0;
 }
 
 .pi05-pipeline-page button.act-flow-item.active .act-flow-n {
@@ -215,6 +231,31 @@
   margin-top: 4px;
 }
 
+.pi05-train-theory {
+  margin-top: 8px;
+}
+
+.pi05-train-theory-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pi05-train-theory-sec h4 {
+  margin: 0 0 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text, #e7ecf3);
+}
+
+.pi05-train-theory-text {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.65;
+  color: var(--text, #e7ecf3);
+  white-space: pre-line;
+}
+
 html[data-theme='light'] .pi05-health-field .pi05-health-shell {
   border-color: var(--border);
 }
@@ -234,6 +275,13 @@ html[data-theme='light'] .pi05-pill.bad {
   color: #b91c1c;
   border-color: rgba(185, 28, 28, 0.3);
   background: rgba(185, 28, 28, 0.06);
+}
+
+html[data-theme='light'] .pi05-pipeline-page button.act-flow-item {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: inherit;
 }
 
 html[data-theme='light'] .pi05-pipeline-page button.act-flow-item.active .act-flow-label,

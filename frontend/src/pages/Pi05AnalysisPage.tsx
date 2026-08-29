@@ -25,10 +25,12 @@ import type { BrowseRoot } from '../features/actPipeline/types'
 import '../styles/model-analysis.css'
 import '../styles/pi05-analysis.css'
 
-const HWW_ROOT = '/root/autodl-tmp/hww/pi05_jax_sft'
-const LOCAL_ROOT = '/root/autodl-tmp/pi05'
-
 type TabId = 'structure' | 'weights' | 'norm' | 'config'
+
+const DEFAULT_PI05 = '/root/autodl-tmp/pi05'
+const DEFAULT_CKPT_PROJECT = '/root/autodl-tmp/pi05/artifacts/checkpoints/pi05_act_robot_smoke'
+/** Path picker chroot: parent of π0.5 project. */
+const PI05_BROWSE_SUPERROOT = '/root/autodl-tmp'
 
 function checkOk(v: unknown): boolean {
   return v === true || v === 'true'
@@ -38,9 +40,16 @@ function runLabel(run: Pi05CkptRun) {
   return `${run.project} / ${run.exp}`
 }
 
+function derivePi05FromCkpt(path: string): string {
+  const marker = '/artifacts/checkpoints'
+  const i = path.indexOf(marker)
+  if (i > 0) return path.slice(0, i)
+  return DEFAULT_PI05
+}
+
 export function Pi05AnalysisPage() {
   const { locale } = useLocale()
-  const [pi05Root, setPi05Root] = useState(HWW_ROOT)
+  const [ckptTarget, setCkptTarget] = useState('')
   const [configPath, setConfigPath] = useState('')
   const [data, setData] = useState<Pi05AnalyzeResult | null>(null)
   const [ckpt, setCkpt] = useState<Pi05CheckpointInspect | null>(null)
@@ -55,20 +64,22 @@ export function Pi05AnalysisPage() {
   const [tab, setTab] = useState<TabId>('structure')
   const [route, setRoute] = useState<Pi05RouteMode>(() => resolveInitialPi05Route())
 
+  const pi05Root = data?.pi05Root || derivePi05FromCkpt(ckptTarget.trim() || DEFAULT_CKPT_PROJECT)
+
   const browseRoots = useMemo(
     () =>
       ({
-        pi05: pi05Root,
-        act: '/root/autodl-tmp/act_robot',
+        pi05: PI05_BROWSE_SUPERROOT,
+        act: PI05_BROWSE_SUPERROOT,
         embody: '',
       }) as Record<BrowseRoot, string>,
-    [pi05Root],
+    [],
   )
 
   const loadCheckpoint = async (path: string, root?: string) => {
     setCkptBusy(true)
     try {
-      const info = await inspectPi05Checkpoint(path, root || pi05Root.trim() || undefined)
+      const info = await inspectPi05Checkpoint(path, root || pi05Root || undefined)
       if (!info.ok && info.error) throw new Error(info.error)
       setCkpt(info)
       setSelectedStep(path)
@@ -79,31 +90,49 @@ export function Pi05AnalysisPage() {
     }
   }
 
-  const load = async (cfg?: string, rootOverride?: string) => {
+  const load = async (opts?: { configFocus?: string; targetOverride?: string }) => {
+    const target = (opts?.targetOverride ?? ckptTarget).trim() || DEFAULT_CKPT_PROJECT
+    if (!ckptTarget.trim() && !opts?.targetOverride) {
+      setCkptTarget(target)
+    }
     setBusy(true)
     setErr('')
     try {
-      const root = (rootOverride ?? pi05Root).trim() || undefined
-      const focus = cfg || configPath || undefined
-      const r = await analyzePi05(root, focus, undefined, route)
+      const focus = (opts?.configFocus ?? configPath).trim() || undefined
+      const r = await analyzePi05(undefined, focus, target, route)
       if (!r.ok) throw new Error(r.error || 'analyze failed')
       setData(r)
       setNormIdx(0)
-      if (!configPath && r.configs?.[0]?.path) {
-        setConfigPath(r.configs[0].path)
-        setSelectedConfig(r.configs[0].path)
+
+      const configs = r.configs || []
+      const keepConfig =
+        (focus && configs.some((c) => c.path === focus) && focus) ||
+        (configPath && configs.some((c) => c.path === configPath) && configPath) ||
+        configs[0]?.path ||
+        ''
+      if (keepConfig) {
+        setConfigPath(keepConfig)
+        setSelectedConfig(keepConfig)
       }
-      if (focus) {
-        setSelectedConfig(focus)
-        setConfigPath(focus)
-      }
+
       const runs = r.checkpoints?.runs || []
-      const preferredRun = runs.find((x) => x.latestPath && x.hasModel) || runs[0]
-      const preferred = preferredRun?.latestPath || ''
+      const prevRun = selectedRunPath
+      const prevStep = selectedStep
+      const keptRun = (prevRun && runs.find((x) => x.path === prevRun)) || null
+      const preferredRun =
+        keptRun || runs.find((x) => x.latestPath && x.hasModel) || runs[0] || null
       setSelectedRunPath(preferredRun?.path || '')
-      if (preferred) {
-        setSelectedStep(preferred)
-        await loadCheckpoint(preferred, root)
+
+      const stepStillThere =
+        preferredRun &&
+        prevStep &&
+        preferredRun.steps.some((s) => s.path === prevStep)
+          ? prevStep
+          : preferredRun?.latestPath || preferredRun?.steps[preferredRun.steps.length - 1]?.path || ''
+
+      if (stepStillThere) {
+        setSelectedStep(stepStillThere)
+        await loadCheckpoint(stepStillThere, r.pi05Root)
       } else {
         setSelectedStep('')
         setCkpt(null)
@@ -117,11 +146,13 @@ export function Pi05AnalysisPage() {
 
   useEffect(() => {
     writeStoredPi05Route(route)
-  }, [route])
-
-  useEffect(() => {
-    void load(undefined, pi05Root || HWW_ROOT)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setData(null)
+    setCkpt(null)
+    setSelectedStep('')
+    setSelectedRunPath('')
+    setSelectedConfig('')
+    setConfigPath('')
+    setErr('')
   }, [route])
 
   const checks = data?.checks || {}
@@ -136,7 +167,6 @@ export function Pi05AnalysisPage() {
     ? normFromCkpt
     : normList[Math.min(normIdx, Math.max(0, normList.length - 1))]
   const metaCfg = (ckpt?.metadata?.config || {}) as Record<string, unknown>
-  const presets = data?.presets || { hww: HWW_ROOT, pi05: LOCAL_ROOT }
 
   const healthItems = [
     { key: 'pi05Exists', label: t('pi05Analysis.check.pi05') },
@@ -178,59 +208,45 @@ export function Pi05AnalysisPage() {
           }}
         />
         <section className="pi05a-topbar" aria-label={t('pi05Analysis.toolbarAria')}>
-          <div className="pi05a-presets" role="group" aria-label={t('pi05Analysis.presetsAria')}>
-            <button
-              type="button"
-              className={`pi05a-seg${pi05Root === presets.hww ? ' active' : ''}`}
-              disabled={busy}
-              onClick={() => {
-                const root = presets.hww || HWW_ROOT
-                setPi05Root(root)
-                setConfigPath('')
-                setSelectedConfig('')
-                void load(undefined, root)
-              }}
-            >
-              {t('pi05Analysis.presetHww')}
-            </button>
-            <button
-              type="button"
-              className={`pi05a-seg${pi05Root === presets.pi05 ? ' active' : ''}`}
-              disabled={busy}
-              onClick={() => {
-                const root = presets.pi05 || LOCAL_ROOT
-                setPi05Root(root)
-                setConfigPath('')
-                setSelectedConfig('')
-                void load(undefined, root)
-              }}
-            >
-              {t('pi05Analysis.presetLocal')}
-            </button>
-          </div>
-
-          <div className="pi05a-topbar-path">
-            <input value={pi05Root} onChange={(e) => setPi05Root(e.target.value)} aria-label={t('pi05Analysis.root')} />
+          <div className="pi05a-topbar-path grow">
+            <input
+              value={ckptTarget}
+              onChange={(e) => setCkptTarget(e.target.value)}
+              placeholder={t('pi05Analysis.rootPlaceholder')}
+              aria-label={t('pi05Analysis.root')}
+            />
             <button type="button" className="pi05a-btn" onClick={() => setPicker('root')}>
               {t('pi05.btnBrowse')}
             </button>
-            <button type="button" className="pi05a-btn primary" disabled={busy} onClick={() => void load(configPath)}>
-              {busy ? t('pi05Analysis.analyzing') : t('pi05Analysis.analyze')}
+            <button
+              type="button"
+              className="pi05a-btn primary"
+              disabled={busy}
+              onClick={() => void load()}
+            >
+              {busy
+                ? t('pi05Analysis.analyzing')
+                : data
+                  ? t('pi05Analysis.analyze')
+                  : t('pi05Analysis.analyzeFirst')}
             </button>
           </div>
+          <p className="pi05a-root-hint muted">{t('pi05Analysis.rootHint')}</p>
 
-          <div className="pi05a-health-mini" aria-label={t('pi05Analysis.health')}>
-            {healthItems.map((item) => (
-              <span
-                key={item.key}
-                className={`pi05a-health-dot-wrap${checkOk(checks[item.key]) ? ' ok' : ' bad'}`}
-                title={`${item.label}: ${String(checks[item.key] ?? '—')}`}
-              >
-                <i className="pi05a-kpi-dot" />
-                <span>{item.label}</span>
-              </span>
-            ))}
-          </div>
+          {data ? (
+            <div className="pi05a-health-mini" aria-label={t('pi05Analysis.health')}>
+              {healthItems.map((item) => (
+                <span
+                  key={item.key}
+                  className={`pi05a-health-dot-wrap${checkOk(checks[item.key]) ? ' ok' : ' bad'}`}
+                  title={`${item.label}: ${String(checks[item.key] ?? '—')}`}
+                >
+                  <i className="pi05a-kpi-dot" />
+                  <span>{item.label}</span>
+                </span>
+              ))}
+            </div>
+          ) : null}
         </section>
 
         {err ? <div className="pi05a-banner err">{err}</div> : null}
@@ -430,7 +446,7 @@ export function Pi05AnalysisPage() {
                             onClick={() => {
                               setSelectedConfig(c.path)
                               setConfigPath(c.path)
-                              void load(c.path)
+                              void load({ configFocus: c.path })
                             }}
                           >
                             <strong>{c.name}</strong>
@@ -480,16 +496,24 @@ export function Pi05AnalysisPage() {
       {picker ? (
         <PathPickerModal
           open
-          title={picker === 'root' ? t('pi05.pickerPi05Root') : t('pi05Analysis.pickConfig')}
-          value={picker === 'root' ? pi05Root : configPath}
+          title={picker === 'root' ? t('pi05Analysis.pickerCkpt') : t('pi05Analysis.pickConfig')}
+          value={picker === 'root' ? ckptTarget : configPath}
           browseRoot="pi05"
           roots={browseRoots}
           pathKind={picker === 'root' ? 'dir' : 'file'}
-          browseAnchor={pi05Root.replace(/\/[^/]+$/, '') || '/root/autodl-tmp'}
+          browseAnchor={PI05_BROWSE_SUPERROOT}
           onClose={() => setPicker(null)}
           onConfirm={(path) => {
-            if (picker === 'root') setPi05Root(path)
-            else {
+            if (picker === 'root') {
+              setCkptTarget(path)
+              setData(null)
+              setCkpt(null)
+              setSelectedStep('')
+              setSelectedRunPath('')
+              setSelectedConfig('')
+              setConfigPath('')
+              setErr('')
+            } else {
               setConfigPath(path)
               setSelectedConfig(path)
             }

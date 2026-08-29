@@ -417,60 +417,176 @@ def _infer_adaptation(project: str, exp: str, step_meta: dict[str, Any] | None =
     return "full_ft" if pg and ex and not pg.endswith("_lora") and not ex.endswith("_lora") else "unknown"
 
 
-def list_checkpoints(pi05_root: str | None = None, route: str | None = None) -> dict[str, Any]:
+def resolve_analysis_paths(
+    pi05_root: str | None = None,
+    checkpoint_path: str | None = None,
+) -> dict[str, Any]:
+    """Map UI selection → π0.5 root + optional checkpoints scope.
+
+    Preferred UI path is a project/exp under ``artifacts/checkpoints/``, e.g.
+    ``…/artifacts/checkpoints/pi05_act_robot_smoke``. Selecting the π0.5 repo
+    root still works (scans all projects).
+    """
+    scope: Path | None = None
+    focus_step: Path | None = None
+    ckpt_target = (checkpoint_path or "").strip()
+    root_arg = (pi05_root or "").strip()
+
+    if ckpt_target:
+        target = Path(ckpt_target).expanduser().resolve()
+        if not target.exists():
+            raise ValueError(f"路径不存在: {target}")
+        parts = target.parts
+        if "artifacts" in parts and "checkpoints" in parts:
+            idx = parts.index("checkpoints")
+            if idx == 0 or parts[idx - 1] != "artifacts":
+                raise ValueError(f"无法从路径解析 artifacts/checkpoints: {target}")
+            ckpt_base = Path(*parts[: idx + 1])
+            pi05 = ckpt_base.parent.parent
+            rest = parts[idx + 1 :]
+            if len(rest) >= 1:
+                scope = ckpt_base.joinpath(*rest[:2]) if len(rest) >= 2 else ckpt_base / rest[0]
+            if len(rest) >= 3:
+                focus_step = ckpt_base.joinpath(*rest[:3])
+            elif len(rest) == 2 and (target / "model.safetensors").is_file():
+                # selected a step dir that looks like a weight export
+                focus_step = target
+                scope = target.parent
+            return {
+                "pi05": pi05,
+                "checkpointBase": ckpt_base,
+                "scope": scope,
+                "focusStep": focus_step,
+                "selectedPath": target,
+            }
+        # Bare project name under default tree, or a π0.5 root mistaken as ckpt
+        if (target / "artifacts" / "checkpoints").is_dir():
+            pi05 = target
+            return {
+                "pi05": pi05,
+                "checkpointBase": pi05 / "artifacts" / "checkpoints",
+                "scope": None,
+                "focusStep": None,
+                "selectedPath": target,
+            }
+        # Treat as project/exp folder under some checkpoints root
+        if target.is_dir():
+            parent = target.parent
+            if parent.name == "checkpoints" and parent.parent.name == "artifacts":
+                return {
+                    "pi05": parent.parent.parent,
+                    "checkpointBase": parent,
+                    "scope": target,
+                    "focusStep": None,
+                    "selectedPath": target,
+                }
+            grand = parent.parent
+            if grand.name == "checkpoints" and grand.parent.name == "artifacts":
+                return {
+                    "pi05": grand.parent.parent,
+                    "checkpointBase": grand,
+                    "scope": parent,
+                    "focusStep": target if any(
+                        (target / n).exists() for n in ("model.safetensors", "metadata.pt", "params")
+                    ) else None,
+                    "selectedPath": target,
+                }
+
+    pi05 = Path(root_arg or default_analysis_root()).expanduser().resolve()
+    if not pi05.is_dir():
+        raise ValueError(f"不是有效目录: {pi05}")
+    return {
+        "pi05": pi05,
+        "checkpointBase": pi05 / "artifacts" / "checkpoints",
+        "scope": None,
+        "focusStep": None,
+        "selectedPath": pi05,
+    }
+
+
+def _collect_exp_run(project: Path, exp: Path) -> dict[str, Any]:
+    steps: list[dict[str, Any]] = []
+    meta_cfg: dict[str, Any] | None = None
+    for step_dir in sorted(exp.iterdir(), key=lambda p: p.name):
+        if not step_dir.is_dir():
+            continue
+        brief = _step_file_brief(step_dir)
+        steps.append(
+            {
+                "name": step_dir.name,
+                "path": str(step_dir),
+                **(_safe_stat(step_dir) or {}),
+                **brief,
+            }
+        )
+        meta_pt = step_dir / "metadata.pt"
+        if meta_cfg is None and meta_pt.is_file():
+            try:
+                import torch
+
+                obj = torch.load(meta_pt, map_location="cpu", weights_only=False)
+                if isinstance(obj, dict) and isinstance(obj.get("config"), dict):
+                    meta_cfg = obj["config"]
+            except Exception:  # noqa: BLE001
+                meta_cfg = None
+    latest = steps[-1] if steps else None
+    adaptation = _infer_adaptation(project.name, exp.name, meta_cfg)
+    return {
+        "project": project.name,
+        "exp": exp.name,
+        "path": str(exp),
+        "steps": steps[-40:],
+        "stepCount": len(steps),
+        "latestStep": latest["name"] if latest else None,
+        "latestPath": latest["path"] if latest else None,
+        "totalBytes": sum(int(s.get("totalBytes") or 0) for s in steps),
+        "hasModel": any(s.get("hasModel") for s in steps),
+        "adaptation": adaptation,
+    }
+
+
+def list_checkpoints(
+    pi05_root: str | None = None,
+    route: str | None = None,
+    checkpoint_path: str | None = None,
+) -> dict[str, Any]:
     from pi05_pipeline_runner import normalize_route, ROUTE_FULL_FT
 
-    pi05 = Path(pi05_root or default_analysis_root()).expanduser().resolve()
+    resolved = resolve_analysis_paths(pi05_root, checkpoint_path)
+    pi05: Path = resolved["pi05"]
+    base: Path = resolved["checkpointBase"]
+    scope: Path | None = resolved["scope"]
     route = normalize_route(route)
-    base = pi05 / "artifacts" / "checkpoints"
     runs: list[dict[str, Any]] = []
-    if base.is_dir():
-        for project in sorted(base.iterdir()):
-            if not project.is_dir():
-                continue
-            for exp in sorted(project.iterdir()):
-                if not exp.is_dir():
-                    continue
-                steps: list[dict[str, Any]] = []
-                meta_cfg: dict[str, Any] | None = None
-                for step_dir in sorted(exp.iterdir(), key=lambda p: p.name):
-                    if not step_dir.is_dir():
-                        continue
-                    brief = _step_file_brief(step_dir)
-                    steps.append(
-                        {
-                            "name": step_dir.name,
-                            "path": str(step_dir),
-                            **(_safe_stat(step_dir) or {}),
-                            **brief,
-                        }
-                    )
-                    meta_pt = step_dir / "metadata.pt"
-                    if meta_cfg is None and meta_pt.is_file():
-                        try:
-                            import torch
 
-                            obj = torch.load(meta_pt, map_location="cpu", weights_only=False)
-                            if isinstance(obj, dict) and isinstance(obj.get("config"), dict):
-                                meta_cfg = obj["config"]
-                        except Exception:  # noqa: BLE001
-                            meta_cfg = None
-                latest = steps[-1] if steps else None
-                adaptation = _infer_adaptation(project.name, exp.name, meta_cfg)
-                runs.append(
-                    {
-                        "project": project.name,
-                        "exp": exp.name,
-                        "path": str(exp),
-                        "steps": steps[-40:],
-                        "stepCount": len(steps),
-                        "latestStep": latest["name"] if latest else None,
-                        "latestPath": latest["path"] if latest else None,
-                        "totalBytes": sum(int(s.get("totalBytes") or 0) for s in steps),
-                        "hasModel": any(s.get("hasModel") for s in steps),
-                        "adaptation": adaptation,
-                    }
-                )
+    def add_project(project: Path) -> None:
+        if not project.is_dir():
+            return
+        for exp in sorted(project.iterdir()):
+            if exp.is_dir():
+                runs.append(_collect_exp_run(project, exp))
+
+    if base.is_dir():
+        if scope is None:
+            for project in sorted(base.iterdir()):
+                add_project(project)
+        elif scope.parent == base:
+            # project directory
+            add_project(scope)
+        elif scope.parent.parent == base:
+            # exp directory
+            runs.append(_collect_exp_run(scope.parent, scope))
+        elif scope.is_dir() and scope.parent.is_dir():
+            # step or odd nesting: use parent as exp if under base
+            try:
+                scope.relative_to(base)
+            except ValueError:
+                pass
+            else:
+                if scope.parent.parent == base:
+                    runs.append(_collect_exp_run(scope.parent.parent, scope.parent))
+                elif scope.parent == base:
+                    add_project(scope)
 
     def sort_key(r: dict[str, Any]) -> tuple:
         adapt = r.get("adaptation") or ""
@@ -480,7 +596,15 @@ def list_checkpoints(pi05_root: str | None = None, route: str | None = None) -> 
         return (prefer, -int(r.get("totalBytes") or 0), r["project"], r["exp"])
 
     runs.sort(key=sort_key)
-    return {"ok": True, "checkpointRoot": str(base), "runs": runs, "route": route}
+    return {
+        "ok": True,
+        "checkpointRoot": str(base),
+        "scope": str(scope) if scope else None,
+        "selectedPath": str(resolved["selectedPath"]),
+        "pi05Root": str(pi05),
+        "runs": runs,
+        "route": route,
+    }
 
 
 def list_prepare_summaries(pi05_root: str | None = None) -> list[dict[str, Any]]:
@@ -818,9 +942,15 @@ def analyze(
 ) -> dict[str, Any]:
     from pi05_pipeline_runner import normalize_route, ROUTE_FULL_FT
 
-    pi05 = Path(pi05_root or default_analysis_root()).expanduser().resolve()
+    try:
+        resolved = resolve_analysis_paths(pi05_root, checkpoint_path)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+
+    pi05: Path = resolved["pi05"]
     act = ACT_ROBOT_ROOT
     route_n = normalize_route(route)
+    focus_step: Path | None = resolved.get("focusStep")
     try:
         spec = pipeline_spec(str(pi05), str(act), route_n)
     except ValueError as e:
@@ -872,11 +1002,24 @@ def analyze(
                 continue
 
     ckpt_info = None
-    if checkpoint_path:
+    # Prefer explicit step; otherwise leave deep inspect to a later step pick
+    # unless a step path with weights was selected.
+    if focus_step and focus_step.is_dir():
         try:
-            ckpt_info = inspect_checkpoint(str(checkpoint_path), str(pi05))
+            ckpt_info = inspect_checkpoint(str(focus_step), str(pi05))
         except Exception as e:  # noqa: BLE001
-            ckpt_info = {"ok": False, "error": str(e), "path": checkpoint_path}
+            ckpt_info = {"ok": False, "error": str(e), "path": str(focus_step)}
+    elif checkpoint_path:
+        cand = Path(str(checkpoint_path)).expanduser().resolve()
+        if cand.is_dir() and (
+            (cand / "model.safetensors").is_file()
+            or (cand / "metadata.pt").is_file()
+            or (cand / "params").exists()
+        ):
+            try:
+                ckpt_info = inspect_checkpoint(str(cand), str(pi05))
+            except Exception as e:  # noqa: BLE001
+                ckpt_info = {"ok": False, "error": str(e), "path": str(cand)}
 
     if isinstance(ckpt_info, dict) and ckpt_info.get("modelStructure"):
         model_structure = ckpt_info["modelStructure"]
@@ -884,10 +1027,12 @@ def analyze(
         model_structure = build_model_structure(yaml_data)
 
     health_hint = (
-        "Tonglu 全参主线：需 pi05_base_pytorch + ≥8×~80GB GPU；batch=256。"
+        "Tl 全参主线：需预训练权重（pi05_base_pytorch） + ≥8×~80GB GPU；batch=256。"
         if route_n == ROUTE_FULL_FT
         else "LoRA 冒烟辅线：单卡 32GB 用双 LoRA + 小 batch；HF/tmp 缓存须在数据盘。"
     )
+
+    ckpt_listing = list_checkpoints(str(pi05), route_n, checkpoint_path or str(resolved["selectedPath"]))
 
     return {
         "ok": True,
@@ -895,6 +1040,8 @@ def analyze(
         "route": route_n,
         "healthHint": health_hint,
         "defaultRoot": str(default_analysis_root()),
+        "selectedPath": str(resolved["selectedPath"]),
+        "checkpointScope": str(resolved["scope"]) if resolved.get("scope") else None,
         "checks": spec.get("checks") or {},
         "paths": {
             **(spec.get("paths") or {}),
@@ -903,7 +1050,7 @@ def analyze(
             "artifactsPrepare": str(pi05 / "artifacts" / "prepare"),
         },
         "configs": list_configs(str(pi05)).get("configs") or [],
-        "checkpoints": list_checkpoints(str(pi05), route_n),
+        "checkpoints": ckpt_listing,
         "normStats": _find_norm_stats(pi05, assets_hint),
         "prepare": list_prepare_summaries(str(pi05)),
         "config": config_info,
