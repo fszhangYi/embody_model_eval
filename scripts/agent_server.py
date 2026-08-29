@@ -31,6 +31,17 @@ Endpoints:
   POST   /api/act-pipeline/jobs/<id>/cancel
   DELETE /api/act-pipeline/jobs/<id>
   POST   /api/act-pipeline/run
+  GET    /api/pi05-pipeline/spec
+  GET    /api/pi05-pipeline/jobs
+  GET    /api/pi05-pipeline/jobs/<id>
+  POST   /api/pi05-pipeline/jobs/<id>/cancel
+  DELETE /api/pi05-pipeline/jobs/<id>
+  POST   /api/pi05-pipeline/run
+  GET    /api/pi05-analysis/configs
+  GET    /api/pi05-analysis/checkpoints
+  POST   /api/pi05-analysis/inspect-config
+  POST   /api/pi05-analysis/inspect-checkpoint
+  POST   /api/pi05-analysis/analyze
   POST   /api/model-analysis/compare
   GET    /api/model-analysis/gpu-status
   POST   /api/model-analysis/analyze-gpu
@@ -38,7 +49,7 @@ Endpoints:
   POST   /api/dataset-converter/detect
   POST   /api/dataset-converter/inspect
   POST   /api/dataset-converter/convert
-  GET    /api/fs/children?root=act|embody&path=<abs>&rootPath=<override>
+  GET    /api/fs/children?root=act|embody|pi05&path=<abs>&rootPath=<override>
   GET    /api/fs/roots
   GET    /api/sensors/arm
   GET    /api/sensors/arm/kin
@@ -82,6 +93,21 @@ from act_pipeline_runner import (
     pipeline_spec,
     remove_act_link,
     start_job,
+)
+from pi05_pipeline_runner import (
+    cancel_job as pi05_cancel_job,
+    delete_job as pi05_delete_job,
+    get_job as pi05_get_job,
+    list_jobs as pi05_list_jobs,
+    pipeline_spec as pi05_pipeline_spec,
+    start_job as pi05_start_job,
+)
+from pi05_analysis import (
+    analyze as pi05_analyze,
+    inspect_checkpoint as pi05_inspect_checkpoint,
+    inspect_config as pi05_inspect_config,
+    list_checkpoints as pi05_list_checkpoints,
+    list_configs as pi05_list_configs,
 )
 from arm_kinematics import (
     compute_fk,
@@ -1219,6 +1245,44 @@ class Handler(SimpleHTTPRequestHandler):
                 return
             self._send_json({"ok": True, "job": job})
             return
+        if path == "/api/pi05-pipeline/spec":
+            qs = parse_qs(parsed.query)
+            pi05_root = (qs.get("pi05Root") or [None])[0]
+            act_root = (qs.get("actRoot") or [None])[0]
+            route = (qs.get("route") or [None])[0]
+            try:
+                self._send_json(pi05_pipeline_spec(pi05_root, act_root, route))
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/api/pi05-pipeline/jobs":
+            self._send_json({"ok": True, "jobs": pi05_list_jobs()})
+            return
+        m_pi05_job = re.match(r"^/api/pi05-pipeline/jobs/([^/]+)$", path)
+        if m_pi05_job:
+            job = pi05_get_job(m_pi05_job.group(1))
+            if not job:
+                self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json({"ok": True, "job": job})
+            return
+        if path == "/api/pi05-analysis/configs":
+            qs = parse_qs(parsed.query)
+            pi05_root = (qs.get("pi05Root") or [None])[0]
+            try:
+                self._send_json(pi05_list_configs(pi05_root))
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/api/pi05-analysis/checkpoints":
+            qs = parse_qs(parsed.query)
+            pi05_root = (qs.get("pi05Root") or [None])[0]
+            route = (qs.get("route") or [None])[0]
+            try:
+                self._send_json(pi05_list_checkpoints(pi05_root, route))
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
         if path == "/api/sensors/arm":
             try:
                 self._send_json(get_arm_status(run_check=False))
@@ -1365,6 +1429,13 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
                 return
             self._send_json({"ok": True, "deleted": m_act_job_del.group(1)})
+            return
+        m_pi05_job_del = re.match(r"^/api/pi05-pipeline/jobs/([^/]+)$", path)
+        if m_pi05_job_del:
+            if not pi05_delete_job(m_pi05_job_del.group(1)):
+                self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+                return
+            self._send_json({"ok": True, "deleted": m_pi05_job_del.group(1)})
             return
         self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
 
@@ -1615,10 +1686,104 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
 
+        if path == "/api/pi05-pipeline/run":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            step_id = body.get("stepId") or body.get("step_id")
+            if not step_id:
+                self._send_json({"ok": False, "error": "stepId required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                params = body.get("params") if isinstance(body.get("params"), dict) else {}
+                pi05_root = body.get("pi05Root") or body.get("pi05_root")
+                act_root = body.get("actRoot") or body.get("act_root")
+                job = pi05_start_job(
+                    str(step_id),
+                    params,
+                    pi05_root=str(pi05_root) if pi05_root else None,
+                    act_root=str(act_root) if act_root else None,
+                    route=str(body.get("route") or params.get("route") or "") or None,
+                )
+                self._send_json({"ok": True, "job": job})
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/pi05-analysis/inspect-config":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            config_path = body.get("configPath") or body.get("path")
+            if not config_path:
+                self._send_json({"ok": False, "error": "configPath required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(
+                    pi05_inspect_config(
+                        str(config_path),
+                        body.get("pi05Root") or body.get("pi05_root"),
+                    )
+                )
+            except FileNotFoundError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.NOT_FOUND)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/pi05-analysis/inspect-checkpoint":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            ckpt_path = body.get("checkpointPath") or body.get("path")
+            if not ckpt_path:
+                self._send_json({"ok": False, "error": "checkpointPath required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(
+                    pi05_inspect_checkpoint(
+                        str(ckpt_path),
+                        body.get("pi05Root") or body.get("pi05_root"),
+                    )
+                )
+            except FileNotFoundError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.NOT_FOUND)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/pi05-analysis/analyze":
+            if not isinstance(body, dict):
+                body = {}
+            try:
+                self._send_json(
+                    pi05_analyze(
+                        body.get("pi05Root") or body.get("pi05_root"),
+                        body.get("configPath") or body.get("config_path"),
+                        body.get("checkpointPath") or body.get("checkpoint_path"),
+                        body.get("route"),
+                    )
+                )
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
         m_cancel = re.match(r"^/api/act-pipeline/jobs/([^/]+)/cancel$", path)
         if m_cancel:
             try:
                 job = cancel_job(m_cancel.group(1))
+                if not job:
+                    self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
+                    return
+                self._send_json({"ok": True, "job": job})
+            except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        m_pi05_cancel = re.match(r"^/api/pi05-pipeline/jobs/([^/]+)/cancel$", path)
+        if m_pi05_cancel:
+            try:
+                job = pi05_cancel_job(m_pi05_cancel.group(1))
                 if not job:
                     self._send_json({"ok": False, "error": "not found"}, HTTPStatus.NOT_FOUND)
                     return

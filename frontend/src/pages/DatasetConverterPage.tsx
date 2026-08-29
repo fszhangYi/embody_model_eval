@@ -480,7 +480,7 @@ export function DatasetConverterPage() {
         }
         value={pickerTarget === 'episode' ? episodePath : filePath}
         browseRoot="act"
-        roots={{ act: actRoot, embody: actRoot }}
+        roots={{ act: actRoot, embody: actRoot, pi05: '' }}
         pathKind={pickerTarget === 'episode' ? 'dir' : 'file'}
         onClose={() => setPickerOpen(false)}
         onConfirm={(p) => {

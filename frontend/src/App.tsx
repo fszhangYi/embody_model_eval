@@ -13,6 +13,9 @@ import { PipelinePage } from './pages/PipelinePage'
 import { ActPipelinePage } from './pages/ActPipelinePage'
 import { ModelAnalysisPage } from './pages/ModelAnalysisPage'
 import { DatasetConverterPage } from './pages/DatasetConverterPage'
+import { Pi05PipelinePage } from './pages/Pi05PipelinePage'
+import { Pi05AnalysisPage } from './pages/Pi05AnalysisPage'
+import { Pi05SetupPage } from './pages/Pi05SetupPage'
 import { SensorsPage } from './pages/SensorsPage'
 import { LoginPage } from './pages/LoginPage'
 
@@ -113,6 +116,30 @@ export default function App() {
             }
           />
           <Route
+            path="/pi05-pipeline"
+            element={
+              <Protected>
+                <Pi05PipelinePage />
+              </Protected>
+            }
+          />
+          <Route
+            path="/pi05-analysis"
+            element={
+              <Protected>
+                <Pi05AnalysisPage />
+              </Protected>
+            }
+          />
+          <Route
+            path="/pi05-setup"
+            element={
+              <Protected>
+                <Pi05SetupPage />
+              </Protected>
+            }
+          />
+          <Route
             path="/sensors"
             element={
               <Protected>
@@ -128,6 +155,9 @@ export default function App() {
           <Route path="/act-pipeline.html" element={<Navigate to="/act-pipeline" replace />} />
           <Route path="/model-analysis.html" element={<Navigate to="/model-analysis" replace />} />
           <Route path="/dataset-converter.html" element={<Navigate to="/dataset-converter" replace />} />
+          <Route path="/pi05-pipeline.html" element={<Navigate to="/pi05-pipeline" replace />} />
+          <Route path="/pi05-analysis.html" element={<Navigate to="/pi05-analysis" replace />} />
+          <Route path="/pi05-setup.html" element={<Navigate to="/pi05-setup" replace />} />
           <Route path="/sensors.html" element={<Navigate to="/sensors" replace />} />
           <Route path="/login.html" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />

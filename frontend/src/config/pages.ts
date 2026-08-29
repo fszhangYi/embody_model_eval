@@ -8,9 +8,12 @@ export type PageId =
   | 'actPipeline'
   | 'modelAnalysis'
   | 'datasetConverter'
+  | 'pi05Pipeline'
+  | 'pi05Analysis'
+  | 'pi05Setup'
   | 'sensors'
 
-export type PageGroupId = 'overview' | 'eval' | 'act' | 'tools' | 'hardware'
+export type PageGroupId = 'overview' | 'eval' | 'act' | 'pi05' | 'tools' | 'hardware'
 
 export interface PageDef {
   id: PageId
@@ -93,6 +96,27 @@ export const PAGES: PageDef[] = [
     desc: '异构具身数据：预览常见文件并在 RLDS / LeRobot / HDF5 间转换',
   },
   {
+    id: 'pi05Pipeline',
+    path: '/pi05-pipeline',
+    label: 'π0.5 数据流水线',
+    short: 'π0.5',
+    desc: 'raw → LeRobot → norm_stats → 训练 → 评测 → 推理服务',
+  },
+  {
+    id: 'pi05Analysis',
+    path: '/pi05-analysis',
+    label: 'π0.5 模型分析',
+    short: '分析',
+    desc: '解析配置 / norm_stats / checkpoint 与路径健康',
+  },
+  {
+    id: 'pi05Setup',
+    path: '/pi05-setup',
+    label: 'π0.5 环境说明',
+    short: '环境',
+    desc: '相对 ACT 的差异、路径检查与文档入口',
+  },
+  {
     id: 'sensors',
     path: '/sensors',
     label: '传感器状态',
@@ -110,6 +134,12 @@ export const PAGE_GROUPS: PageGroupDef[] = [
     label: 'ACT',
     short: 'ACT',
     pageIds: ['actPipeline', 'modelAnalysis', 'datasetConverter'],
+  },
+  {
+    id: 'pi05',
+    label: 'π0.5',
+    short: 'π0.5',
+    pageIds: ['pi05Pipeline', 'pi05Analysis', 'pi05Setup'],
   },
   { id: 'tools', label: '工具', short: '工具', pageIds: ['pipeline', 'chat'] },
   { id: 'hardware', label: '硬件', short: '硬件', pageIds: ['robots', 'sensors'] },

@@ -1,6 +1,6 @@
 export type FieldType = 'path' | 'text' | 'number' | 'select' | 'checkbox'
 export type PathKind = 'file' | 'dir'
-export type BrowseRoot = 'act' | 'embody'
+export type BrowseRoot = 'act' | 'embody' | 'pi05'
 
 export type FieldIo = 'input' | 'output' | 'config'
 

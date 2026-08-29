@@ -215,6 +215,7 @@ export function ActPipelinePage() {
     () => ({
       act: actRoot,
       embody: embodyRoot,
+      pi05: '',
     }),
     [actRoot, embodyRoot],
   )

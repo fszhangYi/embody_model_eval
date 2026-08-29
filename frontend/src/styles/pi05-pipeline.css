@@ -1,0 +1,246 @@
+/* Typography lock — match ACT / model-analysis scale */
+
+.pi05-pipeline-page {
+  --bg-spot-2: color-mix(in srgb, #6ea8ff 16%, transparent);
+  --bg-spot-3: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.pi05-pipeline-page .act-header h1 {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.pi05-pipeline-page .act-sub {
+  font-size: 0.75rem;
+}
+
+.pi05-pipeline-page .pi05-pill {
+  font-size: 0.62rem;
+}
+
+.pi05-pipeline-page .act-train-mem-title {
+  font-size: 0.78rem;
+}
+
+.pi05-pipeline-page .act-train-mem-lead,
+.pi05-pipeline-page .act-train-mem-foot,
+.pi05-pipeline-page .act-train-mem-stats {
+  font-size: 0.72rem;
+}
+
+.pi05-pipeline-page .pi05-jobs-empty {
+  font-size: 0.72rem;
+}
+
+.pi05-pipeline-page .act-field-wide {
+  grid-column: 1 / -1;
+}
+
+.pi05-pipeline-page .act-log {
+  margin-top: 14px;
+}
+
+/* —— Health strip (3rd root cell) —— */
+.pi05-health-field .pi05-health-shell {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 8px;
+  border: 1px solid #354a66;
+  border-radius: 8px;
+  background: var(--input-bg);
+  box-sizing: border-box;
+}
+
+.pi05-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(58, 77, 102, 0.55);
+  background: var(--surface-3, var(--surface));
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.pi05-pill::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--muted);
+  flex-shrink: 0;
+}
+
+.pi05-pill.ok {
+  color: var(--accent, #3dd6c6);
+  border-color: rgba(61, 214, 198, 0.4);
+  background: rgba(61, 214, 198, 0.1);
+}
+
+.pi05-pill.ok::before {
+  background: var(--accent, #3dd6c6);
+  box-shadow: 0 0 8px rgba(61, 214, 198, 0.45);
+}
+
+.pi05-pill.bad {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.pi05-pill.bad::before {
+  background: #f87171;
+}
+
+.pi05-pill.info {
+  color: var(--text);
+  border-color: rgba(61, 214, 198, 0.28);
+  background: rgba(61, 214, 198, 0.06);
+}
+
+.pi05-pill.info::before {
+  background: var(--accent, #3dd6c6);
+}
+
+/* —— Flow: ACT-like type; clickable, no pill chrome —— */
+.pi05-flow-wrap {
+  display: contents;
+}
+
+.pi05-pipeline-page .act-flow {
+  gap: 8px 4px;
+}
+
+.pi05-pipeline-page button.act-flow-item {
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: 0;
+  color: inherit;
+  text-align: left;
+}
+
+.pi05-pipeline-page button.act-flow-item:hover .act-flow-label,
+.pi05-pipeline-page button.act-flow-item:focus-visible .act-flow-label {
+  color: var(--accent, #3dd6c6);
+}
+
+.pi05-pipeline-page button.act-flow-item:focus-visible {
+  outline: none;
+}
+
+.pi05-pipeline-page button.act-flow-item:focus-visible .act-flow-n {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.pi05-pipeline-page .act-flow-n {
+  width: 1.35rem;
+  height: 1.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pi05-pipeline-page .act-flow-label {
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--text, #e7ecf3);
+}
+
+.pi05-pipeline-page .act-flow-to {
+  font-size: 0.65rem;
+  font-weight: 400;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  letter-spacing: 0;
+  color: var(--muted, #8b9bb4);
+  opacity: 0.9;
+}
+
+.pi05-pipeline-page .act-flow-arrow {
+  margin: 0 4px;
+  font-size: 0.72rem;
+  color: var(--muted, #8b9bb4);
+  pointer-events: none;
+}
+
+.pi05-pipeline-page button.act-flow-item.active .act-flow-n {
+  background: rgba(61, 214, 198, 0.28);
+  color: var(--accent, #3dd6c6);
+}
+
+.pi05-pipeline-page button.act-flow-item.active .act-flow-label {
+  color: var(--accent, #3dd6c6);
+  font-weight: 600;
+}
+
+/* —— Step script chip —— */
+.pi05-pipeline-page .act-script {
+  margin-top: 6px;
+}
+
+/* —— Empty jobs —— */
+.pi05-jobs-empty {
+  margin: 8px 4px;
+  padding: 12px 8px;
+  text-align: center;
+  font-size: 0.72rem;
+  color: var(--muted, #8b9bb4);
+  border: 1px dashed rgba(58, 77, 102, 0.45);
+  border-radius: 10px;
+  line-height: 1.45;
+}
+
+/* —— Train guide subtle accent —— */
+.pi05-train-guide {
+  margin-top: 4px;
+}
+
+html[data-theme='light'] .pi05-health-field .pi05-health-shell {
+  border-color: var(--border);
+}
+
+html[data-theme='light'] .pi05-pill {
+  border-color: var(--border);
+  background: var(--surface-2);
+}
+
+html[data-theme='light'] .pi05-pill.ok {
+  color: #0f766e;
+  border-color: rgba(13, 148, 136, 0.35);
+  background: rgba(13, 148, 136, 0.08);
+}
+
+html[data-theme='light'] .pi05-pill.bad {
+  color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.3);
+  background: rgba(185, 28, 28, 0.06);
+}
+
+html[data-theme='light'] .pi05-pipeline-page button.act-flow-item.active .act-flow-label,
+html[data-theme='light'] .pi05-pipeline-page button.act-flow-item:hover .act-flow-label {
+  color: #0f766e;
+}
+
+html[data-theme='light'] .pi05-jobs-empty {
+  border-color: var(--border);
+}

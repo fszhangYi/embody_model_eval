@@ -695,7 +695,7 @@ export function ModelAnalysisPage() {
           title={t('modelAnalysis.pickCkptTitle')}
           value={pickerTarget === 'single' ? singleDir : ckptDirs[pickerTarget] || ''}
           browseRoot="act"
-          roots={{ act: actRoot, embody: actRoot }}
+          roots={{ act: actRoot, embody: actRoot, pi05: '' }}
           pathKind="dir"
           browseAnchor={actRoot}
           onClose={() => setPickerTarget(null)}

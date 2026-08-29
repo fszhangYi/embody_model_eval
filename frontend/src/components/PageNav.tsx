@@ -23,6 +23,9 @@ function resolvePageId(pathname: string): PageId {
   if (pathname.startsWith('/act-pipeline')) return 'actPipeline'
   if (pathname.startsWith('/model-analysis')) return 'modelAnalysis'
   if (pathname.startsWith('/dataset-converter')) return 'datasetConverter'
+  if (pathname.startsWith('/pi05-pipeline')) return 'pi05Pipeline'
+  if (pathname.startsWith('/pi05-analysis')) return 'pi05Analysis'
+  if (pathname.startsWith('/pi05-setup')) return 'pi05Setup'
   if (pathname.startsWith('/sensors')) return 'sensors'
   return 'home'
 }

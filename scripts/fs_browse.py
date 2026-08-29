@@ -7,10 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from act_pipeline_runner import ACT_ROBOT_ROOT, EMBODY_ROOT
+from pi05_pipeline_runner import PI05_ROOT
 
 ROOTS: dict[str, Path] = {
     "act": ACT_ROBOT_ROOT.resolve(),
     "embody": EMBODY_ROOT.resolve(),
+    "pi05": PI05_ROOT.resolve(),
 }
 
 

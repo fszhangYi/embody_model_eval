@@ -20,11 +20,23 @@ export type MessageTree = {
     loggingOut: string
   }
   pageGroups: Record<
-    'overview' | 'eval' | 'act' | 'tools' | 'hardware',
+    'overview' | 'eval' | 'act' | 'pi05' | 'tools' | 'hardware',
     { label: string; short: string }
   >
   pages: Record<
-    'home' | 'eval' | 'hub' | 'pipeline' | 'chat' | 'robots' | 'actPipeline' | 'modelAnalysis' | 'datasetConverter' | 'sensors',
+    | 'home'
+    | 'eval'
+    | 'hub'
+    | 'pipeline'
+    | 'chat'
+    | 'robots'
+    | 'actPipeline'
+    | 'modelAnalysis'
+    | 'datasetConverter'
+    | 'pi05Pipeline'
+    | 'pi05Analysis'
+    | 'pi05Setup'
+    | 'sensors',
     { label: string; short: string; desc: string }
   >
   settings: {
@@ -178,6 +190,7 @@ export const messages: Record<Locale, MessageTree> = {
       overview: { label: '总览', short: '总览' },
       eval: { label: '评测', short: '评测' },
       act: { label: 'ACT', short: 'ACT' },
+      pi05: { label: 'π0.5', short: 'π0.5' },
       tools: { label: '工具', short: '工具' },
       hardware: { label: '硬件', short: '硬件' },
     },
@@ -226,6 +239,21 @@ export const messages: Record<Locale, MessageTree> = {
         label: '数据集格式转换',
         short: '转换',
         desc: '异构具身数据：11 类训练生态 lineage 检测与格式互转',
+      },
+      pi05Pipeline: {
+        label: 'π0.5 数据流水线',
+        short: 'π0.5',
+        desc: 'raw → LeRobot → norm_stats → 训练 → 评测 → 推理服务',
+      },
+      pi05Analysis: {
+        label: 'π0.5 模型分析',
+        short: '分析',
+        desc: '解析配置 / norm_stats / checkpoint 与路径健康',
+      },
+      pi05Setup: {
+        label: 'π0.5 环境说明',
+        short: '环境',
+        desc: '相对 ACT 的差异、路径检查与文档入口',
       },
       sensors: {
         label: '传感器状态',
@@ -399,6 +427,7 @@ export const messages: Record<Locale, MessageTree> = {
       overview: { label: 'Overview', short: 'Home' },
       eval: { label: 'Evaluation', short: 'Eval' },
       act: { label: 'ACT', short: 'ACT' },
+      pi05: { label: 'π0.5', short: 'π0.5' },
       tools: { label: 'Tools', short: 'Tools' },
       hardware: { label: 'Hardware', short: 'HW' },
     },
@@ -447,6 +476,21 @@ export const messages: Record<Locale, MessageTree> = {
         label: 'Dataset format converter',
         short: 'Convert',
         desc: 'Heterogeneous embodied data: 11 training-ecology lineages detect & convert',
+      },
+      pi05Pipeline: {
+        label: 'π0.5 data pipeline',
+        short: 'π0.5',
+        desc: 'raw → LeRobot → norm_stats → train → eval → serve',
+      },
+      pi05Analysis: {
+        label: 'π0.5 model analysis',
+        short: 'Analyze',
+        desc: 'Inspect configs / norm_stats / checkpoints and path health',
+      },
+      pi05Setup: {
+        label: 'π0.5 setup notes',
+        short: 'Setup',
+        desc: 'Differences vs ACT, path checks, and docs',
       },
       sensors: {
         label: 'Sensor status',
