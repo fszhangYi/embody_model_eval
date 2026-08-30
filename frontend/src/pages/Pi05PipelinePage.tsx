@@ -45,6 +45,7 @@ const FLOW_KEYS = [
 type PickerTarget =
   | { kind: 'field'; field: StepField }
   | { kind: 'root'; root: BrowseRoot }
+  | { kind: 'saveYaml' }
 
 function defaultParams(step: PipelineStep): Record<string, string | number | boolean> {
   const out: Record<string, string | number | boolean> = {}
@@ -320,15 +321,12 @@ export function Pi05PipelinePage() {
         if (cancelled) return
         setParams((prev) => {
           const cur = prev.train || {}
-          const nextSave =
-            !cur.savePath || cur.savePath === cur.configPath ? r.path : String(cur.savePath)
           return {
             ...prev,
             train: {
               ...cur,
               ...r.params,
               configPath: path,
-              savePath: nextSave,
               scriptPath: cur.scriptPath ?? '',
               printOnly: cur.printOnly ?? false,
             },
@@ -367,47 +365,48 @@ export function Pi05PipelinePage() {
 
   const setField = (key: string, value: string | number | boolean) => {
     if (!step) return
-    setParams((prev) => {
-      const cur = { ...(prev[step.id] || defaultParams(step)), [key]: value }
-      if (step.id === 'train' && key === 'configPath') {
-        const prevCfg = String(prev.train?.configPath || '')
-        const prevSave = String(prev.train?.savePath || '')
-        if (!prevSave || prevSave === prevCfg) cur.savePath = value
-      }
-      return { ...prev, [step.id]: cur }
-    })
+    setParams((prev) => ({
+      ...prev,
+      [step.id]: { ...(prev[step.id] || defaultParams(step)), [key]: value },
+    }))
   }
 
-  const onSaveTrainYaml = async () => {
+  const doSaveTrainYaml = async (savePath: string) => {
     if (!rootsReady) return
-    const savePath = String(currentParams.savePath || currentParams.configPath || '').trim()
-    if (!savePath) {
+    const dest = savePath.trim()
+    if (!dest) {
       setYamlMsg(t('pi05.trainYaml.needSavePath'))
       return
     }
     setYamlBusy(true)
     setYamlMsg('')
     try {
+      const mergeFrom = String(currentParams.configPath || '').trim() || undefined
       const r = await savePi05TrainYaml({
-        savePath,
+        savePath: dest,
         params: currentParams,
         pi05Root: pi05Root.trim() || undefined,
-        mergeFrom: String(currentParams.configPath || '') || undefined,
+        mergeFrom,
       })
-      setYamlMsg(t('pi05.trainYaml.saved', { path: r.path }))
+      // Sync load path to the file we just wrote (avoids stale merge_from on next run).
       setParams((prev) => ({
         ...prev,
         train: {
           ...(prev.train || currentParams),
           configPath: r.path,
-          savePath: r.path,
         },
       }))
+      setYamlMsg(t('pi05.trainYaml.saved', { path: r.path }))
     } catch (e) {
       setYamlMsg(e instanceof Error ? e.message : String(e))
     } finally {
       setYamlBusy(false)
     }
+  }
+
+  const onSaveTrainYaml = () => {
+    if (!rootsReady) return
+    setPicker({ kind: 'saveYaml' })
   }
 
   const onRun = async () => {
@@ -483,9 +482,12 @@ export function Pi05PipelinePage() {
   const pickerValue = useMemo(() => {
     if (!picker) return ''
     if (picker.kind === 'root') return browseRoots[picker.root]
+    if (picker.kind === 'saveYaml') {
+      return String(currentParams.configPath || params.train?.configPath || '')
+    }
     if (!step) return ''
     return String(currentParams[picker.field.key] ?? '')
-  }, [picker, browseRoots, step, currentParams])
+  }, [picker, browseRoots, step, currentParams, params.train?.configPath])
 
   return (
     <div className="act-pipeline-page pi05-pipeline-page" data-locale={locale}>
@@ -597,7 +599,7 @@ export function Pi05PipelinePage() {
                         type="button"
                         className="btn-secondary"
                         disabled={busy || yamlBusy || !rootsReady}
-                        onClick={() => void onSaveTrainYaml()}
+                        onClick={() => onSaveTrainYaml()}
                         title={t('pi05.trainYaml.saveTitle')}
                       >
                         {yamlBusy ? t('pi05.trainYaml.saving') : t('pi05.trainYaml.save')}
@@ -624,7 +626,7 @@ export function Pi05PipelinePage() {
                 ) : null}
                 <div className="act-fields">
                   {step.fields
-                    .filter((f) => !f.hidden)
+                    .filter((f) => !f.hidden && f.key !== 'savePath')
                     .map((f) => (
                       <FieldInput
                         key={f.key}
@@ -779,12 +781,18 @@ export function Pi05PipelinePage() {
               ? picker.root === 'embody'
                 ? t('pi05.pickerEmbodyRoot')
                 : t('pi05.pickerPi05Root')
-              : fieldLabel(stepId, picker.field)
+              : picker.kind === 'saveYaml'
+                ? t('pi05.trainYaml.saveDialogTitle')
+                : fieldLabel(stepId, picker.field)
           }
           value={pickerValue}
-          browseRoot={picker.kind === 'root' ? picker.root : picker.field.browseRoot || 'pi05'}
+          browseRoot={
+            picker.kind === 'root' ? picker.root : picker.kind === 'saveYaml' ? 'pi05' : picker.field.browseRoot || 'pi05'
+          }
           roots={browseRoots}
-          pathKind={picker.kind === 'root' ? 'dir' : picker.field.pathKind || 'dir'}
+          pathKind={
+            picker.kind === 'root' ? 'dir' : picker.kind === 'saveYaml' ? 'file' : picker.field.pathKind || 'dir'
+          }
           browseAnchor={
             picker.kind === 'root'
               ? rootBrowseAnchor(picker.root, browseRoots[picker.root], spec)
@@ -794,10 +802,14 @@ export function Pi05PipelinePage() {
           onConfirm={(path) => {
             if (picker.kind === 'root') {
               if (picker.root === 'pi05') setPi05Root(path)
+              setPicker(null)
+            } else if (picker.kind === 'saveYaml') {
+              setPicker(null)
+              void doSaveTrainYaml(path)
             } else {
               setField(picker.field.key, path)
+              setPicker(null)
             }
-            setPicker(null)
           }}
         />
       ) : null}

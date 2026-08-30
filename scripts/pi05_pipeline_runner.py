@@ -2,7 +2,9 @@
 
 Primary route: Tl PyTorch full FT (mlu_full_ft*). Secondary: JAX LoRA smoke.
 Steps 1–3 and 5 use explicit dirs (no train YAML). Train (step 4) loads YAML
-into form hyperparams and can save back. Step 6 converters may live under act_robot.
+into form hyperparams; Save-as-YAML is a separate path dialog (syncs load path).
+Run merges form → temp YAML (independent of Save). Step 6 converters may live
+under act_robot.
 """
 
 from __future__ import annotations
@@ -164,8 +166,8 @@ def pipeline_spec(
         train_title = "训练 π0.5（PyTorch 全参）"
         train_subtitle = "train_tonglu_full_ft.sh / torchrun"
         train_desc = (
-            "Tl mlu_full_ft*：gemma_2b + gemma_300m 双全参，全局 batch=256，"
-            "默认 8 卡 torchrun。缺 pi05_base_pytorch 或 GPU<8 时 preflight 失败。"
+            "选 YAML 文件自动回填超参；点「保存为 YAML」弹出路径写入（与开训无关）。"
+            "运行时用当前表单生成临时配置（Tl 全参 / torchrun）。"
         )
         default_cfg = preferred if Path(preferred).is_file() else (
             paths["smokeConfig"] if Path(paths["smokeConfig"]).is_file() else (configs[0] if configs else "")
@@ -174,7 +176,10 @@ def pipeline_spec(
         train_options = [paths["trainScriptJax8"], paths["train2Script"]]
         train_title = "训练 π0.5（JAX LoRA 冒烟）"
         train_subtitle = "train_*.sh / pi05_jax_sft.train"
-        train_desc = "JAX + FSDP；单卡 32GB 请用双 LoRA + 小 batch（smoke 配置）。"
+        train_desc = (
+            "选 YAML 文件自动回填超参；点「保存为 YAML」弹出路径写入（与开训无关）。"
+            "JAX + FSDP；单卡 32GB 请用双 LoRA + 小 batch（smoke 配置）。"
+        )
         default_cfg = (
             paths["smokeConfig"]
             if Path(paths["smokeConfig"]).is_file()
@@ -296,29 +301,21 @@ def pipeline_spec(
                 {
                     "key": "scriptPath",
                     "label": "启动脚本",
-                    "type": "select",
+                    "type": "path",
+                    "pathKind": "file",
+                    "browseRoot": "pi05",
                     "io": "config",
-                    "default": paths["trainScript"],
-                    "options": train_options,
+                    "default": train_options[0] if train_options else paths.get("trainFullFtScript") or paths["trainScript"],
                 },
                 {
                     "key": "configPath",
                     "label": "YAML 配置（加载回填）",
-                    "type": "select" if configs else "path",
+                    "type": "path",
                     "pathKind": "file",
                     "browseRoot": "pi05",
                     "io": "input",
                     "default": default_cfg,
-                    "options": configs or None,
-                },
-                {
-                    "key": "savePath",
-                    "label": "保存 YAML 路径",
-                    "type": "path",
-                    "pathKind": "file",
-                    "browseRoot": "pi05",
-                    "io": "output",
-                    "default": default_cfg,
+                    "hint": "选择文件后自动回填超参；「保存为 YAML」另选写入路径（与开训无关）",
                 },
                 {"key": "printOnly", "label": "print-only（预检 TrainConfig）", "type": "checkbox", "io": "config", "default": False},
                 *train_hp_form_fields("pi05"),
