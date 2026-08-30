@@ -97,6 +97,30 @@ export function deleteJob(id: string) {
   )
 }
 
+export function loadActTrainYaml(configPath: string, actRoot?: string) {
+  return api<{
+    ok: boolean
+    path: string
+    yaml: unknown
+    params: Record<string, string | number | boolean>
+  }>('/api/act-pipeline/load-train-yaml', {
+    method: 'POST',
+    body: JSON.stringify({ configPath, actRoot }),
+  })
+}
+
+export function saveActTrainYaml(opts: {
+  savePath: string
+  params: Record<string, unknown>
+  actRoot?: string
+  mergeFrom?: string
+}) {
+  return api<{ ok: boolean; path: string; bytes: number }>('/api/act-pipeline/save-train-yaml', {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  })
+}
+
 export function fetchFsChildren(rootKey: string, path = '', rootPath?: string) {
   const qs = new URLSearchParams({ root: rootKey })
   if (path) qs.set('path', path)

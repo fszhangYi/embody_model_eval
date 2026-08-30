@@ -3,7 +3,7 @@ import { PathPickerModal } from '../components/PathPickerModal'
 import { PageChrome } from '../components/PageChrome'
 import { useLocale } from '../i18n/LocaleContext'
 import { t, trText } from '../i18n/runtime'
-import { cancelJob, deleteJob, fetchJob, fetchJobs, fetchPipelineSpec, createActLink, removeActLink, runPipelineStep } from '../features/actPipeline/api'
+import { cancelJob, deleteJob, fetchJob, fetchJobs, fetchPipelineSpec, createActLink, removeActLink, runPipelineStep, loadActTrainYaml, saveActTrainYaml } from '../features/actPipeline/api'
 import { HyperparamBenchPanel } from '../features/actPipeline/HyperparamBenchPanel'
 import { TrainMemoryGuide } from '../features/actPipeline/TrainMemoryGuide'
 import type { BrowseRoot, PipelineJob, PipelineSpec, PipelineStep, StepField } from '../features/actPipeline/types'
@@ -21,6 +21,7 @@ const FLOW_KEYS = [
 type PickerTarget =
   | { kind: 'field'; field: StepField }
   | { kind: 'root'; root: BrowseRoot }
+  | { kind: 'saveYaml' }
 
 function defaultParams(step: PipelineStep): Record<string, string | number | boolean> {
   const out: Record<string, string | number | boolean> = {}
@@ -74,7 +75,7 @@ function FieldInput({
   ioRole?: 'input' | 'output' | 'neutral'
 }) {
   const id = `act-field-${field.key}`
-  const wide = field.key === 'scriptPath'
+  const wide = field.key === 'scriptPath' || field.key === 'configPath'
   const fieldClass = `act-field act-field-${ioRole}${wide ? ' act-field-wide' : ''}`
   const label = fieldLabel(stepId, field)
 
@@ -210,6 +211,9 @@ export function ActPipelinePage() {
   const [actRoot, setActRoot] = useState('')
   const [linkReady, setLinkReady] = useState(false)
   const [linkMsg, setLinkMsg] = useState('')
+  const [yamlBusy, setYamlBusy] = useState(false)
+  const [yamlMsg, setYamlMsg] = useState('')
+  const trainConfigPath = String(params.train?.configPath ?? '')
 
   const browseRoots = useMemo(
     () => ({
@@ -292,6 +296,42 @@ export function ActPipelinePage() {
       return { ...prev, [step.id]: defaultParams(step) }
     })
   }, [step])
+
+  // Train step: selecting a YAML auto-fills hyperparams into the form.
+  useEffect(() => {
+    if (stepId !== 'train' || !linkReady) return
+    const path = trainConfigPath.trim()
+    if (!path) return
+    let cancelled = false
+    setYamlBusy(true)
+    setYamlMsg('')
+    loadActTrainYaml(path, actRoot.trim() || undefined)
+      .then((r) => {
+        if (cancelled) return
+        setParams((prev) => {
+          const cur = prev.train || {}
+          return {
+            ...prev,
+            train: {
+              ...cur,
+              ...r.params,
+              configPath: path,
+              scriptPath: cur.scriptPath ?? '',
+            },
+          }
+        })
+        setYamlMsg(t('act.trainYaml.loaded', { path: r.path }))
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setYamlMsg(e.message || t('act.trainYaml.loadFail'))
+      })
+      .finally(() => {
+        if (!cancelled) setYamlBusy(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [stepId, trainConfigPath, actRoot, linkReady])
 
   useEffect(() => {
     if (!activeJob || !isJobActive(activeJob.status)) return
@@ -400,6 +440,43 @@ export function ActPipelinePage() {
     }))
   }
 
+  const doSaveTrainYaml = async (savePath: string) => {
+    if (!linkReady) return
+    const dest = savePath.trim()
+    if (!dest) {
+      setYamlMsg(t('act.trainYaml.needSavePath'))
+      return
+    }
+    setYamlBusy(true)
+    setYamlMsg('')
+    try {
+      const mergeFrom = String(currentParams.configPath || '').trim() || undefined
+      const r = await saveActTrainYaml({
+        savePath: dest,
+        params: currentParams,
+        actRoot: actRoot.trim() || undefined,
+        mergeFrom,
+      })
+      setParams((prev) => ({
+        ...prev,
+        train: {
+          ...(prev.train || currentParams),
+          configPath: r.path,
+        },
+      }))
+      setYamlMsg(t('act.trainYaml.saved', { path: r.path }))
+    } catch (e) {
+      setYamlMsg(e instanceof Error ? e.message : String(e))
+    } finally {
+      setYamlBusy(false)
+    }
+  }
+
+  const onSaveTrainYaml = () => {
+    if (!linkReady) return
+    setPicker({ kind: 'saveYaml' })
+  }
+
   const setFields = (patch: Record<string, string | number | boolean>) => {
     if (!step || !linkReady) return
     setParams((prev) => ({
@@ -429,19 +506,28 @@ export function ActPipelinePage() {
   const pickerValue = useMemo(() => {
     if (!picker) return ''
     if (picker.kind === 'root') return browseRoots[picker.root]
+    if (picker.kind === 'saveYaml') {
+      return String(currentParams.configPath || params.train?.configPath || '')
+    }
     if (!step) return ''
     return String(currentParams[picker.field.key] ?? '')
-  }, [picker, browseRoots, step, currentParams])
+  }, [picker, browseRoots, step, currentParams, params.train?.configPath])
 
   const onPickerConfirm = (path: string) => {
     if (!picker) return
     if (picker.kind === 'root') {
       if (picker.root === 'embody') applyEmbodyRoot(path)
       else applyActRoot(path)
+      setPicker(null)
+    } else if (picker.kind === 'saveYaml') {
+      setPicker(null)
+      void doSaveTrainYaml(path)
     } else if (linkReady) {
       setField(picker.field.key, path)
+      setPicker(null)
+    } else {
+      setPicker(null)
     }
-    setPicker(null)
   }
 
   const embodyReady = Boolean(embodyRoot.trim())
@@ -575,22 +661,50 @@ export function ActPipelinePage() {
                       <p className="act-config-hint muted">{t('act.configLocked')}</p>
                     ) : null}
                   </div>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={busy || !linkReady}
-                    onClick={() => void onRun()}
-                  >
-                    {busy
-                      ? t('act.btnStarting')
-                      : step.id === 'hyperparam_bench'
-                        ? t('act.btnHyperparam')
-                        : t('act.btnRun')}
-                  </button>
+                  <div className="act-step-actions">
+                    {step.id === 'train' ? (
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        disabled={busy || yamlBusy || !linkReady}
+                        onClick={() => onSaveTrainYaml()}
+                        title={t('act.trainYaml.saveTitle')}
+                      >
+                        {yamlBusy ? t('act.trainYaml.saving') : t('act.trainYaml.save')}
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={busy || !linkReady}
+                      onClick={() => void onRun()}
+                    >
+                      {busy
+                        ? t('act.btnStarting')
+                        : step.id === 'hyperparam_bench'
+                          ? t('act.btnHyperparam')
+                          : t('act.btnRun')}
+                    </button>
+                  </div>
                 </div>
+                {step.id === 'train' && yamlMsg ? (
+                  <p
+                    className={`pi05-train-yaml-msg muted${
+                      yamlMsg.includes('fail') || yamlMsg.includes('Error') || yamlMsg.includes('错误')
+                        ? ' err'
+                        : ''
+                    }`}
+                  >
+                    {yamlBusy ? t('act.trainYaml.loading') : null}
+                    {yamlBusy ? ' · ' : null}
+                    {yamlMsg}
+                  </p>
+                ) : step.id === 'train' && yamlBusy ? (
+                  <p className="pi05-train-yaml-msg muted">{t('act.trainYaml.loading')}</p>
+                ) : null}
                 <div className="act-fields">
                   {step.fields
-                    .filter((f) => !f.hidden)
+                    .filter((f) => !f.hidden && f.key !== 'savePath')
                     .map((f) => (
                     <FieldInput
                       key={f.key}
@@ -760,12 +874,18 @@ export function ActPipelinePage() {
               ? picker.root === 'act'
                 ? t('act.pickerActRoot')
                 : t('act.pickerEmbodyRoot')
-              : fieldLabel(stepId, picker.field)
+              : picker.kind === 'saveYaml'
+                ? t('act.trainYaml.saveDialogTitle')
+                : fieldLabel(stepId, picker.field)
           }
           value={pickerValue}
-          browseRoot={picker.kind === 'root' ? picker.root : picker.field.browseRoot || 'act'}
+          browseRoot={
+            picker.kind === 'root' ? picker.root : picker.kind === 'saveYaml' ? 'act' : picker.field.browseRoot || 'act'
+          }
           roots={browseRoots}
-          pathKind={picker.kind === 'root' ? 'dir' : picker.field.pathKind || 'dir'}
+          pathKind={
+            picker.kind === 'root' ? 'dir' : picker.kind === 'saveYaml' ? 'file' : picker.field.pathKind || 'dir'
+          }
           browseAnchor={
             picker.kind === 'root' ? rootBrowseAnchor(picker.root, browseRoots[picker.root], spec) : undefined
           }

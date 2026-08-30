@@ -14,6 +14,8 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
+from act_train_yaml import save_train_yaml as save_act_train_yaml
+
 ROOT = Path(__file__).resolve().parent.parent
 RUNS_DIR = ROOT / "agent_skills" / ".run" / "act_pipeline"
 ACT_ROBOT_ROOT = Path(os.environ.get("ACT_ROBOT_ROOT", "/root/autodl-tmp/act_robot"))
@@ -321,13 +323,27 @@ def pipeline_spec(act_root: str | None = None, embody_root: str | None = None) -
             "step": 3,
             "title": "训练 ACT",
             "subtitle": "train.py",
-            "description": "在 HDF5 上训练策略 checkpoint。",
+            "description": (
+                "选 YAML 文件自动回填超参；点「保存为 YAML」弹出路径写入（与开训无关）。"
+                "运行时用当前表单超参生成 train.py CLI。"
+            ),
             "outputs": ["ckptDir"],
+            "ui": "train_yaml",
             "fields": _exec_fields(
                 ar,
                 "train.py",
                 "train.py",
                 [
+                {
+                    "key": "configPath",
+                    "label": "YAML 配置（加载回填）",
+                    "type": "path",
+                    "pathKind": "file",
+                    "browseRoot": "act",
+                    "io": "input",
+                    "default": "",
+                    "hint": "选择文件后自动回填超参；「保存为 YAML」另选写入路径（与开训无关）",
+                },
                 {"key": "dataDir", "label": "HDF5 目录", "type": "path", "pathKind": "dir", "browseRoot": "act", "io": "input", "default": paths["convertedDir"]},
                 {"key": "ckptDir", "label": "Checkpoint 输出", "type": "path", "pathKind": "dir", "browseRoot": "act", "io": "output", "default": paths["ckptDir"]},
                 {"key": "actionSpace", "label": "动作空间", "type": "select", "io": "config", "default": "cartesian_abs", "options": ["joint", "cartesian_abs", "cartesian"]},
@@ -601,6 +617,15 @@ def build_argv(step_id: str, params: dict[str, Any]) -> tuple[list[str], Path, s
             argv.append(_flag("unwrapRx"))
         _append_flag_if(argv, "skipExisting", p)
     elif step_id == "train":
+        # Snapshot current form hyperparams to a run recipe YAML (provenance);
+        # train.py still receives CLI built from the form.
+        merge_from = str(p.get("configPath") or "").strip() or None
+        run_cfg_dir = RUNS_DIR / "train_cfgs"
+        run_cfg_dir.mkdir(parents=True, exist_ok=True)
+        run_cfg = run_cfg_dir / f"train_{uuid.uuid4().hex[:10]}.yaml"
+        save_act_train_yaml(run_cfg, p, act_root, merge_from=merge_from)
+        p["_runRecipePath"] = str(run_cfg)
+
         argv += [
             _flag("dataDir"), str(p["dataDir"]),
             _flag("ckptDir"), str(p["ckptDir"]),
@@ -734,7 +759,11 @@ def build_argv(step_id: str, params: dict[str, Any]) -> tuple[list[str], Path, s
     else:
         raise ValueError(step_id)
 
-    return argv, cwd, " ".join(argv)
+    cmdline = " ".join(argv)
+    recipe = str(p.get("_runRecipePath") or "").strip()
+    if recipe:
+        cmdline = f"{cmdline}  # recipe={recipe}"
+    return argv, cwd, cmdline
 
 
 def _read_log_tail(path: Path, max_chars: int = 12000) -> str:

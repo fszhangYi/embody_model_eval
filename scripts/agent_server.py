@@ -31,6 +31,8 @@ Endpoints:
   POST   /api/act-pipeline/jobs/<id>/cancel
   DELETE /api/act-pipeline/jobs/<id>
   POST   /api/act-pipeline/run
+  POST   /api/act-pipeline/load-train-yaml
+  POST   /api/act-pipeline/save-train-yaml
   GET    /api/pi05-pipeline/spec
   GET    /api/pi05-pipeline/jobs
   GET    /api/pi05-pipeline/jobs/<id>
@@ -98,6 +100,8 @@ from act_pipeline_runner import (
     remove_act_link,
     start_job,
 )
+from act_train_yaml import load_train_yaml as act_load_train_yaml
+from act_train_yaml import save_train_yaml as act_save_train_yaml
 from pi05_pipeline_runner import (
     _count_gpus as pi05_count_gpus,
     cancel_job as pi05_cancel_job,
@@ -1711,6 +1715,49 @@ class Handler(SimpleHTTPRequestHandler):
                 )
                 self._send_json({"ok": True, "job": job})
             except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/act-pipeline/load-train-yaml":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            config_path = body.get("configPath") or body.get("path")
+            if not config_path:
+                self._send_json({"ok": False, "error": "configPath required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(
+                    act_load_train_yaml(
+                        str(config_path),
+                        body.get("actRoot") or body.get("act_root"),
+                    )
+                )
+            except FileNotFoundError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.NOT_FOUND)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+
+        if path == "/api/act-pipeline/save-train-yaml":
+            if not isinstance(body, dict):
+                self._send_json({"ok": False, "error": "body must be object"}, HTTPStatus.BAD_REQUEST)
+                return
+            save_path = body.get("savePath") or body.get("path") or body.get("configPath")
+            params = body.get("params") if isinstance(body.get("params"), dict) else {}
+            if not save_path:
+                self._send_json({"ok": False, "error": "savePath required"}, HTTPStatus.BAD_REQUEST)
+                return
+            try:
+                self._send_json(
+                    act_save_train_yaml(
+                        str(save_path),
+                        params,
+                        body.get("actRoot") or body.get("act_root"),
+                        merge_from=body.get("mergeFrom") or body.get("configPath"),
+                    )
+                )
+            except Exception as e:  # noqa: BLE001
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
 
