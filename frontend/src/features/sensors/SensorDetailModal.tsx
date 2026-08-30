@@ -5,6 +5,7 @@ import {
   type SensorDevice,
   type SensorStatus,
 } from './types'
+import { sensorCheck, sensorRow, sensorSection, sensorSummary, sensorValue } from './sensorI18n'
 
 function statusClass(status: SensorStatus): string {
   if (status === 'ok') return 'ok'
@@ -53,7 +54,15 @@ export function SensorDetailModal({
           ? t('sensors.modal.previewFt')
           : device.kind === 'arm'
             ? t('sensors.modal.previewArmLoading')
-            : t('sensors.modal.previewGeneric')
+            : device.kind === 'bus'
+              ? t('sensors.modal.previewBus')
+              : device.kind === 'pipeline'
+                ? t('sensors.modal.previewPipeline')
+                : device.kind === 'gello'
+                  ? t('sensors.modal.previewGello')
+                  : device.kind === 'gripper'
+                    ? t('sensors.modal.previewGripper')
+                    : t('sensors.modal.previewGeneric')
 
   return createPortal(
     <div
@@ -91,7 +100,7 @@ export function SensorDetailModal({
         </div>
 
         <div className="sensors-modal-body">
-          <p className="sensors-modal-summary">{trText(detail.summary)}</p>
+          <p className="sensors-modal-summary">{sensorSummary(detail.summary)}</p>
 
           <div className="sensors-modal-preview" aria-hidden={device.kind !== 'arm'}>
             {device.kind === 'arm' && arm?.pose ? (
@@ -135,22 +144,22 @@ export function SensorDetailModal({
           <dl className="sensors-metrics sensors-metrics-lg">
             {device.metrics.map((m) => (
               <div key={m.label} className="sensors-metric">
-                <dt>{trText(m.label)}</dt>
-                <dd>{trText(m.value)}</dd>
+                <dt>{sensorRow(m.label)}</dt>
+                <dd>{sensorValue(m.value)}</dd>
               </div>
             ))}
           </dl>
 
           <div className="sensors-modal-sections">
             {detail.sections.map((sec) => (
-              <section key={trText(sec.title)} className="sensors-modal-section">
-                <h3>{trText(sec.title)}</h3>
+              <section key={sec.title} className="sensors-modal-section">
+                <h3>{sensorSection(sec.title)}</h3>
                 <table>
                   <tbody>
                     {sec.rows.map((row) => (
-                      <tr key={trText(row.label)}>
-                        <th scope="row">{trText(row.label)}</th>
-                        <td>{trText(row.value)}</td>
+                      <tr key={row.label}>
+                        <th scope="row">{sensorRow(row.label)}</th>
+                        <td>{sensorValue(row.value)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -224,9 +233,9 @@ export function SensorDetailModal({
               <h3>{t('sensors.modal.checklist')}</h3>
               <ul className="sensors-check-list">
                 {detail.checklist.map((item) => (
-                  <li key={trText(item)}>
+                  <li key={item}>
                     <span className="sensors-check-box" aria-hidden="true" />
-                    {trText(item)}
+                    {sensorCheck(item)}
                   </li>
                 ))}
               </ul>

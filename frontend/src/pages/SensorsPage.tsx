@@ -8,6 +8,7 @@ import { ArmKinematicsModal } from '../features/sensors/ArmKinematicsModal'
 import {
   SENSOR_DEVICES,
   applyArmStatus,
+  sortedSensorDevices,
   type SensorDevice,
   type SensorStatus,
 } from '../features/sensors/types'
@@ -114,7 +115,7 @@ export function SensorsPage() {
   const { locale } = useLocale()
   const [toast, setToast] = useState(() => t('sensors.toastLoading'))
   const [active, setActive] = useState<SensorDevice | null>(null)
-  const [devices, setDevices] = useState<SensorDevice[]>(() => SENSOR_DEVICES.map((d) => ({ ...d })))
+  const [devices, setDevices] = useState<SensorDevice[]>(() => sortedSensorDevices(SENSOR_DEVICES))
   const [armBusy, setArmBusy] = useState(false)
 
   const patchArm = useCallback((updater: (arm: SensorDevice) => SensorDevice) => {
@@ -142,7 +143,7 @@ export function SensorsPage() {
   }, [patchArm])
 
   useEffect(() => {
-    setDevices(SENSOR_DEVICES.map((d) => ({ ...d })))
+    setDevices(sortedSensorDevices(SENSOR_DEVICES))
     setToast(t('sensors.toastLoading'))
     void loadArm()
   }, [locale, loadArm])

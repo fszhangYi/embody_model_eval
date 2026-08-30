@@ -137,7 +137,7 @@ export function ArmKinematicsModal({
               <span className="sensors-tag-demo">arm_kin</span>
             </div>
             <h2 id="sensors-arm-modal-title">{trText(device.name)}</h2>
-            <p className="muted">{device.model} · {t('sensors.arm.subtitle')}</p>
+            <p className="muted">{trText(device.model)} · {t('sensors.arm.subtitle')}</p>
           </div>
           <button type="button" className="sensors-modal-close" onClick={onClose} aria-label={t('pathPicker.closeAria')}>
             ×
