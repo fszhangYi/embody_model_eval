@@ -939,9 +939,19 @@ def build_argv(step_id: str, params: dict[str, Any]) -> tuple[list[str], Path, s
     config_path = run_cfg
 
     cwd = pi05
+    # Prefer pi05/.venv for JAX (and any script that honors USE_VENV / PYTHON_BIN).
+    venv_py = pi05 / ".venv" / "bin" / "python"
+    if venv_py.is_file():
+        env["USE_VENV"] = "1"
+        env.setdefault("PYTHON_BIN", str(venv_py))
+        env.setdefault("PI05_PYTHON", str(venv_py))
+    env.setdefault("XLA_PYTHON_CLIENT_PREALLOCATE", "false")
+    env.setdefault("XLA_PYTHON_CLIENT_ALLOCATOR", "platform")
+    env.setdefault("XLA_PYTHON_CLIENT_MEM_FRACTION", "0.92")
+    env.setdefault("TOKENIZERS_PARALLELISM", "false")
+
     if p.get("printOnly"):
         py = env.get("PYTHON_BIN") or env.get("PI05_PYTHON") or "python3"
-        venv_py = pi05 / ".venv" / "bin" / "python"
         if venv_py.is_file():
             py = str(venv_py)
         src = pi05 / "src"
