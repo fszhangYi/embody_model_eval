@@ -69,6 +69,7 @@ def _count_gpus() -> int:
 def _default_paths(pi05: Path | None = None, route: str = ROUTE_FULL_FT) -> dict[str, str]:
     pi05 = pi05 or PI05_ROOT
     er = EMBODY_ROOT
+    ar = ACT_ROBOT_ROOT
     route = normalize_route(route)
     smoke = str(pi05 / "configs" / "pi05_act_robot_smoke.yaml")
     full_ft = str(pi05 / "configs" / "pi05_tonglu0630_full_ft_two_view.yaml")
@@ -78,36 +79,71 @@ def _default_paths(pi05: Path | None = None, route: str = ROUTE_FULL_FT) -> dict
     base_pytorch = str(pi05 / "checkpoints" / "pi05_base_pytorch")
     base_jax = str(pi05 / "checkpoints" / "pi0.5_base" / "params")
     docs_full = str(pi05 / "docs" / "tonglu_mlu_full_ft_reproduce.md")
+    smoke_route = route == ROUTE_SMOKE_LORA
+    # Smoke placeholders validated on RTX 5090 32GB (dual LoRA + bs=2): peak ~17GiB.
+    if smoke_route:
+        repo_id = "company/act_robot_three_view_smoke"
+        assets_norm = str(
+            pi05 / "artifacts" / "assets" / "pi05_act_robot_smoke" / "company" / "act_robot_three_view_smoke"
+        )
+        ckpt_run = str(pi05 / "artifacts" / "checkpoints" / "pi05_act_robot_smoke" / "convert_smoke")
+        raw_dir = str(ar / "data" / "raw")
+        annotation_dir = str(ar / "data" / "annotation" / "annotation" / "restored_txt")
+        camera_names = "chest top wrist_2"
+        paligemma = "gemma_2b_lora"
+        action_expert = "gemma_300m_lora"
+        embody_act = str(er / "data" / "ec616_pi05_smoke")
+        embody_chunk = str(er / "data" / "ec616_pi05_smoke_chunk")
+        quality_pass = str(pi05 / "data" / "smoke_quality_pass.json")
+        quality_fail = str(pi05 / "data" / "smoke_quality_fail.txt")
+        quality_report = str(pi05 / "data" / "smoke_quality_report.json")
+    else:
+        repo_id = "company/tonglu0630_two_view_terminated"
+        assets_norm = str(
+            pi05 / "artifacts" / "assets" / "pi05_tonglu0630_mlu" / "company" / "tonglu0630_two_view_terminated"
+        )
+        ckpt_run = str(pi05 / "artifacts" / "checkpoints" / "pi05_tonglu0630_mlu" / "mlu_full_ft_two_view")
+        raw_dir = "/root/autodl-tmp/datasets/tonglu0630/raw_data"
+        annotation_dir = "/root/autodl-tmp/datasets/tonglu0630/annotation"
+        camera_names = "top wrist_2"
+        paligemma = "gemma_2b"
+        action_expert = "gemma_300m"
+        embody_act = str(er / "data" / "ec616_pi05")
+        embody_chunk = str(er / "data" / "ec616_pi05_chunk")
+        quality_pass = str(pi05 / "data" / "quality_pass.json")
+        quality_fail = str(pi05 / "data" / "quality_fail.txt")
+        quality_report = str(pi05 / "data" / "quality_report.json")
     return {
         "pi05Root": str(pi05),
         "embodyRoot": str(er),
+        "actRobotRoot": str(ar),
         "route": route,
         "smokeConfig": smoke,
         "fullFtConfig": full_ft,
         "fullConfig": str(pi05 / "configs" / "pi05_act_robot_local.yaml"),
         "lerobotHome": str(pi05 / "data" / "lerobot"),
         "assetsDir": str(pi05 / "artifacts" / "assets"),
-        "assetsNormDir": str(
-            pi05 / "artifacts" / "assets" / "pi05_tonglu0630_mlu" / "company" / "tonglu0630_two_view_terminated"
-        ),
+        "assetsNormDir": assets_norm,
         "ckptBaseDir": str(pi05 / "artifacts" / "checkpoints"),
         "evalDir": str(pi05 / "artifacts" / "eval"),
         "inferDir": str(pi05 / "artifacts" / "infer"),
-        "ckptRunDir": str(
-            pi05 / "artifacts" / "checkpoints" / "pi05_tonglu0630_mlu" / "mlu_full_ft_two_view"
-        ),
-        "embodyActDir": str(er / "data" / "ec616_pi05"),
-        "embodyChunkDir": str(er / "data" / "ec616_pi05_chunk"),
+        "ckptRunDir": ckpt_run,
+        "embodyActDir": embody_act,
+        "embodyChunkDir": embody_chunk,
         "baseCkpt": base_pytorch if route == ROUTE_FULL_FT else base_jax,
         "baseCkptPytorch": base_pytorch,
         "baseCkptJax": base_jax,
         "prepareScript": str(pi05 / "scripts" / "prepare_dataset.sh"),
-        "qualityScript": str(ACT_ROBOT_ROOT / "scripts" / "check_episode_quality.py"),
-        "rawDir": "/root/autodl-tmp/datasets/tonglu0630/raw_data",
-        "annotationDir": "/root/autodl-tmp/datasets/tonglu0630/annotation",
-        "qualityPassJson": str(pi05 / "data" / "quality_pass.json"),
-        "qualityFailTxt": str(pi05 / "data" / "quality_fail.txt"),
-        "qualityReportJson": str(pi05 / "data" / "quality_report.json"),
+        "qualityScript": str(ar / "scripts" / "check_episode_quality.py"),
+        "rawDir": raw_dir,
+        "annotationDir": annotation_dir,
+        "repoId": repo_id,
+        "cameraNames": camera_names,
+        "paligemmaVariant": paligemma,
+        "actionExpertVariant": action_expert,
+        "qualityPassJson": quality_pass,
+        "qualityFailTxt": quality_fail,
+        "qualityReportJson": quality_report,
         "normScript": str(pi05 / "scripts" / "compute_norm_stats.sh"),
         "trainScript": train_full if route == ROUTE_FULL_FT else train_jax8,
         "trainFullFtScript": train_full,
@@ -116,8 +152,8 @@ def _default_paths(pi05: Path | None = None, route: str = ROUTE_FULL_FT) -> dict
         "inferBatchScript": str(pi05 / "scripts" / "infer_offline_batch.sh"),
         "inferSingleScript": str(pi05 / "scripts" / "evaluate_checkpoint.sh"),
         # Format helpers currently ship under act_robot; default is absolute path only.
-        "embodyScript": str(ACT_ROBOT_ROOT / "scripts" / "infer_to_embody_eval.py"),
-        "embodyChunkScript": str(ACT_ROBOT_ROOT / "scripts" / "infer_to_embody_eval_chunk.py"),
+        "embodyScript": str(ar / "scripts" / "infer_to_embody_eval.py"),
+        "embodyChunkScript": str(ar / "scripts" / "infer_to_embody_eval_chunk.py"),
         "docsInstall": str(pi05 / "docs" / "installation.md"),
         "docsIssues": str(pi05 / "docs" / "issues.md"),
         "docsFullFt": docs_full,
@@ -226,9 +262,9 @@ def pipeline_spec(
                 {"key": "outputDir", "label": "LeRobot 输出根", "type": "path", "pathKind": "dir", "browseRoot": "pi05", "io": "output", "default": paths["lerobotHome"]},
                 {"key": "annotationDir", "label": "标注目录", "type": "path", "pathKind": "dir", "browseRoot": "pi05", "io": "input", "default": paths["annotationDir"]},
                 {"key": "filterJson", "label": "白名单 JSON", "type": "path", "pathKind": "file", "browseRoot": "pi05", "io": "input", "default": paths["qualityPassJson"]},
-                {"key": "repoId", "label": "repo_id（数据集名）", "type": "text", "io": "config", "default": "company/tonglu0630_two_view_terminated"},
+                {"key": "repoId", "label": "repo_id（数据集名）", "type": "text", "io": "config", "default": paths["repoId"]},
                 {"key": "datasetFormat", "label": "dataset_format", "type": "select", "io": "config", "default": "tonglu_annotation", "options": ["tonglu_annotation", "company_steps"]},
-                {"key": "cameraNames", "label": "相机（空格分隔）", "type": "text", "io": "config", "default": "top wrist_2"},
+                {"key": "cameraNames", "label": "相机（空格分隔）", "type": "text", "io": "config", "default": paths["cameraNames"]},
                 {"key": "stride", "label": "stride", "type": "number", "io": "config", "default": 1},
                 {"key": "seed", "label": "seed", "type": "number", "io": "config", "default": 42},
                 {"key": "dryRun", "label": "dry-run（只扫描不写）", "type": "checkbox", "io": "config", "default": False},
@@ -269,7 +305,7 @@ def pipeline_spec(
                     "label": "repo_id（数据集名）",
                     "type": "text",
                     "io": "config",
-                    "default": "company/tonglu0630_two_view_terminated",
+                    "default": paths["repoId"],
                 },
                 {
                     "key": "outputDir",
@@ -362,7 +398,7 @@ def pipeline_spec(
                     "label": "repo_id（数据集名）",
                     "type": "text",
                     "io": "config",
-                    "default": "company/tonglu0630_two_view_terminated",
+                    "default": paths["repoId"],
                 },
                 {
                     "key": "assetsBaseDir",
@@ -391,7 +427,7 @@ def pipeline_spec(
                     "label": "paligemma_variant",
                     "type": "select",
                     "io": "config",
-                    "default": "gemma_2b",
+                    "default": paths["paligemmaVariant"],
                     "options": ["gemma_2b", "gemma_2b_lora", "dummy"],
                 },
                 {
@@ -399,7 +435,7 @@ def pipeline_spec(
                     "label": "action_expert_variant",
                     "type": "select",
                     "io": "config",
-                    "default": "gemma_300m",
+                    "default": paths["actionExpertVariant"],
                     "options": ["gemma_300m", "gemma_300m_lora", "dummy"],
                 },
             ],
@@ -446,7 +482,7 @@ def pipeline_spec(
                     "label": "repo_id（数据集名）",
                     "type": "text",
                     "io": "config",
-                    "default": "company/tonglu0630_two_view_terminated",
+                    "default": paths["repoId"],
                 },
                 {
                     "key": "assetsBaseDir",
@@ -474,7 +510,7 @@ def pipeline_spec(
                     "label": "paligemma_variant",
                     "type": "select",
                     "io": "config",
-                    "default": "gemma_2b",
+                    "default": paths["paligemmaVariant"],
                     "options": ["gemma_2b", "gemma_2b_lora", "dummy"],
                 },
                 {
@@ -482,7 +518,7 @@ def pipeline_spec(
                     "label": "action_expert_variant",
                     "type": "select",
                     "io": "config",
-                    "default": "gemma_300m",
+                    "default": paths["actionExpertVariant"],
                     "options": ["gemma_300m", "gemma_300m_lora", "dummy"],
                 },
             ],
@@ -500,7 +536,7 @@ def pipeline_spec(
                 {"key": "inferJson", "label": "单条 infer JSON（可选）", "type": "path", "pathKind": "file", "browseRoot": "pi05", "io": "input", "default": ""},
                 {"key": "rawDir", "label": "raw 目录", "type": "path", "pathKind": "dir", "browseRoot": "pi05", "io": "input", "default": paths["rawDir"]},
                 {"key": "outputDir", "label": "embody 输出", "type": "path", "pathKind": "dir", "browseRoot": "embody", "io": "output", "default": paths["embodyActDir"]},
-                {"key": "suite", "label": "套件 ID", "type": "text", "io": "config", "default": "ec616_pi05"},
+                {"key": "suite", "label": "套件 ID", "type": "text", "io": "config", "default": "ec616_pi05_smoke" if route == ROUTE_SMOKE_LORA else "ec616_pi05"},
                 {"key": "refreshIndex", "label": "refresh-index", "type": "checkbox", "io": "config", "default": False},
                 {"key": "fps", "label": "fps", "type": "number", "io": "config", "default": 30.0},
                 {"key": "limit", "label": "limit（0=全部）", "type": "number", "io": "config", "default": 0},
@@ -523,7 +559,7 @@ def pipeline_spec(
                 {"key": "inferJson", "label": "单条 infer JSON（可选）", "type": "path", "pathKind": "file", "browseRoot": "pi05", "io": "input", "default": ""},
                 {"key": "rawDir", "label": "raw 目录", "type": "path", "pathKind": "dir", "browseRoot": "pi05", "io": "input", "default": paths["rawDir"]},
                 {"key": "outputDir", "label": "embody 输出", "type": "path", "pathKind": "dir", "browseRoot": "embody", "io": "output", "default": paths["embodyChunkDir"]},
-                {"key": "suite", "label": "套件 ID", "type": "text", "io": "config", "default": "ec616_pi05_chunk"},
+                {"key": "suite", "label": "套件 ID", "type": "text", "io": "config", "default": "ec616_pi05_smoke_chunk" if route == ROUTE_SMOKE_LORA else "ec616_pi05_chunk"},
                 {"key": "refreshIndex", "label": "refresh-index", "type": "checkbox", "io": "config", "default": False},
                 {"key": "fps", "label": "fps", "type": "number", "io": "config", "default": 30.0},
                 {"key": "limit", "label": "limit（0=全部）", "type": "number", "io": "config", "default": 0},
