@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PathPickerModal } from '../components/PathPickerModal'
 import { PageChrome } from '../components/PageChrome'
 import { useLocale } from '../i18n/LocaleContext'
@@ -6,6 +6,7 @@ import { t } from '../i18n/runtime'
 import {
   cancelPi05Job,
   deletePi05Job,
+  fetchPi05CheckpointSteps,
   fetchPi05Job,
   fetchPi05Jobs,
   fetchPi05Spec,
@@ -38,7 +39,7 @@ const FLOW_KEYS = [
   { n: 2, id: 'convert', labelKey: 'pi05.flow.convert', to: 'lerobot/' },
   { n: 3, id: 'norm_stats', labelKey: 'pi05.flow.norm', to: 'norm_stats.json' },
   { n: 4, id: 'train', labelKey: 'pi05.flow.train', to: 'checkpoints/' },
-  { n: 5, id: 'infer_batch', labelKey: 'pi05.flow.infer', to: 'infer/' },
+  { n: 5, id: 'infer_single', labelKey: 'pi05.flow.infer', to: 'infer/' },
   { n: 6, id: 'embody', labelKey: 'pi05.flow.embody', to: 'data/' },
 ] as const
 
@@ -81,6 +82,8 @@ function FieldInput({
   onBrowse,
   disabled = false,
   ioRole = 'neutral',
+  selectOptions,
+  selectBusy = false,
 }: {
   field: StepField
   stepId: string
@@ -90,6 +93,9 @@ function FieldInput({
   onBrowse?: () => void
   disabled?: boolean
   ioRole?: 'input' | 'output' | 'neutral'
+  /** Overrides field.options when provided (dynamic selects). */
+  selectOptions?: string[]
+  selectBusy?: boolean
 }) {
   const id = `pi05-field-${field.key}`
   const wide =
@@ -122,15 +128,35 @@ function FieldInput({
     )
   }
   if (field.type === 'select') {
+    const opts = selectOptions ?? field.options ?? []
+    const isCkptStep = field.optionsSource === 'checkpointSteps' || field.key === 'checkpointStep'
+    const shown = String(value)
+    const hasValue = opts.includes(shown) || (isCkptStep && shown === '')
     return (
       <label className={fieldClass}>
-        <span>{label}</span>
-        <select id={id} value={String(value)} disabled={disabled} onChange={(e) => onChange(e.target.value)}>
-          {(field.options || []).map((o) => (
+        <span>
+          {label}
+          {selectBusy ? (
+            <span className="act-field-hint"> {t('pi05.field.checkpointStep.scanning')}</span>
+          ) : null}
+        </span>
+        <select
+          id={id}
+          value={hasValue ? shown : isCkptStep ? '' : opts[0] || ''}
+          disabled={disabled || selectBusy}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {isCkptStep ? <option value="" /> : null}
+          {opts.map((o) => (
             <option key={o} value={o} title={o}>
               {o.includes('/') ? o.split('/').pop() : o}
             </option>
           ))}
+          {!isCkptStep && opts.length === 0 ? (
+            <option value="" disabled>
+              {t('pi05.field.checkpointStep.empty')}
+            </option>
+          ) : null}
         </select>
       </label>
     )
@@ -237,13 +263,18 @@ export function Pi05PipelinePage() {
   const [route, setRoute] = useState<Pi05RouteMode>(() => resolveInitialPi05Route())
   const [yamlBusy, setYamlBusy] = useState(false)
   const [yamlMsg, setYamlMsg] = useState('')
+  const [ckptSteps, setCkptSteps] = useState<string[]>([])
+  const [ckptStepsBusy, setCkptStepsBusy] = useState(false)
   const trainConfigPath = String(params.train?.configPath ?? '')
+  const prevRouteRef = useRef(route)
 
   useEffect(() => {
     writeStoredPi05Route(route)
   }, [route])
 
   useEffect(() => {
+    const routeChanged = prevRouteRef.current !== route
+    prevRouteRef.current = route
     fetchPi05Spec(pi05Root.trim() || undefined, route)
       .then((s) => {
         setSpec(s)
@@ -253,8 +284,12 @@ export function Pi05PipelinePage() {
         }
         setParams((prev) => {
           const next = initParamsFromSpec(s)
-          for (const id of Object.keys(next)) {
-            if (prev[id]) next[id] = { ...next[id], ...prev[id] }
+          // Keep in-route edits when only pi05Root refreshes; route switch must
+          // take new script/config/ckpt defaults (LoRA vs full-FT).
+          if (!routeChanged) {
+            for (const id of Object.keys(next)) {
+              if (prev[id]) next[id] = { ...next[id], ...prev[id] }
+            }
           }
           return next
         })
@@ -276,6 +311,7 @@ export function Pi05PipelinePage() {
   const rootsReady = Boolean(pi05Root.trim())
   const currentParams = step ? params[step.id] ?? defaultParams(step) : {}
   const checks = spec?.checks || {}
+  const inferCkptDir = String(params.infer_single?.ckptDir ?? currentParams.ckptDir ?? '').trim()
 
   const stepLabelForId = useCallback(
     (id: string) => {
@@ -284,6 +320,41 @@ export function Pi05PipelinePage() {
     },
     [spec, locale, route],
   )
+
+  // Sample infer: rescan numeric step subdirs whenever Checkpoint 目录 changes.
+  useEffect(() => {
+    if (stepId !== 'infer_single') return
+    const dir = inferCkptDir
+    if (!dir) {
+      setCkptSteps([])
+      return
+    }
+    let cancelled = false
+    setCkptStepsBusy(true)
+    fetchPi05CheckpointSteps(dir)
+      .then((r) => {
+        if (cancelled) return
+        const steps = r.steps || []
+        setCkptSteps(steps)
+        setParams((prev) => {
+          const cur = prev.infer_single || {}
+          const curStep = String(cur.checkpointStep ?? '')
+          if (curStep === '' || steps.includes(curStep)) return prev
+          // Prefer scanned latest; fall back to empty (= runtime latest).
+          const nextStep = r.latest || ''
+          return { ...prev, infer_single: { ...cur, checkpointStep: nextStep } }
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setCkptSteps([])
+      })
+      .finally(() => {
+        if (!cancelled) setCkptStepsBusy(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [stepId, inferCkptDir])
 
   useEffect(() => {
     fetchPi05Spec(undefined, route)
@@ -539,7 +610,6 @@ export function Pi05PipelinePage() {
           {FLOW_KEYS.map((f, i) => {
             const active =
               stepId === f.id ||
-              (f.id === 'infer_batch' && stepId === 'infer_single') ||
               (f.id === 'embody' && stepId === 'embody_chunk')
             return (
               <span key={f.n} className="pi05-flow-wrap">
@@ -637,6 +707,15 @@ export function Pi05PipelinePage() {
                         onChange={(v) => setField(f.key, v)}
                         disabled={!rootsReady}
                         ioRole={fieldIoRole(f, step)}
+                        selectOptions={
+                          f.optionsSource === 'checkpointSteps' || f.key === 'checkpointStep'
+                            ? ckptSteps
+                            : undefined
+                        }
+                        selectBusy={
+                          (f.optionsSource === 'checkpointSteps' || f.key === 'checkpointStep') &&
+                          ckptStepsBusy
+                        }
                         onBrowse={
                           f.type === 'path' && rootsReady
                             ? () => setPicker({ kind: 'field', field: f })

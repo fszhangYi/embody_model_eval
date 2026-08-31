@@ -34,6 +34,7 @@ Endpoints:
   POST   /api/act-pipeline/load-train-yaml
   POST   /api/act-pipeline/save-train-yaml
   GET    /api/pi05-pipeline/spec
+  GET    /api/pi05-pipeline/checkpoint-steps?ckptDir=
   GET    /api/pi05-pipeline/jobs
   GET    /api/pi05-pipeline/jobs/<id>
   POST   /api/pi05-pipeline/jobs/<id>/cancel
@@ -107,6 +108,7 @@ from pi05_pipeline_runner import (
     cancel_job as pi05_cancel_job,
     delete_job as pi05_delete_job,
     get_job as pi05_get_job,
+    list_checkpoint_steps as pi05_list_checkpoint_steps,
     list_jobs as pi05_list_jobs,
     pipeline_spec as pi05_pipeline_spec,
     start_job as pi05_start_job,
@@ -1284,6 +1286,14 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 self._send_json(pi05_pipeline_spec(pi05_root, act_root, route))
             except ValueError as e:
+                self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
+            return
+        if path == "/api/pi05-pipeline/checkpoint-steps":
+            qs = parse_qs(parsed.query)
+            ckpt_dir = (qs.get("ckptDir") or [None])[0]
+            try:
+                self._send_json(pi05_list_checkpoint_steps(ckpt_dir))
+            except Exception as e:  # noqa: BLE001
                 self._send_json({"ok": False, "error": str(e)}, HTTPStatus.BAD_REQUEST)
             return
         if path == "/api/pi05-pipeline/jobs":

@@ -11,6 +11,9 @@ export interface StepField {
   io?: FieldIo
   default?: string | number | boolean
   options?: string[]
+  /** Dynamic options: e.g. "checkpointSteps" scanned from optionsDependsOn path. */
+  optionsSource?: string
+  optionsDependsOn?: string
   pathKind?: PathKind
   browseRoot?: BrowseRoot
   hint?: string

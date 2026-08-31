@@ -26,6 +26,18 @@ export function fetchPi05Jobs() {
   return api<{ ok: boolean; jobs: PipelineJob[] }>('/api/pi05-pipeline/jobs')
 }
 
+export function fetchPi05CheckpointSteps(ckptDir: string) {
+  const qs = new URLSearchParams()
+  if (ckptDir) qs.set('ckptDir', ckptDir)
+  return api<{
+    ok: boolean
+    ckptDir?: string
+    steps: string[]
+    latest: string | null
+    error?: string
+  }>(`/api/pi05-pipeline/checkpoint-steps?${qs.toString()}`)
+}
+
 export function fetchPi05Job(id: string) {
   return api<{ ok: boolean; job: PipelineJob }>(
     `/api/pi05-pipeline/jobs/${encodeURIComponent(id)}`,

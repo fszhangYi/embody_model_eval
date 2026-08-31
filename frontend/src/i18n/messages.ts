@@ -243,7 +243,7 @@ export const messages: Record<Locale, MessageTree> = {
       pi05Pipeline: {
         label: 'π0.5 数据流水线',
         short: 'π0.5',
-        desc: 'raw → LeRobot → norm_stats → 训练 → 离线推理 → embody',
+        desc: 'raw → LeRobot → norm_stats → 训练 → 样本推理 → embody',
       },
       pi05Analysis: {
         label: 'π0.5 模型分析',
@@ -480,7 +480,7 @@ export const messages: Record<Locale, MessageTree> = {
       pi05Pipeline: {
         label: 'π0.5 data pipeline',
         short: 'π0.5',
-        desc: 'raw → LeRobot → norm_stats → train → offline infer → embody',
+        desc: 'raw → LeRobot → norm_stats → train → sample infer → embody',
       },
       pi05Analysis: {
         label: 'π0.5 model analysis',

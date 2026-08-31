@@ -100,7 +100,7 @@ export const PAGES: PageDef[] = [
     path: '/pi05-pipeline',
     label: 'π0.5 数据流水线',
     short: 'π0.5',
-    desc: 'raw → LeRobot → norm_stats → 训练 → 离线推理 → embody',
+    desc: 'raw → LeRobot → norm_stats → 训练 → 样本推理 → embody',
   },
   {
     id: 'pi05Analysis',
