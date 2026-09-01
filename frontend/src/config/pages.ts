@@ -96,6 +96,13 @@ export const PAGES: PageDef[] = [
     desc: '异构具身数据：预览常见文件并在 RLDS / LeRobot / HDF5 间转换',
   },
   {
+    id: 'pi05Setup',
+    path: '/pi05-setup',
+    label: 'π0.5 环境检测',
+    short: '环境',
+    desc: '选择路径并自动检测物料是否满足要求',
+  },
+  {
     id: 'pi05Pipeline',
     path: '/pi05-pipeline',
     label: 'π0.5 数据流水线',
@@ -108,13 +115,6 @@ export const PAGES: PageDef[] = [
     label: 'π0.5 模型分析',
     short: '分析',
     desc: '选择项目根后手动分析配置 / norm_stats / checkpoint',
-  },
-  {
-    id: 'pi05Setup',
-    path: '/pi05-setup',
-    label: 'π0.5 环境检测',
-    short: '环境',
-    desc: '选择路径并自动检测物料是否满足要求',
   },
   {
     id: 'sensors',
@@ -139,7 +139,7 @@ export const PAGE_GROUPS: PageGroupDef[] = [
     id: 'pi05',
     label: 'π0.5',
     short: 'π0.5',
-    pageIds: ['pi05Pipeline', 'pi05Analysis', 'pi05Setup'],
+    pageIds: ['pi05Setup', 'pi05Pipeline', 'pi05Analysis'],
   },
   { id: 'tools', label: '工具', short: '工具', pageIds: ['pipeline', 'chat'] },
   { id: 'hardware', label: '硬件', short: '硬件', pageIds: ['robots', 'sensors'] },
@@ -153,7 +153,7 @@ export function groupForPage(pageId: PageId): PageGroupDef | undefined {
   return PAGE_GROUPS.find((g) => g.pageIds.includes(pageId))
 }
 
-/** Flat page order for Alt+N / adjacent shortcuts (follows group order). */
+/** Flat page order for Alt+1–9 / Alt+0 / adjacent shortcuts (follows group order). */
 export function pagesInNavOrder(): PageDef[] {
   const byId = new Map(PAGES.map((p) => [p.id, p]))
   const ordered: PageDef[] = []

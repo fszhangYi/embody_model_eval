@@ -16,9 +16,9 @@ const MODULE_IDS: PageId[] = [
   'actPipeline',
   'modelAnalysis',
   'datasetConverter',
+  'pi05Setup',
   'pi05Pipeline',
   'pi05Analysis',
-  'pi05Setup',
   'sensors',
 ]
 

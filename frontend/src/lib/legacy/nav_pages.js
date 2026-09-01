@@ -85,7 +85,7 @@ function isTypingTarget(el) {
  * animated stacking contexts cannot cover it.
  *
  * Shortcuts (ignored while typing in inputs):
- *   Alt+1…N  → jump to page N
+ *   Alt+1…9 / Alt+0 → jump to page 1…9 / 10
  *   Alt+←/→  or Alt+[/] → previous / next page
  *   Esc      → close menu
  *
@@ -98,10 +98,16 @@ export function mountPageNav(root, opts = {}) {
   const current = PAGES.find((p) => p.id === currentId) || PAGES[0];
   const currentIdx = Math.max(0, PAGES.findIndex((p) => p.id === currentId));
 
+  const digitShortcut = (i) => {
+    if (i < 9) return i + 1;
+    if (i === 9) return 0;
+    return null;
+  };
+
   root.classList.add('page-nav');
   root.innerHTML = `
     <button type="button" class="page-nav-btn pill" id="pageNavBtn" aria-expanded="false" aria-haspopup="true"
-      title="切换页面 · Alt+1–${PAGES.length} 直达 · Alt+←/→ 上/下页">
+      title="切换页面 · Alt+1–9 / Alt+0 直达 · Alt+←/→ 上/下页">
       <span class="page-nav-label">${current.short || current.label}</span>
       <span class="page-nav-caret" aria-hidden="true">▾</span>
     </button>
@@ -113,18 +119,21 @@ export function mountPageNav(root, opts = {}) {
   menu.className = 'page-nav-menu page-nav-menu-portal';
   menu.setAttribute('role', 'menu');
   menu.hidden = true;
-  menu.innerHTML = PAGES.map((p, i) => `
+  menu.innerHTML = PAGES.map((p, i) => {
+    const d = digitShortcut(i);
+    const hotkey = d === null ? '' : `Alt+${d}`;
+    return `
     <a role="menuitem" class="page-nav-item${p.id === currentId ? ' active' : ''}"
        href="${p.href}" data-page="${p.id}" data-idx="${i}"
-       title="Alt+${i + 1}">
+       ${hotkey ? `title="${hotkey}"` : ''}>
       <span class="page-nav-item-main">
         <span class="page-nav-item-title">${p.label}</span>
         <span class="page-nav-item-desc">${p.desc || ''}</span>
       </span>
-      <kbd class="page-nav-item-key">Alt+${i + 1}</kbd>
-    </a>
-  `).join('') + `
-    <div class="page-nav-hint" role="note">Alt+← / Alt+→ 切换相邻页</div>
+      ${hotkey ? `<kbd class="page-nav-item-key">${hotkey}</kbd>` : ''}
+    </a>`;
+  }).join('') + `
+    <div class="page-nav-hint" role="note">Alt+← / Alt+→ 切换相邻页（无数字快捷键的页面请用此方式）</div>
   `;
   document.body.appendChild(menu);
 
@@ -197,14 +206,17 @@ export function mountPageNav(root, opts = {}) {
     if (isTypingTarget(e.target)) return;
     if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
 
-    // Alt+1 … Alt+N
-    const digit = e.code?.startsWith('Digit')
-      ? Number(e.code.slice(5))
-      : (/^[1-9]$/.test(e.key) ? Number(e.key) : 0);
-    if (digit >= 1 && digit <= PAGES.length) {
-      e.preventDefault();
-      goToIndex(digit - 1);
-      return;
+    // Alt+1…9 → index 0…8; Alt+0 → index 9
+    let digit = null;
+    if (e.code?.startsWith('Digit')) digit = Number(e.code.slice(5));
+    else if (/^[0-9]$/.test(e.key)) digit = Number(e.key);
+    if (digit !== null && digit >= 0 && digit <= 9) {
+      const index = digit === 0 ? 9 : digit - 1;
+      if (index < PAGES.length) {
+        e.preventDefault();
+        goToIndex(index);
+        return;
+      }
     }
 
     // Alt+← / Alt+[  previous · Alt+→ / Alt+]  next

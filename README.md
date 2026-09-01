@@ -6,7 +6,7 @@ SO-100 六轴策略 / 模型的 **功能评测可视化**：在同一坐标系�
 - TCP（指尖中点）xyz 轴 + 当前帧 ±15 散点
 - 左侧：播放 / 显隐 / 观测相机同步 (F) / 画布录制（WebM）
 - 右侧：概览、误差、关节轨迹、任务/接触 (G)、数值（可折叠）
-- Hub：多 episode 汇总，含 obs / 任务列与机型防呆；顶栏「页面」菜单可扩展更多 tab（Alt+1…N / Alt+←→ 切换）
+- Hub：多 episode 汇总，含 obs / 任务列与机型防呆；顶栏「页面」菜单可扩展更多 tab（Alt+1–9 / Alt+0 / Alt+←→ 切换）
 - 机械臂 3D：`robots.html` 下拉选择 `config/robots.json` 中的机型并浏览 URDF（当前含 SO-100 / EC616 / Koch）
 - 数据流：`pipeline.html` ComfyUI 风格画布，演示 ACT/SAM2 训练与推理张量流向
 - AI Chat：`chat.html` 选择托管 Skill、配置 Agent 链接，将诉求与 skill 一并发送并显示回执

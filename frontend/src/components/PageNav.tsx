@@ -50,11 +50,21 @@ export function PageNav() {
     }
     return ordered
   }, [pageGroups, pageById])
+
+  /** Digit shortcuts: Alt+1…9 → pages 0…8, Alt+0 → page 9. Later pages: no digit badge. */
   const shortcutOf = useMemo(() => {
     const map = new Map<PageId, number>()
-    navPages.forEach((p, i) => map.set(p.id, i + 1))
+    navPages.forEach((p, i) => {
+      if (i < 9) map.set(p.id, i + 1)
+      else if (i === 9) map.set(p.id, 0)
+    })
     return map
   }, [navPages])
+
+  const shortcutLabel = (digit: number | undefined) => {
+    if (digit === undefined) return undefined
+    return `Alt+${digit}`
+  }
 
   const currentId = resolvePageId(location.pathname)
   const currentIdx = Math.max(0, navPages.findIndex((p) => p.id === currentId))
@@ -104,17 +114,19 @@ export function PageNav() {
       if (isTypingTarget(e.target)) return
       if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return
 
-      const digit = e.code?.startsWith('Digit')
-        ? Number(e.code.slice(5))
-        : /^[1-9]$/.test(e.key)
-          ? Number(e.key)
-          : 0
-      if (digit >= 1 && digit <= navPages.length) {
-        e.preventDefault()
-        const page = navPages[digit - 1]
-        if (isPageBlocked(page.id)) return
-        if (page.id !== currentId) navigate(page.path)
-        return
+      // Alt+1…9 → index 0…8; Alt+0 → index 9 (single physical digit keys only).
+      let digit: number | null = null
+      if (e.code?.startsWith('Digit')) digit = Number(e.code.slice(5))
+      else if (/^[0-9]$/.test(e.key)) digit = Number(e.key)
+      if (digit !== null && digit >= 0 && digit <= 9) {
+        const index = digit === 0 ? 9 : digit - 1
+        if (index < navPages.length) {
+          e.preventDefault()
+          const page = navPages[index]
+          if (isPageBlocked(page.id)) return
+          if (page.id !== currentId) navigate(page.path)
+          return
+        }
       }
       if (e.key === 'ArrowLeft' || e.key === '[' || e.code === 'BracketLeft') {
         e.preventDefault()
@@ -154,21 +166,18 @@ export function PageNav() {
       ? `${currentGroup.short} · ${current.short || current.label}`
       : current.short || current.label
 
-  const renderPageLink = (p: (typeof pages)[number], keyN: number) => {
+  const renderPageLink = (p: (typeof pages)[number], digit: number | undefined) => {
     const blocked = isPageBlocked(p.id)
     const className = `page-nav-item${p.id === currentId ? ' active' : ''}${blocked ? ' disabled' : ''}`
-    const title = blocked
-      ? m.settings.sensors.unreachableHint
-      : keyN
-        ? `Alt+${keyN}`
-        : undefined
+    const hotkey = shortcutLabel(digit)
+    const title = blocked ? m.settings.sensors.unreachableHint : hotkey
     const body = (
       <>
         <span className="page-nav-item-main">
           <span className="page-nav-item-title">{p.label}</span>
           <span className="page-nav-item-desc">{p.desc}</span>
         </span>
-        {keyN ? <kbd className="page-nav-item-key">Alt+{keyN}</kbd> : null}
+        {hotkey ? <kbd className="page-nav-item-key">{hotkey}</kbd> : null}
       </>
     )
     if (blocked) {
@@ -206,7 +215,7 @@ export function PageNav() {
         className="page-nav-btn pill"
         aria-expanded={open}
         aria-haspopup="true"
-        title={t('nav.switchPages', { n: navPages.length })}
+        title={t('nav.switchPages')}
         onClick={(e) => {
           e.stopPropagation()
           setOpen((v) => !v)
@@ -235,7 +244,7 @@ export function PageNav() {
           // Single leaf: one-level link
           if (groupPages.length === 1) {
             const p = groupPages[0]
-            const keyN = shortcutOf.get(p.id) ?? 0
+            const keyN = shortcutOf.get(p.id)
             return renderPageLink(p, keyN)
           }
 
@@ -271,7 +280,7 @@ export function PageNav() {
                   aria-label={group.label}
                 >
                   {groupPages.map((p) => {
-                    const keyN = shortcutOf.get(p.id) ?? 0
+                    const keyN = shortcutOf.get(p.id)
                     return renderPageLink(p, keyN)
                   })}
                 </div>
