@@ -23,6 +23,10 @@ import {
   writeStoredPi05Route,
   type Pi05RouteMode,
 } from '../features/pi05/routeMode'
+import {
+  applyLoraTaskRefStep,
+  parseLoraTaskRefJson,
+} from '../features/pi05/loraTaskRefExport'
 import '../styles/pi05-route.css'
 import type {
   BrowseRoot,
@@ -266,10 +270,12 @@ export function Pi05PipelinePage() {
   const [route, setRoute] = useState<Pi05RouteMode>(() => resolveInitialPi05Route())
   const [yamlBusy, setYamlBusy] = useState(false)
   const [yamlMsg, setYamlMsg] = useState('')
+  const [importMsg, setImportMsg] = useState('')
   const [ckptSteps, setCkptSteps] = useState<string[]>([])
   const [ckptStepsBusy, setCkptStepsBusy] = useState(false)
   const trainConfigPath = String(params.train?.configPath ?? '')
   const prevRouteRef = useRef(route)
+  const quickImportRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     writeStoredPi05Route(route)
@@ -312,6 +318,10 @@ export function Pi05PipelinePage() {
 
   const step = useMemo(() => spec?.steps.find((s) => s.id === stepId) ?? null, [spec, stepId])
   const rootsReady = Boolean(pi05Root.trim())
+
+  useEffect(() => {
+    setImportMsg('')
+  }, [stepId])
   const currentParams = step ? params[step.id] ?? defaultParams(step) : {}
   const checks = spec?.checks || {}
   const inferCkptDir = String(params.infer_single?.ckptDir ?? currentParams.ckptDir ?? '').trim()
@@ -443,6 +453,51 @@ export function Pi05PipelinePage() {
       ...prev,
       [step.id]: { ...(prev[step.id] || defaultParams(step)), [key]: value },
     }))
+  }
+
+  const onQuickImportClick = () => {
+    if (!step || !rootsReady) return
+    setImportMsg('')
+    quickImportRef.current?.click()
+  }
+
+  const onQuickImportFile = async (fileList: FileList | null) => {
+    const input = quickImportRef.current
+    const file = fileList?.[0]
+    if (!step || !file) {
+      if (input) input.value = ''
+      return
+    }
+    try {
+      const text = await file.text()
+      const doc = parseLoraTaskRefJson(JSON.parse(text))
+      const allowed = step.fields.map((f) => f.key).filter((k) => k !== 'savePath')
+      if (!doc.steps.some((s) => s.id === step.id)) {
+        setImportMsg(t('pi05.quickImportNoStep', { id: step.id }))
+        return
+      }
+      const patch = applyLoraTaskRefStep(doc, step.id, allowed)
+      const count = Object.keys(patch).length
+      setParams((prev) => ({
+        ...prev,
+        [step.id]: { ...(prev[step.id] || defaultParams(step)), ...patch },
+      }))
+      setImportMsg(
+        t('pi05.quickImportDone', {
+          name: doc.TASK_NAME || file.name,
+          count,
+        }),
+      )
+      setYamlMsg('')
+    } catch (e) {
+      setImportMsg(
+        t('pi05.quickImportFail', {
+          error: e instanceof Error ? e.message : String(e),
+        }),
+      )
+    } finally {
+      if (input) input.value = ''
+    }
   }
 
   const doSaveTrainYaml = async (savePath: string) => {
@@ -667,6 +722,15 @@ export function Pi05PipelinePage() {
                     ) : null}
                   </div>
                   <div className="act-step-actions">
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      disabled={busy || !rootsReady}
+                      onClick={() => onQuickImportClick()}
+                      title={t('pi05.quickImportTitle')}
+                    >
+                      {t('pi05.quickImport')}
+                    </button>
                     {step.id === 'train' ? (
                       <button
                         type="button"
@@ -688,6 +752,28 @@ export function Pi05PipelinePage() {
                     </button>
                   </div>
                 </div>
+                <input
+                  ref={quickImportRef}
+                  type="file"
+                  accept="application/json,.json"
+                  hidden
+                  onChange={(e) => void onQuickImportFile(e.target.files)}
+                />
+                {importMsg ? (
+                  <p
+                    className={`pi05-train-yaml-msg muted${
+                      importMsg.includes('失败') ||
+                      importMsg.includes('fail') ||
+                      importMsg.includes('Fail') ||
+                      importMsg.includes('Error') ||
+                      importMsg.includes('错误')
+                        ? ' err'
+                        : ''
+                    }`}
+                  >
+                    {importMsg}
+                  </p>
+                ) : null}
                 {step.id === 'train' && yamlMsg ? (
                   <p className={`pi05-train-yaml-msg muted${yamlMsg.includes('fail') || yamlMsg.includes('Error') || yamlMsg.includes('错误') ? ' err' : ''}`}>
                     {yamlBusy ? t('pi05.trainYaml.loading') : null}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { PageChrome } from '../components/PageChrome'
 import { PathPickerModal } from '../components/PathPickerModal'
 import type { BrowseRoot, PathKind } from '../features/actPipeline/types'
+import { fetchFsChildren } from '../features/actPipeline/api'
 import { useLocale } from '../i18n/LocaleContext'
 import { t } from '../i18n/runtime'
 import {
@@ -11,6 +12,13 @@ import {
   probeFsPath,
   type Pi05AnalyzeResult,
 } from '../features/pi05/api'
+import {
+  buildLoraTaskMkdirSh,
+  buildLoraTaskRefJson,
+  DEFAULT_LORA_ADDRESS,
+  DEFAULT_LORA_TASK_NAME,
+  downloadLoraTaskBundle,
+} from '../features/pi05/loraTaskRefExport'
 import { Pi05RouteChrome } from '../features/pi05/Pi05RouteChrome'
 import { Pi05FullFtYamlGuide } from '../features/pi05/FullFtYamlGuide'
 import {
@@ -21,6 +29,8 @@ import {
 import '../styles/act-pipeline.css'
 import '../styles/pi05-setup.css'
 import '../styles/pi05-route.css'
+
+const LORA_EXPORT_STORAGE = 'embody.pi05.setup.loraExport'
 
 type ExpectKind = 'dir' | 'file' | 'pytorch_base'
 type GpuState = 'idle' | 'checking' | 'ok' | 'bad'
@@ -180,6 +190,12 @@ export function Pi05SetupPage() {
   const [gpuBusy, setGpuBusy] = useState(false)
   const [picker, setPicker] = useState<PathSlot | null>(null)
   const [probeBusy, setProbeBusy] = useState(false)
+  const [loraAddress, setLoraAddress] = useState(DEFAULT_LORA_ADDRESS)
+  const [loraTaskName, setLoraTaskName] = useState(DEFAULT_LORA_TASK_NAME)
+  const [loraAddressOptions, setLoraAddressOptions] = useState<string[]>([DEFAULT_LORA_ADDRESS])
+  const [loraExportMsg, setLoraExportMsg] = useState('')
+  const [loraMkdirSh, setLoraMkdirSh] = useState('')
+  const [loraMkdirCopied, setLoraMkdirCopied] = useState(false)
 
   const fullFt = route === 'full_ft'
   const paths = data?.paths || {}
@@ -292,6 +308,9 @@ export function Pi05SetupPage() {
     setGpuCount(null)
     setProbes({})
     setFocus(null)
+    setLoraExportMsg('')
+    setLoraMkdirSh('')
+    setLoraMkdirCopied(false)
     void load(undefined, stored)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route])
@@ -299,6 +318,79 @@ export function Pi05SetupPage() {
   useEffect(() => {
     saveStoredPaths(route, pathValues)
   }, [route, pathValues])
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LORA_EXPORT_STORAGE)
+      if (!raw) return
+      const parsed = JSON.parse(raw) as { address?: string; taskName?: string }
+      if (parsed.address?.trim()) setLoraAddress(parsed.address.trim())
+      if (parsed.taskName?.trim()) setLoraTaskName(parsed.taskName.trim())
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        LORA_EXPORT_STORAGE,
+        JSON.stringify({ address: loraAddress, taskName: loraTaskName }),
+      )
+    } catch {
+      /* ignore */
+    }
+  }, [loraAddress, loraTaskName])
+
+  useEffect(() => {
+    if (fullFt) return
+    let cancelled = false
+    void (async () => {
+      const opts = new Set<string>([DEFAULT_LORA_ADDRESS])
+      // AUTODL_TMP candidates: shallow roots only (skip symlink-resolved deep paths).
+      const isAddressCandidate = (p: string) => {
+        const parts = p.replace(/\/+$/, '').split('/').filter(Boolean)
+        return parts.length > 0 && parts.length <= 2
+      }
+      try {
+        const r = await fetchFsChildren('pi05', '', '/root')
+        for (const e of r.entries || []) {
+          if (e.isDir && e.path && isAddressCandidate(e.path)) opts.add(e.path)
+        }
+      } catch {
+        /* keep defaults */
+      }
+      if (!cancelled) setLoraAddressOptions([...opts].sort((a, b) => a.localeCompare(b)))
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [fullFt])
+
+  const onExportLoraRef = () => {
+    const name = loraTaskName.trim()
+    if (!name) {
+      setLoraExportMsg(t('pi05Setup.loraExport.needTask'))
+      setLoraMkdirSh('')
+      setLoraMkdirCopied(false)
+      return
+    }
+    const doc = buildLoraTaskRefJson(loraAddress, name)
+    downloadLoraTaskBundle(doc)
+    setLoraMkdirSh(buildLoraTaskMkdirSh(doc))
+    setLoraMkdirCopied(false)
+    setLoraExportMsg(t('pi05Setup.loraExport.done', { name: doc.TASK_NAME }))
+  }
+
+  const onCopyLoraMkdir = async () => {
+    if (!loraMkdirSh) return
+    try {
+      await navigator.clipboard.writeText(`${loraMkdirSh}\n`)
+      setLoraMkdirCopied(true)
+    } catch {
+      setLoraMkdirCopied(false)
+    }
+  }
 
   const setPathValue = (id: PathSlotId, next: string) => {
     setPathValues((prev) => ({ ...prev, [id]: next }))
@@ -383,6 +475,66 @@ export function Pi05SetupPage() {
             <p className="pi05-route-hero-kicker">{t('pi05Setup.heroSmoke.kicker')}</p>
             <h2>{t('pi05Setup.heroSmoke.title')}</h2>
             <p className="muted">{t('pi05Setup.heroSmoke.lead')}</p>
+            <div className="pi05-lora-export" aria-label={t('pi05Setup.loraExport.aria')}>
+              <label className="pi05-lora-export-field">
+                <span className="pi05-lora-export-label">{t('pi05Setup.loraExport.address')}</span>
+                <select
+                  value={loraAddress}
+                  onChange={(e) => setLoraAddress(e.target.value)}
+                  title={t('pi05Setup.loraExport.addressHint')}
+                >
+                  {!loraAddressOptions.includes(loraAddress) && loraAddress ? (
+                    <option value={loraAddress}>{loraAddress}</option>
+                  ) : null}
+                  {loraAddressOptions.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="pi05-lora-export-field">
+                <span className="pi05-lora-export-label">{t('pi05Setup.loraExport.taskName')}</span>
+                <input
+                  type="text"
+                  value={loraTaskName}
+                  onChange={(e) => setLoraTaskName(e.target.value)}
+                  placeholder={DEFAULT_LORA_TASK_NAME}
+                  title={t('pi05Setup.loraExport.taskHint')}
+                  spellCheck={false}
+                />
+              </label>
+              <button type="button" className="pi05-lora-export-btn" onClick={onExportLoraRef}>
+                {t('pi05Setup.loraExport.button')}
+              </button>
+            </div>
+            {loraExportMsg ? <p className="pi05-lora-export-msg muted">{loraExportMsg}</p> : null}
+            {loraMkdirSh ? (
+              <div className="pi05-lora-mkdir">
+                <div className="pi05-lora-mkdir-head">
+                  <span className="pi05-lora-export-label">{t('pi05Setup.loraExport.mkdirLabel')}</span>
+                  <button
+                    type="button"
+                    className="pi05-lora-mkdir-copy"
+                    onClick={() => void onCopyLoraMkdir()}
+                  >
+                    {loraMkdirCopied
+                      ? t('pi05Setup.loraExport.mkdirCopied')
+                      : t('pi05Setup.loraExport.mkdirCopy')}
+                  </button>
+                </div>
+                <p className="pi05-lora-mkdir-hint muted">{t('pi05Setup.loraExport.mkdirHint')}</p>
+                <textarea
+                  className="pi05-lora-mkdir-code"
+                  readOnly
+                  spellCheck={false}
+                  value={loraMkdirSh}
+                  rows={4}
+                  onFocus={(e) => e.currentTarget.select()}
+                  aria-label={t('pi05Setup.loraExport.mkdirLabel')}
+                />
+              </div>
+            ) : null}
           </div>
         )}
 

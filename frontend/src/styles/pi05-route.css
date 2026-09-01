@@ -57,6 +57,128 @@
   background: var(--panel);
 }
 
+.pi05-lora-export {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 12px;
+  margin-top: 14px;
+}
+
+.pi05-lora-export-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 160px;
+}
+
+.pi05-lora-export-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.pi05-lora-export-field select,
+.pi05-lora-export-field input {
+  width: 100%;
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 70%, #000 8%);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 6px 10px;
+}
+
+.pi05-lora-export-field select {
+  cursor: pointer;
+}
+
+.pi05-lora-export-btn {
+  appearance: none;
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  color: var(--accent);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.pi05-lora-export-btn:hover {
+  background: color-mix(in srgb, var(--accent) 22%, var(--panel));
+}
+
+.pi05-lora-export-msg {
+  margin: 8px 0 0;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.pi05-lora-mkdir {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
+}
+
+.pi05-lora-mkdir-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pi05-lora-mkdir-hint {
+  margin: 4px 0 8px;
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.pi05-lora-mkdir-copy {
+  appearance: none;
+  flex: 0 0 auto;
+  min-height: 28px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 70%, #000 6%);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pi05-lora-mkdir-copy:hover {
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+  color: var(--accent);
+}
+
+.pi05-lora-mkdir-code {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--panel) 55%, #000 18%);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.74rem;
+  line-height: 1.45;
+  resize: vertical;
+  white-space: pre;
+  overflow-x: auto;
+}
+
 .pi05-route-hero-kicker {
   margin: 0 0 6px;
   font-size: 0.68rem;
