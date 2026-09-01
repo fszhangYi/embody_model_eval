@@ -58,7 +58,7 @@ export const PAGES: PageDef[] = [
     path: '/pipeline',
     label: '模型数据流',
     short: '数据流',
-    desc: 'ComfyUI 风格：训练 / 推理流向演示',
+    desc: 'ComfyUI 风格：ACT / SAM2 / π0.5 训练与推理流向',
   },
   {
     id: 'chat',

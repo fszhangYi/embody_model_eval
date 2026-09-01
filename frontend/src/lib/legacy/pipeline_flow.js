@@ -1,5 +1,5 @@
 /**
- * ComfyUI-inspired node canvas for ACT / SAM2Grasp dataflow demos.
+ * ComfyUI-inspired node canvas for ACT / SAM2Grasp / π0.5 dataflow demos.
  * Self-contained (no external graph lib) — wires on <canvas>, nodes as DOM.
  */
 
@@ -42,6 +42,11 @@ export const PIPELINES = [
     id: 'act',
     label: '纯 ACT (CVAE)',
     desc: 'ResNet 视觉骨干 + CVAE ACT（L1+KL）',
+  },
+  {
+    id: 'pi05',
+    label: 'π0.5 (VLA)',
+    desc: 'PaliGemma 条件 + Action Expert · flow matching',
   },
 ];
 
@@ -339,11 +344,169 @@ const ACT_INFER = {
   ]),
 };
 
+const PI05_TRAIN = {
+  id: 'pi05_train',
+  label: 'π0.5 · 训练',
+  blurb: '多视角 + 语言 + 状态 → PaliGemma 条件 · Action Expert · flow matching',
+  nodes: /** @type {FlowNode[]} */ ([
+    {
+      id: 'raw', title: 'LeRobot Episode', kind: 'data', x: 40, y: 100,
+      outputs: ['RGB', 'state', 'action', 'prompt'],
+      detail: '示教：多相机 RGB、本体状态、专家动作 chunk、任务文本（repo_id / camera_mapping）。',
+      file: 'lerobot dataset / convert',
+    },
+    {
+      id: 'norm', title: 'norm_stats', kind: 'cache', x: 320, y: 40,
+      inputs: ['state', 'action'], outputs: ['state_n', 'action_n'],
+      detail: '数据集 mean/std；无 stats 时尺度与预训练先验不对齐。换数据必须重算。',
+      file: 'artifacts/assets · compute_norm_stats',
+    },
+    {
+      id: 'ds', title: 'Train batch', kind: 'data', x: 600, y: 100,
+      inputs: ['RGB', 'state_n', 'action_n', 'prompt'], outputs: ['batch'],
+      detail: '归一化后的观测 / 动作 / 文本组成 batch；action_dim 常 pad 到 Expert 宽度。',
+      file: 'pi05_jax_sft · data loader',
+    },
+    {
+      id: 'siglip', title: 'SigLIP 视觉', kind: 'vision', x: 880, y: 40,
+      inputs: ['batch'], outputs: ['vtok'],
+      detail: '各视角 RGB → 视觉 token；视角数与分辨率决定序列长度与显存。',
+      file: 'PaliGemma / SigLIP',
+    },
+    {
+      id: 'lang', title: '文本 + 状态 token', kind: 'data', x: 880, y: 220,
+      inputs: ['batch'], outputs: ['ltok'],
+      detail: '任务 prompt（及可选离散状态）tokenize；受 max_token_len 约束。',
+      file: 'tokenizer',
+    },
+    {
+      id: 'vlm', title: 'PaliGemma 条件', kind: 'model', x: 1140, y: 100,
+      inputs: ['vtok', 'ltok'], outputs: ['cond'],
+      detail: '视觉与语言 token 交叉注意力，得到当前情境表征（条件侧）。',
+      file: 'paligemma_variant=gemma_2b',
+    },
+    {
+      id: 'noise', title: '噪声 ε', kind: 'model', x: 1140, y: 300,
+      inputs: ['action_n'], outputs: ['path'],
+      detail: '在动作空间构造噪声 ↔ 示教动作的插值路径（flow matching）。',
+      file: 'flow matching schedule',
+    },
+    {
+      id: 'expert', title: 'Action Expert', kind: 'model', x: 1400, y: 140,
+      inputs: ['cond', 'path'], outputs: ['vel'],
+      detail: 'Gemma≈300M，与 VLM 联合注意力；预测速度场（或等价目标）→ action_horizon chunk。',
+      file: 'action_expert_variant=gemma_300m',
+    },
+    {
+      id: 'loss', title: 'Flow matching loss', kind: 'loss', x: 1660, y: 140,
+      inputs: ['vel', 'path'], outputs: ['grad'],
+      detail: '条件 flow：拟合示教动作流形；勿随意改成一步 MSE（与预训练目标不一致）。',
+      file: 'train_pytorch · flow loss',
+    },
+    {
+      id: 'opt', title: 'FSDP / ckpt', kind: 'ctrl', x: 1920, y: 140,
+      inputs: ['grad'], outputs: ['weights'],
+      detail: '全参或 LoRA；按 exp_name/step 写出 checkpoint，供推理与分析页。',
+      file: 'artifacts/checkpoints',
+    },
+  ]),
+  edges: /** @type {FlowEdge[]} */ ([
+    { from: 'raw', fromPort: 'state', to: 'norm', toPort: 'state' },
+    { from: 'raw', fromPort: 'action', to: 'norm', toPort: 'action' },
+    { from: 'raw', fromPort: 'RGB', to: 'ds', toPort: 'RGB', label: 'views' },
+    { from: 'raw', fromPort: 'prompt', to: 'ds', toPort: 'prompt' },
+    { from: 'norm', fromPort: 'state_n', to: 'ds', toPort: 'state_n' },
+    { from: 'norm', fromPort: 'action_n', to: 'ds', toPort: 'action_n' },
+    { from: 'ds', fromPort: 'batch', to: 'siglip', toPort: 'batch' },
+    { from: 'ds', fromPort: 'batch', to: 'lang', toPort: 'batch' },
+    { from: 'siglip', fromPort: 'vtok', to: 'vlm', toPort: 'vtok' },
+    { from: 'lang', fromPort: 'ltok', to: 'vlm', toPort: 'ltok' },
+    { from: 'norm', fromPort: 'action_n', to: 'noise', toPort: 'action_n', label: 'GT' },
+    { from: 'vlm', fromPort: 'cond', to: 'expert', toPort: 'cond' },
+    { from: 'noise', fromPort: 'path', to: 'expert', toPort: 'path' },
+    { from: 'expert', fromPort: 'vel', to: 'loss', toPort: 'vel', label: 'pred' },
+    { from: 'noise', fromPort: 'path', to: 'loss', toPort: 'path' },
+    { from: 'loss', fromPort: 'grad', to: 'opt', toPort: 'grad' },
+  ]),
+};
+
+const PI05_INFER = {
+  id: 'pi05_infer',
+  label: 'π0.5 · 推理',
+  blurb: 'JPEG + state + prompt → VLM 条件 · flow 采样动作 chunk → 真机 / 评测',
+  nodes: /** @type {FlowNode[]} */ ([
+    {
+      id: 'cam', title: '多相机 RGB', kind: 'data', x: 40, y: 80, outputs: ['RGB'],
+      detail: '真机 / raw：多视角 JPEG（与训练 camera_mapping 对齐）。',
+      file: 'serve / infer_from_raw',
+    },
+    {
+      id: 'prop', title: '机器人状态', kind: 'robot', x: 40, y: 240, outputs: ['state'],
+      detail: '本体感觉（TCP / qpos 等）；须用训练同套 norm_stats。',
+      file: 'robot_state',
+    },
+    {
+      id: 'prompt', title: '任务 prompt', kind: 'data', x: 40, y: 400, outputs: ['prompt'],
+      detail: '自然语言任务描述；与训练 tokenizer / max_token_len 一致。',
+      file: 'client request',
+    },
+    {
+      id: 'ckpt', title: 'π0.5 ckpt', kind: 'cache', x: 320, y: 320,
+      outputs: ['weights', 'stats'],
+      detail: 'checkpoint + assets/*/norm_stats.json（asset_id / repo_id 须匹配）。',
+      file: 'artifacts/checkpoints · assets',
+    },
+    {
+      id: 'policy', title: 'VLM + Expert', kind: 'model', x: 560, y: 140,
+      inputs: ['RGB', 'state', 'prompt', 'weights', 'stats'], outputs: ['cond'],
+      detail: '加载权重与 norm；SigLIP+语言条件 → 情境表征（无示教 GT）。',
+      file: 'serve.py / evaluate',
+    },
+    {
+      id: 'sample', title: 'Flow 采样', kind: 'model', x: 840, y: 140,
+      inputs: ['cond'], outputs: ['chunk'],
+      detail: '从噪声积分到动作 chunk（action_horizon）；再反归一化到控制维。',
+      file: 'flow sampler',
+    },
+    {
+      id: 'buf', title: '动作缓冲', kind: 'ctrl', x: 1100, y: 140,
+      inputs: ['chunk'], outputs: ['cmd'],
+      detail: 'chunk 回放或 temporal aggregation 平滑。',
+      file: 'serve runtime',
+    },
+    {
+      id: 'ctrl', title: '底层控制', kind: 'robot', x: 1360, y: 140,
+      inputs: ['cmd'], outputs: ['exec'],
+      detail: '下发真机 / 仿真执行器。',
+      file: 'robot runtime',
+    },
+    {
+      id: 'eval', title: 'Embody 评测', kind: 'data', x: 1620, y: 140,
+      inputs: ['exec'], outputs: [],
+      detail: '离线 infer JSON → 轨迹对照 / Hub 汇总。',
+      file: 'embody_model_eval',
+    },
+  ]),
+  edges: /** @type {FlowEdge[]} */ ([
+    { from: 'cam', fromPort: 'RGB', to: 'policy', toPort: 'RGB' },
+    { from: 'prop', fromPort: 'state', to: 'policy', toPort: 'state' },
+    { from: 'prompt', fromPort: 'prompt', to: 'policy', toPort: 'prompt' },
+    { from: 'ckpt', fromPort: 'weights', to: 'policy', toPort: 'weights' },
+    { from: 'ckpt', fromPort: 'stats', to: 'policy', toPort: 'stats', label: 'norm' },
+    { from: 'policy', fromPort: 'cond', to: 'sample', toPort: 'cond' },
+    { from: 'sample', fromPort: 'chunk', to: 'buf', toPort: 'chunk', label: 'A_t' },
+    { from: 'buf', fromPort: 'cmd', to: 'ctrl', toPort: 'cmd' },
+    { from: 'ctrl', fromPort: 'exec', to: 'eval', toPort: 'exec' },
+  ]),
+};
+
 export const GRAPHS = {
   sam2grasp_train: SAM2_TRAIN,
   sam2grasp_infer: SAM2_INFER,
   act_train: ACT_TRAIN,
   act_infer: ACT_INFER,
+  pi05_train: PI05_TRAIN,
+  pi05_infer: PI05_INFER,
   // backwards-compatible aliases
   train: SAM2_TRAIN,
   infer: SAM2_INFER,
@@ -354,6 +517,8 @@ export const CANONICAL_GRAPH_KEYS = [
   'sam2grasp_infer',
   'act_train',
   'act_infer',
+  'pi05_train',
+  'pi05_infer',
 ];
 
 const KIND_OPTIONS = Object.keys(KIND_COLORS);

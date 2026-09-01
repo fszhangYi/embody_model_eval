@@ -228,7 +228,7 @@ export const messages: Record<Locale, MessageTree> = {
       pipeline: {
         label: '模型数据流',
         short: '数据流',
-        desc: 'ComfyUI 风格：训练 / 推理流向演示',
+        desc: 'ComfyUI 风格：ACT / SAM2 / π0.5 训练与推理流向',
       },
       chat: {
         label: 'AI Chat · Skills',
@@ -481,7 +481,7 @@ export const messages: Record<Locale, MessageTree> = {
       pipeline: {
         label: 'Model dataflow',
         short: 'Flow',
-        desc: 'ComfyUI-style train / infer graph demo',
+        desc: 'ComfyUI-style ACT / SAM2 / π0.5 train & infer graphs',
       },
       chat: {
         label: 'AI Chat · Skills',
