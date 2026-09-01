@@ -38,3 +38,18 @@ export function fieldLabel(stepId: string, field: StepField): string {
   if (g !== generic) return g
   return trText(field.label)
 }
+
+/** Hover tooltip for a pipeline field (native `title`). */
+export function fieldTip(stepId: string, field: StepField): string {
+  const key = `pi05.fieldTip.${stepId}.${field.key}`
+  const localized = t(key)
+  if (localized !== key) return localized
+  const generic = `pi05.fieldTip.${field.key}`
+  const g = t(generic)
+  if (g !== generic) return g
+  if (field.hint) {
+    const viaHint = t('pi05.scriptHint', { hint: field.hint })
+    if (viaHint && viaHint !== 'pi05.scriptHint') return viaHint
+  }
+  return ''
+}

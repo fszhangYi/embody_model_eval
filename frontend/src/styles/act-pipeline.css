@@ -480,6 +480,11 @@
   gap: 6px;
 }
 
+.act-field-tip {
+  border-bottom: 1px dashed color-mix(in srgb, var(--muted, #94a3b8) 70%, transparent);
+  cursor: help;
+}
+
 .act-field-hint {
   font-size: 0.62rem;
   color: var(--accent, #3dd6c6);

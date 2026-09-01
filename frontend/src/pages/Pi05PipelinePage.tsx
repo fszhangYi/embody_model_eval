@@ -14,7 +14,7 @@ import {
   runPi05Step,
   savePi05TrainYaml,
 } from '../features/pi05/api'
-import { fieldLabel, stepDescription, stepTitle } from '../features/pi05/stepI18n'
+import { fieldLabel, fieldTip, stepDescription, stepTitle } from '../features/pi05/stepI18n'
 import { Pi05TrainGuide } from '../features/pi05/TrainGuide'
 import { Pi05TrainTheory } from '../features/pi05/TrainTheory'
 import { Pi05RouteChrome } from '../features/pi05/Pi05RouteChrome'
@@ -110,11 +110,13 @@ function FieldInput({
 
   const fieldClass = `act-field act-field-${ioRole}${wide ? ' act-field-wide' : ''}`
   const label = fieldLabel(stepId, field)
+  const tip = fieldTip(stepId, field) || undefined
+  const labelTitleProps = tip ? { title: tip, className: 'act-field-tip' as const } : {}
 
   if (field.type === 'checkbox') {
     return (
       <div className={`${fieldClass} act-field-check`}>
-        <label className="act-field-check-hit" htmlFor={id}>
+        <label className="act-field-check-hit" htmlFor={id} title={tip}>
           <input
             id={id}
             type="checkbox"
@@ -122,7 +124,7 @@ function FieldInput({
             disabled={disabled}
             onChange={(e) => onChange(e.target.checked)}
           />
-          <span>{label}</span>
+          <span {...labelTitleProps}>{label}</span>
         </label>
       </div>
     )
@@ -133,8 +135,8 @@ function FieldInput({
     const shown = String(value)
     const hasValue = opts.includes(shown) || (isCkptStep && shown === '')
     return (
-      <label className={fieldClass}>
-        <span>
+      <label className={fieldClass} title={tip}>
+        <span {...labelTitleProps}>
           {label}
           {selectBusy ? (
             <span className="act-field-hint"> {t('pi05.field.checkpointStep.scanning')}</span>
@@ -145,6 +147,7 @@ function FieldInput({
           value={hasValue ? shown : isCkptStep ? '' : opts[0] || ''}
           disabled={disabled || selectBusy}
           onChange={(e) => onChange(e.target.value)}
+          title={tip}
         >
           {isCkptStep ? <option value="" /> : null}
           {opts.map((o) => (
@@ -162,13 +165,12 @@ function FieldInput({
     )
   }
   if (field.type === 'path') {
-    const tip = field.hint ? t('pi05.scriptHint', { hint: field.hint }) : undefined
     return (
       <label className={fieldClass}>
         <span className="act-field-label">
           {ioRole === 'input' ? <span className="act-io-tag in">{t('pi05.io.in')}</span> : null}
           {ioRole === 'output' ? <span className="act-io-tag out">{t('pi05.io.out')}</span> : null}
-          <span>{label}</span>
+          <span {...labelTitleProps}>{label}</span>
           {field.hint ? (
             <span className="act-field-hint" title={tip}>
               {field.hint}
@@ -203,13 +205,14 @@ function FieldInput({
       <span className="act-field-label">
         {ioRole === 'input' ? <span className="act-io-tag in">{t('pi05.io.in')}</span> : null}
         {ioRole === 'output' ? <span className="act-io-tag out">{t('pi05.io.out')}</span> : null}
-        <span>{label}</span>
+        <span {...labelTitleProps}>{label}</span>
       </span>
       <input
         id={id}
         type={field.type === 'number' ? 'number' : 'text'}
         value={String(value ?? '')}
         disabled={disabled}
+        title={tip}
         onChange={(e) => onChange(field.type === 'number' ? Number(e.target.value) : e.target.value)}
       />
     </label>
