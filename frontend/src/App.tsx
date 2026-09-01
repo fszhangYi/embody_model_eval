@@ -4,6 +4,7 @@ import { AuthProvider } from './auth/AuthContext'
 import { RequireAuth } from './auth/RequireAuth'
 import { LocaleProvider } from './i18n/LocaleContext'
 import { AppearanceProvider } from './prefs/AppearanceContext'
+import { SensorsEmbedProvider } from './prefs/SensorsEmbedContext'
 import { HomePage } from './pages/HomePage'
 import { EvalPage } from './pages/EvalPage'
 import { HubPage } from './pages/HubPage'
@@ -48,6 +49,7 @@ export default function App() {
       <LocaleProvider>
         <AppearanceProvider>
         <AuthProvider>
+          <SensorsEmbedProvider>
           <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<HomeOrEvalRedirect />} />
@@ -162,6 +164,7 @@ export default function App() {
           <Route path="/login.html" element={<Navigate to="/login" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
+          </SensorsEmbedProvider>
         </AuthProvider>
         </AppearanceProvider>
       </LocaleProvider>

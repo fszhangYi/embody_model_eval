@@ -4,6 +4,7 @@ import { PageNav } from '../components/PageNav'
 import { SettingsGear } from '../components/SettingsModal'
 import { useLocale } from '../i18n/LocaleContext'
 import type { PageId } from '../config/pages'
+import { useSensorsEmbed } from '../prefs/SensorsEmbedContext'
 import '../styles/home.css'
 
 const MODULE_IDS: PageId[] = [
@@ -23,8 +24,10 @@ const MODULE_IDS: PageId[] = [
 
 export function HomePage() {
   const { m, pages } = useLocale()
+  const { reachability } = useSensorsEmbed()
   const home = m.home
   const modules = MODULE_IDS.map((id) => pages.find((p) => p.id === id)!).filter(Boolean)
+  const sensorsBlocked = reachability === 'fail'
 
   return (
     <div className="home-page">
@@ -82,18 +85,38 @@ export function HomePage() {
             <p className="muted">{home.modulesHint}</p>
           </div>
           <div className="home-module-grid">
-            {modules.map((p, i) => (
-              <Link key={p.id} className="home-module-card" to={p.path}>
-                <span className="home-module-idx" aria-hidden="true">
-                  {String(i + 2).padStart(2, '0')}
-                </span>
-                <span className="home-module-body">
-                  <span className="home-module-title">{p.label}</span>
-                  <span className="home-module-desc">{p.desc}</span>
-                </span>
-                <span className="home-module-path">{p.path}</span>
-              </Link>
-            ))}
+            {modules.map((p, i) => {
+              const blocked = p.id === 'sensors' && sensorsBlocked
+              const body = (
+                <>
+                  <span className="home-module-idx" aria-hidden="true">
+                    {String(i + 2).padStart(2, '0')}
+                  </span>
+                  <span className="home-module-body">
+                    <span className="home-module-title">{p.label}</span>
+                    <span className="home-module-desc">{p.desc}</span>
+                  </span>
+                  <span className="home-module-path">{p.path}</span>
+                </>
+              )
+              if (blocked) {
+                return (
+                  <span
+                    key={p.id}
+                    className="home-module-card disabled"
+                    aria-disabled="true"
+                    title={m.settings.sensors.unreachableHint}
+                  >
+                    {body}
+                  </span>
+                )
+              }
+              return (
+                <Link key={p.id} className="home-module-card" to={p.path}>
+                  {body}
+                </Link>
+              )
+            })}
           </div>
         </section>
 

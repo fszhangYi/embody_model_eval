@@ -19,6 +19,7 @@ Endpoints:
   GET    /api/agent/config
   PUT    /api/agent/config
   POST   /api/agent/probe
+  GET    /api/sensors-view/ping?url=
   GET    /api/pipeline/graphs
   PUT    /api/pipeline/graphs
   GET    /api/act-pipeline/spec
@@ -84,7 +85,7 @@ from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.parse import parse_qs, unquote, urlparse
+from urllib.parse import parse_qs, unquote, urlparse, urlunparse
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(SCRIPTS_DIR) not in sys.path:
@@ -509,6 +510,54 @@ def http_get(url: str, api_key: str, timeout: float = 8.0) -> dict[str, Any]:
         return {"ok": False, "status": e.code, "error": parsed, "message": str(e)}
     except Exception as e:
         return {"ok": False, "status": 0, "message": str(e)}
+
+
+def _normalize_sensors_embed_url(raw: str) -> str:
+    text = (raw or "").strip()
+    if not text:
+        raise ValueError("url required")
+    if not re.match(r"^https?://", text, flags=re.I):
+        text = "https://" + text
+    parsed = urlparse(text)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        raise ValueError("url must be http(s) with a host")
+    path = parsed.path or "/"
+    if path != "/" and not path.endswith("/"):
+        path = path + "/"
+    return urlunparse((parsed.scheme, parsed.netloc, path, "", "", ""))
+
+
+def ping_sensors_view(raw_url: str, timeout: float = 6.0) -> dict[str, Any]:
+    """Server-side reachability check for the sensors-view embed base URL."""
+    try:
+        base = _normalize_sensors_embed_url(raw_url)
+    except ValueError as e:
+        return {"ok": False, "status": 0, "message": str(e)}
+
+    candidates: list[str] = []
+    base_trimmed = base.rstrip("/")
+    candidates.append(f"{base_trimmed}/api/health")
+    candidates.append(base if base.endswith("/") else f"{base}/")
+
+    last: dict[str, Any] = {"ok": False, "status": 0, "message": "no probe attempted", "url": base}
+    for probe in candidates:
+        result = http_get(probe, api_key="", timeout=timeout)
+        last = {
+            "ok": bool(result.get("ok")),
+            "status": int(result.get("status") or 0),
+            "url": base,
+            "probed": probe,
+            "message": result.get("message") or ("ok" if result.get("ok") else "unreachable"),
+        }
+        if result.get("ok"):
+            last["message"] = f"reachable · HTTP {last['status']}"
+            return last
+        # HTML login / SPA root still counts as host up
+        if int(result.get("status") or 0) in (200, 301, 302, 303, 307, 308, 401, 403):
+            last["ok"] = True
+            last["message"] = f"reachable · HTTP {last['status']}"
+            return last
+    return last
 
 
 def merge_config_override(cfg: dict[str, Any], override: dict[str, Any] | None) -> dict[str, Any]:
@@ -1153,6 +1202,11 @@ class Handler(SimpleHTTPRequestHandler):
         if path == "/api/skills":
             SKILLS_DIR.mkdir(parents=True, exist_ok=True)
             self._send_json({"ok": True, "skills": list_skills_in(SKILLS_DIR)})
+            return
+        if path == "/api/sensors-view/ping":
+            qs = parse_qs(parsed.query)
+            target = (qs.get("url") or [""])[0]
+            self._send_json(ping_sensors_view(str(target)))
             return
         if path == "/api/skills/sources":
             scanned = scan_cursor_home_skills()

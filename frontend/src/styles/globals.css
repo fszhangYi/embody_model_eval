@@ -263,6 +263,16 @@ body:has(.act-pipeline-page),
   outline: 1px solid rgba(61, 214, 198, 0.35);
 }
 
+.page-nav-item.disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.page-nav-item.disabled:hover {
+  background: transparent;
+}
+
 .page-nav-item-main {
   min-width: 0;
   flex: 1;

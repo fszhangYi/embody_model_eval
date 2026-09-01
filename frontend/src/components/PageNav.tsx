@@ -4,6 +4,7 @@ import { useAuth } from '../auth/AuthContext'
 import { useLocale } from '../i18n/LocaleContext'
 import type { PageGroupId, PageId } from '../config/pages'
 import { groupForPage } from '../config/pages'
+import { useSensorsEmbed } from '../prefs/SensorsEmbedContext'
 
 function isTypingTarget(el: EventTarget | null): boolean {
   if (!el || !(el instanceof Element)) return false
@@ -35,7 +36,10 @@ export function PageNav() {
   const navigate = useNavigate()
   const { authRequired, user, logout } = useAuth()
   const { pages, pageGroups, t, m } = useLocale()
+  const { reachability } = useSensorsEmbed()
+  const sensorsBlocked = reachability === 'fail'
   const pageById = useMemo(() => new Map(pages.map((p) => [p.id, p])), [pages])
+  const isPageBlocked = (id: PageId) => id === 'sensors' && sensorsBlocked
   const navPages = useMemo(() => {
     const ordered: typeof pages = []
     for (const g of pageGroups) {
@@ -108,23 +112,34 @@ export function PageNav() {
       if (digit >= 1 && digit <= navPages.length) {
         e.preventDefault()
         const page = navPages[digit - 1]
+        if (isPageBlocked(page.id)) return
         if (page.id !== currentId) navigate(page.path)
         return
       }
       if (e.key === 'ArrowLeft' || e.key === '[' || e.code === 'BracketLeft') {
         e.preventDefault()
-        const next = (currentIdx - 1 + navPages.length) % navPages.length
-        navigate(navPages[next].path)
+        for (let step = 1; step <= navPages.length; step++) {
+          const next = (currentIdx - step + navPages.length) % navPages.length
+          if (!isPageBlocked(navPages[next].id)) {
+            navigate(navPages[next].path)
+            break
+          }
+        }
       }
       if (e.key === 'ArrowRight' || e.key === ']' || e.code === 'BracketRight') {
         e.preventDefault()
-        const next = (currentIdx + 1) % navPages.length
-        navigate(navPages[next].path)
+        for (let step = 1; step <= navPages.length; step++) {
+          const next = (currentIdx + step) % navPages.length
+          if (!isPageBlocked(navPages[next].id)) {
+            navigate(navPages[next].path)
+            break
+          }
+        }
       }
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [currentId, currentIdx, flyout, navigate, navPages])
+  }, [currentId, currentIdx, flyout, navigate, navPages, sensorsBlocked])
 
   useEffect(() => {
     if (!open || !btnRef.current || !menuRef.current) return
@@ -138,6 +153,50 @@ export function PageNav() {
     currentGroup && currentGroup.pageIds.length > 1
       ? `${currentGroup.short} · ${current.short || current.label}`
       : current.short || current.label
+
+  const renderPageLink = (p: (typeof pages)[number], keyN: number) => {
+    const blocked = isPageBlocked(p.id)
+    const className = `page-nav-item${p.id === currentId ? ' active' : ''}${blocked ? ' disabled' : ''}`
+    const title = blocked
+      ? m.settings.sensors.unreachableHint
+      : keyN
+        ? `Alt+${keyN}`
+        : undefined
+    const body = (
+      <>
+        <span className="page-nav-item-main">
+          <span className="page-nav-item-title">{p.label}</span>
+          <span className="page-nav-item-desc">{p.desc}</span>
+        </span>
+        {keyN ? <kbd className="page-nav-item-key">Alt+{keyN}</kbd> : null}
+      </>
+    )
+    if (blocked) {
+      return (
+        <span
+          key={p.id}
+          role="menuitem"
+          aria-disabled="true"
+          className={className}
+          title={title}
+        >
+          {body}
+        </span>
+      )
+    }
+    return (
+      <Link
+        key={p.id}
+        role="menuitem"
+        className={className}
+        to={p.path}
+        title={title}
+        onClick={() => setOpen(false)}
+      >
+        {body}
+      </Link>
+    )
+  }
 
   return (
     <div className={`page-nav${open ? ' open' : ''}`}>
@@ -177,22 +236,7 @@ export function PageNav() {
           if (groupPages.length === 1) {
             const p = groupPages[0]
             const keyN = shortcutOf.get(p.id) ?? 0
-            return (
-              <Link
-                key={group.id}
-                role="menuitem"
-                className={`page-nav-item${p.id === currentId ? ' active' : ''}`}
-                to={p.path}
-                title={keyN ? `Alt+${keyN}` : undefined}
-                onClick={() => setOpen(false)}
-              >
-                <span className="page-nav-item-main">
-                  <span className="page-nav-item-title">{p.label}</span>
-                  <span className="page-nav-item-desc">{p.desc}</span>
-                </span>
-                {keyN ? <kbd className="page-nav-item-key">Alt+{keyN}</kbd> : null}
-              </Link>
-            )
+            return renderPageLink(p, keyN)
           }
 
           const isFlyout = flyout === group.id
@@ -228,22 +272,7 @@ export function PageNav() {
                 >
                   {groupPages.map((p) => {
                     const keyN = shortcutOf.get(p.id) ?? 0
-                    return (
-                      <Link
-                        key={p.id}
-                        role="menuitem"
-                        className={`page-nav-item${p.id === currentId ? ' active' : ''}`}
-                        to={p.path}
-                        title={keyN ? `Alt+${keyN}` : undefined}
-                        onClick={() => setOpen(false)}
-                      >
-                        <span className="page-nav-item-main">
-                          <span className="page-nav-item-title">{p.label}</span>
-                          <span className="page-nav-item-desc">{p.desc}</span>
-                        </span>
-                        {keyN ? <kbd className="page-nav-item-key">Alt+{keyN}</kbd> : null}
-                      </Link>
-                    )
+                    return renderPageLink(p, keyN)
                   })}
                 </div>
               ) : null}

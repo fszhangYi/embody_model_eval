@@ -15,23 +15,27 @@ import type { MessageTree } from '../i18n/messages'
 import type { DocsLocale, Locale } from '../i18n/types'
 import { useAppearance } from '../prefs/AppearanceContext'
 import type { DensityPref, ThemePref } from '../prefs/appearance'
+import { useSensorsEmbed } from '../prefs/SensorsEmbedContext'
+import { normalizeSensorsEmbedUrl } from '../prefs/sensorsEmbed'
 import '../styles/settings.css'
 
-type SettingsTab = 'appearance' | 'language' | 'auth' | 'users' | 'about'
+type SettingsTab = 'appearance' | 'language' | 'sensors' | 'auth' | 'users' | 'about'
 
 function SettingRow({
   title,
   desc,
   badge,
+  stack,
   children,
 }: {
   title: string
   desc: string
   badge?: string
+  stack?: boolean
   children: ReactNode
 }) {
   return (
-    <div className="settings-row">
+    <div className={`settings-row${stack ? ' settings-row-stack' : ''}`}>
       <div className="settings-row-text">
         <div className="settings-row-title">
           <span>{title}</span>
@@ -162,6 +166,83 @@ function PanelLanguage() {
         })}
       </p>
     </>
+  )
+}
+
+function PanelSensors() {
+  const { m } = useLocale()
+  const { url, setUrl, reachability, reachMessage, ping } = useSensorsEmbed()
+  const s = m.settings.sensors
+  const live = m.common.live
+  const [draft, setDraft] = useState(url)
+
+  useEffect(() => {
+    setDraft(url)
+  }, [url])
+
+  // Auto-save after pause in typing; persist triggers a ping via context.
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      const next = normalizeSensorsEmbedUrl(draft)
+      if (next !== url) setUrl(draft)
+    }, 450)
+    return () => window.clearTimeout(handle)
+  }, [draft, url, setUrl])
+
+  const statusLabel =
+    reachability === 'ok'
+      ? s.statusOk
+      : reachability === 'fail'
+        ? s.statusFail
+        : reachability === 'checking'
+          ? s.statusChecking
+          : s.statusUnknown
+
+  return (
+    <SettingRow title={s.url} desc={s.urlDesc} badge={live} stack>
+      <div className="settings-sensors-control">
+        <input
+          className="settings-users-input"
+          type="url"
+          value={draft}
+          placeholder={s.urlPlaceholder}
+          spellCheck={false}
+          autoComplete="off"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => {
+            const next = normalizeSensorsEmbedUrl(draft)
+            setDraft(next)
+            if (next !== url) setUrl(next)
+          }}
+        />
+        <div className="settings-sensors-meta">
+          <span
+            className={`settings-sensors-status settings-sensors-status-${reachability}`}
+            title={reachMessage || undefined}
+          >
+            {statusLabel}
+            {reachMessage ? ` · ${reachMessage}` : ''}
+          </span>
+          <button
+            type="button"
+            className="settings-primary-btn settings-sensors-ping"
+            disabled={reachability === 'checking'}
+            onClick={() => {
+              const next = normalizeSensorsEmbedUrl(draft)
+              setDraft(next)
+              if (next !== url) setUrl(next)
+              else void ping()
+            }}
+          >
+            {reachability === 'checking' ? s.pinging : s.ping}
+          </button>
+        </div>
+        <p className="settings-sensors-saved muted">{s.saved}</p>
+        {reachability === 'fail' ? (
+          <p className="settings-sensors-hint muted">{s.unreachableHint}</p>
+        ) : null}
+      </div>
+    </SettingRow>
   )
 }
 
@@ -641,6 +722,7 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
             <h3 className="settings-panel-title">{tabs[tab].label}</h3>
             {tab === 'appearance' ? <PanelAppearance /> : null}
             {tab === 'language' ? <PanelLanguage /> : null}
+            {tab === 'sensors' ? <PanelSensors /> : null}
             {tab === 'auth' ? <PanelAuth /> : null}
             {tab === 'users' ? <PanelUsers /> : null}
             {tab === 'about' ? <PanelAbout /> : null}
@@ -653,7 +735,9 @@ function SettingsDialog({ open, onClose }: { open: boolean; onClose: () => void 
               ? m.common.escHintSaved
               : tab === 'appearance'
                 ? m.common.escHintAppearance
-                : m.common.escHint}
+                : tab === 'sensors'
+                  ? m.common.escHintSensors
+                  : m.common.escHint}
           </span>
           <button type="button" className="settings-primary-btn" onClick={onClose}>
             {m.common.done}

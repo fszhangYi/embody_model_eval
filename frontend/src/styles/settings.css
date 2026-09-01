@@ -230,6 +230,16 @@
   min-height: 28px;
 }
 
+.settings-row-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.settings-row-stack .settings-row-control {
+  width: 100%;
+}
+
 .settings-badge {
   font-size: 0.62rem;
   font-weight: 600;
@@ -713,6 +723,59 @@
   .settings-gear-label {
     display: none;
   }
+}
+
+.settings-sensors-control {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+
+.settings-sensors-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-sensors-status {
+  flex: 1 1 160px;
+  min-width: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.settings-sensors-status-ok {
+  color: var(--accent, #3dd6c6);
+}
+
+.settings-sensors-status-fail {
+  color: #f07178;
+}
+
+.settings-sensors-status-checking {
+  color: var(--spark, #f0b429);
+}
+
+.settings-sensors-ping {
+  flex: 0 0 auto;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 0.72rem;
+}
+
+.settings-sensors-ping:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.settings-sensors-saved,
+.settings-sensors-hint {
+  margin: 0;
+  font-size: 0.7rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

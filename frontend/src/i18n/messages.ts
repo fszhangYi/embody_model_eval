@@ -11,6 +11,7 @@ export type MessageTree = {
     escHint: string
     escHintSaved: string
     escHintAppearance: string
+    escHintSensors: string
   }
   nav: {
     switchPages: string
@@ -44,7 +45,7 @@ export type MessageTree = {
     kicker: string
     navAria: string
     tabs: Record<
-      'appearance' | 'language' | 'auth' | 'users' | 'about',
+      'appearance' | 'language' | 'sensors' | 'auth' | 'users' | 'about',
       { label: string; hint: string }
     >
     appearance: {
@@ -68,6 +69,19 @@ export type MessageTree = {
       docsDesc: string
       followUi: string
       applied: string
+    }
+    sensors: {
+      url: string
+      urlDesc: string
+      urlPlaceholder: string
+      saved: string
+      ping: string
+      pinging: string
+      statusOk: string
+      statusFail: string
+      statusChecking: string
+      statusUnknown: string
+      unreachableHint: string
     }
     auth: {
       cookie: string
@@ -178,6 +192,7 @@ export const messages: Record<Locale, MessageTree> = {
       escHint: '更改不会保存 · Esc 关闭',
       escHintSaved: '语言偏好已写入本地 · Esc 关闭',
       escHintAppearance: '外观偏好已写入本地 · Esc 关闭',
+      escHintSensors: '地址自动保存并探测 · Esc 关闭',
     },
     nav: {
       switchPages: '切换页面 · Alt+1–{n} 直达 · Alt+←/→ 上/下页',
@@ -258,7 +273,7 @@ export const messages: Record<Locale, MessageTree> = {
       sensors: {
         label: '传感器状态',
         short: '传感器',
-        desc: '机械臂 / 夹爪 / 触觉 / RealSense / 六维力 / Gello',
+        desc: '嵌入 sensors-view 仪表盘（地址可在设置中配置）',
       },
     },
     settings: {
@@ -268,6 +283,7 @@ export const messages: Record<Locale, MessageTree> = {
       tabs: {
         appearance: { label: '外观', hint: '主题与界面密度' },
         language: { label: '语言', hint: '界面与文档语言' },
+        sensors: { label: '传感器', hint: 'sensors-view 嵌入地址' },
         auth: { label: '鉴权与安全', hint: '会话与细粒度权限' },
         users: { label: '用户管理', hint: '账号与角色' },
         about: { label: '关于', hint: '版本与说明' },
@@ -293,6 +309,20 @@ export const messages: Record<Locale, MessageTree> = {
         docsDesc: '用于 README / 空状态 / Skills 说明等文案；选「跟随界面」时与界面语言一致。',
         followUi: '跟随界面',
         applied: '当前生效文档语言：{lang}',
+      },
+      sensors: {
+        url: 'sensors-view 地址',
+        urlDesc:
+          '「传感器状态」页通过 iframe 嵌入此 URL。修改后自动写入本机，并立即探测可达性；不可达时导航入口置灰。',
+        urlPlaceholder: 'https://host:8443/',
+        saved: '已保存到本机',
+        ping: '重新探测',
+        pinging: '探测中…',
+        statusOk: '可达',
+        statusFail: '不可达',
+        statusChecking: '探测中',
+        statusUnknown: '未探测',
+        unreachableHint: '地址不可达时，「传感器状态」入口会置灰，无法打开。',
       },
       auth: {
         cookie: '会话 Cookie 鉴权',
@@ -345,7 +375,7 @@ export const messages: Record<Locale, MessageTree> = {
       about: {
         p1: '设置面板：语言与外观偏好会写入 localStorage；用户管理需管理员登录。',
         li1: '布局参考：VS Code / Cursor Settings、Linear Preferences、GitHub Settings',
-        li2: '可在「外观」切换主题 / 紧凑布局 / 密度，「语言」切换界面与文档语言',
+        li2: '可在「外观」切换主题 / 紧凑布局 / 密度，「语言」切换界面与文档语言，「传感器」配置嵌入地址',
         li3: '当前生产鉴权仍以 Cookie 会话为准',
       },
     },
@@ -415,6 +445,7 @@ export const messages: Record<Locale, MessageTree> = {
       escHint: 'Changes are not saved · Esc to close',
       escHintSaved: 'Language preference saved locally · Esc to close',
       escHintAppearance: 'Appearance preference saved locally · Esc to close',
+      escHintSensors: 'URL auto-saved and probed · Esc to close',
     },
     nav: {
       switchPages: 'Switch page · Alt+1–{n} jump · Alt+←/→ prev/next',
@@ -495,7 +526,7 @@ export const messages: Record<Locale, MessageTree> = {
       sensors: {
         label: 'Sensor status',
         short: 'Sensors',
-        desc: 'Arm / gripper / tactile / RealSense / F/T / Gello',
+        desc: 'Embeds the sensors-view dashboard (URL configurable in Settings)',
       },
     },
     settings: {
@@ -505,6 +536,7 @@ export const messages: Record<Locale, MessageTree> = {
       tabs: {
         appearance: { label: 'Appearance', hint: 'Theme and density' },
         language: { label: 'Language', hint: 'UI and docs language' },
+        sensors: { label: 'Sensors', hint: 'sensors-view embed URL' },
         auth: { label: 'Auth & security', hint: 'Session and fine-grained access' },
         users: { label: 'Users', hint: 'Accounts and roles' },
         about: { label: 'About', hint: 'Version and notes' },
@@ -530,6 +562,20 @@ export const messages: Record<Locale, MessageTree> = {
         docsDesc: 'For README / empty states / Skills tips. “Follow UI” tracks the interface language.',
         followUi: 'Follow UI',
         applied: 'Effective docs language: {lang}',
+      },
+      sensors: {
+        url: 'sensors-view URL',
+        urlDesc:
+          'The Sensor status page embeds this URL in an iframe. Changes are auto-saved locally and probed immediately; the nav entry is disabled when unreachable.',
+        urlPlaceholder: 'https://host:8443/',
+        saved: 'Saved on this device',
+        ping: 'Probe again',
+        pinging: 'Probing…',
+        statusOk: 'Reachable',
+        statusFail: 'Unreachable',
+        statusChecking: 'Probing',
+        statusUnknown: 'Not probed',
+        unreachableHint: 'When unreachable, the Sensor status entry is grayed out and cannot be opened.',
       },
       auth: {
         cookie: 'Session cookie auth',
@@ -582,7 +628,7 @@ export const messages: Record<Locale, MessageTree> = {
       about: {
         p1: 'Settings: language and appearance preferences are saved locally; user management requires an admin session.',
         li1: 'Layout inspired by VS Code / Cursor Settings, Linear Preferences, GitHub Settings',
-        li2: 'Use Appearance for theme / compact / density, and Language for UI & docs locale',
+        li2: 'Use Appearance for theme / compact / density, Language for UI & docs locale, and Sensors for the embed URL',
         li3: 'Production auth still uses Cookie sessions',
       },
     },

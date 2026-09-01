@@ -318,6 +318,19 @@
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
 }
 
+.home-module-card.disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.home-module-card.disabled:hover {
+  border-color: rgba(58, 77, 102, 0.75);
+  background: rgba(18, 26, 38, 0.72);
+  transform: none;
+  box-shadow: none;
+}
+
 .home-module-idx {
   grid-row: 1 / span 2;
   align-self: start;
